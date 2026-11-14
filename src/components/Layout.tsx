@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Bell,
@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { currentUser, packLate, useStore } from '../data/store';
 import { canSee, isSupplier, type Module } from '../data/permissions';
+import { useTableLabels } from './useTableLabels';
 import { Toaster } from './ui';
 import UserSwitcher from './UserSwitcher';
 import { Forbidden } from './Guard';
@@ -52,6 +53,8 @@ export default function Layout() {
   const { state } = useStore();
   const user = currentUser(state);
   const [q, setQ] = useState('');
+  const mainRef = useRef<HTMLElement>(null);
+  useTableLabels(mainRef);
   const navigate = useNavigate();
   const location = useLocation();
   const alerts = state.products.filter(packLate).length + state.proformas.filter((p) => p.status === 'a_signer').length;
@@ -130,7 +133,7 @@ export default function Layout() {
           <Layers size={11} /> Données de démonstration
         </div>
       </nav>
-      <main className="main">
+      <main className="main" ref={mainRef}>
         {allowedHere ? <Outlet /> : <Forbidden />}
       </main>
       <Toaster />

@@ -423,6 +423,8 @@ export function LogisticsTab({ pf, portal }: { pf: Proforma; portal?: boolean })
   const [scope, setScope] = useState<'pf' | 'others' | 'all'>('pf');
   const [selected, setSelected] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState<string | null>(null);
+  // Alternative tactile au glisser-déposer : toucher une ligne, puis un conteneur
+  const [picked, setPicked] = useState<string | null>(null);
 
   const lastReached = TRACK_STEPS.map((s) => s.reached(pf)).lastIndexOf(true);
 
@@ -517,7 +519,14 @@ export function LogisticsTab({ pf, portal }: { pf: Proforma; portal?: boolean })
                   const alloc = allocatedQty(state, src.id, p.id);
                   const rest = Math.max(0, line.qty - alloc);
                   return (
-                    <tr key={src.id + p.id} draggable={rest > 0} onDragStart={(e) => e.dataTransfer.setData('text/plain', `${src.id}|${p.id}`)} title={rest > 0 ? 'Glisser vers un conteneur' : 'Entièrement affecté'}>
+                    <tr
+                      key={src.id + p.id}
+                      draggable={rest > 0}
+                      className={`${rest > 0 ? 'clickable' : ''} ${picked === `${src.id}|${p.id}` ? 'selected' : ''}`}
+                      onClick={() => rest > 0 && setPicked(picked === `${src.id}|${p.id}` ? null : `${src.id}|${p.id}`)}
+                      onDragStart={(e) => e.dataTransfer.setData('text/plain', `${src.id}|${p.id}`)}
+                      title={rest > 0 ? 'Glisser vers un conteneur, ou toucher puis choisir le conteneur' : 'Entièrement affecté'}
+                    >
                       <td>
                         <GripVertical size={14} className="drag-handle" />
                       </td>
@@ -540,7 +549,9 @@ export function LogisticsTab({ pf, portal }: { pf: Proforma; portal?: boolean })
               </tbody>
             </table>
           </div>
-          <div className="xs muted mt">Glissez une ligne sur un conteneur : la quantité restante est affectée dans la limite de la capacité.</div>
+          <div className="xs muted mt">
+            Glissez une ligne sur un conteneur, ou touchez-la puis touchez le conteneur : la quantité restante est affectée dans la limite de la capacité.
+          </div>
         </div>
 
         <div className="card pad">
@@ -549,6 +560,11 @@ export function LogisticsTab({ pf, portal }: { pf: Proforma; portal?: boolean })
             <div className="grow" />
             <span className="pill grey">Capacité : {m3(containers.reduce((s, c) => s + containerCapacity(c), 0))}</span>
           </div>
+          {picked && (
+            <div className="pill orange mb" style={{ whiteSpace: 'normal' }}>
+              {byId(state.products, picked.split('|')[1]).ref} sélectionné : touchez un conteneur pour l’affecter
+            </div>
+          )}
           <div className="cgrid">
             {containers.map((c, i) => {
               const cbm = containerCbm(state, c);
@@ -557,7 +573,12 @@ export function LogisticsTab({ pf, portal }: { pf: Proforma; portal?: boolean })
                 <div
                   key={c.id}
                   className={`ccard ${sel?.id === c.id ? 'selected' : ''} ${dragOver === c.id ? 'drop' : ''}`}
-                  onClick={() => setSelected(c.id)}
+                  onClick={() => {
+                    if (picked) {
+                      drop(c, picked);
+                      setPicked(null);
+                    } else setSelected(c.id);
+                  }}
                   onDragOver={(e) => {
                     e.preventDefault();
                     setDragOver(c.id);

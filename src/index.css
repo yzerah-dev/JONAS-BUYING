@@ -304,3 +304,86 @@ tr[draggable='true'] { cursor: grab; }
   .page-head h1 { font-size: 22px; }
   .menu { width: min(320px, calc(100vw - 32px)); }
 }
+
+/* =====================================================================
+   Responsive — placé en dernier pour l'emporter sur les règles bureau
+   ===================================================================== */
+@media (max-width: 1100px) {
+  .split, .split3 { grid-template-columns: minmax(0, 1fr); }
+  .sticky-panel { position: static; }
+}
+
+@media (max-width: 820px) {
+  /* En-tête : seule la barre d'onglets reste collée en haut */
+  .topbar { position: static; }
+  .sidebar { top: env(safe-area-inset-top, 0px); }
+
+  .page-head { gap: 10px; }
+  .page-head .grow { display: none; }
+  .row.wrap > .search, .row.wrap > select.input { flex: 1 1 100%; }
+
+  /* Chiffres clés : 2 colonnes, quelles que soient les colonnes prévues sur bureau */
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px; }
+  .kpi { padding: 10px; gap: 8px; }
+  .kpi .kpi-icon { width: 32px; height: 32px; }
+  .kpi .kpi-value { font-size: 17px; overflow-wrap: anywhere; }
+
+  /* Cartouches semaine / conteneurs */
+  .week-head { gap: 10px 14px; padding: 12px; }
+  .week-head > div:nth-child(2) { min-width: 0 !important; flex: 1; }
+  .week-head .grow { display: none; }
+  .week-head .metric { border-left: 0; padding-left: 0; flex: 1 1 28%; }
+  .week-head .metric .v { font-size: 17px; }
+  .summary-bar { gap: 12px 18px; padding: 12px; }
+  .summary-bar .grow { display: none; }
+
+  /* Frises d'étapes : défilement horizontal plutôt que libellés écrasés */
+  .stepper { overflow-x: auto; padding-bottom: 6px; scrollbar-width: thin; }
+  .step { min-width: 82px; }
+
+  .tabs { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; }
+  .tabs button { flex-shrink: 0; }
+  .seg { max-width: 100%; overflow-x: auto; }
+  .seg button { flex-shrink: 0; }
+  .chips { gap: 6px; }
+  .chip { padding: 6px 10px; }
+
+  .gallery { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)) !important; gap: 10px; }
+  .pcard { padding: 10px; }
+  .pcard .photo { height: 110px; font-size: 56px; }
+  .mini-grid { grid-template-columns: repeat(3, 1fr) !important; row-gap: 6px; }
+  .cgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .group-head { flex-wrap: wrap; }
+  .card.pad.row, .card.pad.row.wrap { flex-wrap: wrap; }
+  .thumb[style*='width: 220px'] { width: 100% !important; }
+
+  /* Tableaux : fiches empilées, libellé de colonne devant chaque valeur */
+  .tbl:not(.matrix) thead { display: none; }
+  .tbl:not(.matrix), .tbl:not(.matrix) tbody { display: block; }
+  .tbl:not(.matrix) tr { display: flex; flex-wrap: wrap; gap: 2px 12px; padding: 10px 12px; border-top: 1px solid var(--line); }
+  .tbl:not(.matrix) td { display: flex; align-items: center; gap: 6px; border: 0; padding: 2px 0; text-align: left !important; white-space: normal; }
+  .tbl:not(.matrix) td::before { content: attr(data-label); color: var(--muted); font-size: 11px; font-weight: 600; }
+  .tbl:not(.matrix) td[data-label='']::before { display: none; }
+  .tbl:not(.matrix) td:first-child { flex: 1 1 100%; font-weight: 700; }
+  .tbl:not(.matrix) td:first-child::before { display: none; }
+  .tbl:not(.matrix) td:empty { display: none; }
+  .tbl:not(.matrix) td .col { flex-direction: row; flex-wrap: wrap; align-items: center; }
+  .tbl:not(.matrix) td[colspan] { flex: 1 1 100%; }
+  .tbl tr.clickable td { background: transparent !important; }
+  .tbl tr.selected { background: var(--green-softer); }
+}
+@media (max-width: 820px) {
+  .pcard .row, .card .row { flex-wrap: wrap; }
+  .pcard .grow { min-width: 0; }
+  .brand-logo { max-width: 100%; overflow-wrap: anywhere; }
+  .gallery[style*='300px'], .gallery[style*='320px'] { grid-template-columns: minmax(0, 1fr) !important; }
+}
+@media (max-width: 820px) {
+  .pill[style*='100%'] { white-space: normal; flex-wrap: wrap; gap: 4px 10px; }
+}
+@media (max-width: 820px) {
+  .week-head .cal-icon { display: none; }
+  .week-head > div:nth-child(2) { flex: 1 1 55% !important; }
+  .card.pad.row > .kpis { flex: 1 1 100%; }
+  .portal .topbar > .bold { flex: 1 1 auto; min-width: 0; }
+}

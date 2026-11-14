@@ -69,6 +69,7 @@ export default function Containers() {
     if (id) params.set('c', id);
     else params.delete('c');
     setParams(params);
+    if (id) revealPanel();
   };
 
   const count = (s: ContainerStatus) => state.containers.filter((c) => c.status === s).length;
@@ -499,4 +500,10 @@ function ContainerDetail({ c, onClose }: { c: Container; onClose: () => void }) 
       </div>
     </div>
   );
+}
+
+/** Sur téléphone, le panneau de détail est sous la liste : on le fait défiler à l'écran. */
+function revealPanel() {
+  if (window.innerWidth > 1100) return;
+  requestAnimationFrame(() => document.querySelector('.sticky-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
 }

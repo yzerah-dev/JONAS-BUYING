@@ -131,7 +131,10 @@ export default function Design() {
             mode={mode}
             state={state}
             selected={sel?.id}
-            onSelect={setSelId}
+            onSelect={(id) => {
+              setSelId(id);
+              revealPanel();
+            }}
           />
         </div>
         <div className="sticky-panel">{sel && <PackPanel p={sel} />}</div>
@@ -390,4 +393,10 @@ function PackPanel({ p }: { p: Product }) {
       </div>
     </div>
   );
+}
+
+/** Sur téléphone, le panneau de détail est sous la liste : on le fait défiler à l'écran. */
+function revealPanel() {
+  if (window.innerWidth > 1100) return;
+  requestAnimationFrame(() => document.querySelector('.sticky-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
 }

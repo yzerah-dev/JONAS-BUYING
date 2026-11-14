@@ -1,12 +1,16 @@
+import { useRef } from 'react';
 import { Navigate, NavLink, Outlet } from 'react-router-dom';
 import { Bell, Boxes, Container as Ctn, Euro, FileText, Home, Package, Truck } from 'lucide-react';
 import { isSupplier } from '../data/permissions';
+import { useTableLabels } from '../components/useTableLabels';
 import { Toaster } from '../components/ui';
 import UserSwitcher from '../components/UserSwitcher';
 import { usePortal } from './usePortal';
 
 export default function PortalLayout() {
   const { user, supplier, packsToValidate, dieCutsRequested, plansRequested, docsMissing } = usePortal();
+  const mainRef = useRef<HTMLElement>(null);
+  useTableLabels(mainRef);
   if (!isSupplier(user) || !supplier) return <Navigate to="/" replace />;
   const todo = packsToValidate.length + dieCutsRequested.length + plansRequested.length + docsMissing.length;
 
@@ -52,7 +56,7 @@ export default function PortalLayout() {
           Vous ne voyez que les données de {supplier.shortName}.
         </div>
       </nav>
-      <main className="main">
+      <main className="main" ref={mainRef}>
         <Outlet />
       </main>
       <Toaster />
