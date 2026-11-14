@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Calendar, Check, ChevronDown, ChevronUp, Flame, Search, Users } from 'lucide-react';
-import { byId, useAuth, useStore, type State } from '../data/store';
+import { byId, capacityOf, useAuth, useStore, type State } from '../data/store';
 import type { Product } from '../data/types';
-import { designerColor, BrandLogo, Pill, ProductThumb, toast } from '../components/ui';
+import { BrandLogo, Pill, ProductThumb } from '../components/ui';
+import { designerColor, toast } from '../components/ui-shared';
+import { pressable } from '../lib/a11y';
 import { TODAY, diffDays, eur2, fshort, fstamp, initials, num, weekKey, weekLabel, weekRange } from '../lib/format';
 
 type Tab = 'designer' | 'semaine' | 'urgent';
@@ -199,7 +201,7 @@ function DevelopmentPage() {
               }
             >
               {weeksOf(items).map(([wk, ps]) => (
-                <WeekSub key={wk} wk={wk} items={ps} drop={dropZone(`${d}|${wk}`, d, ps[0].devDeadline)}>
+                <WeekSub key={wk} wk={wk} items={ps} capacity={capacityOf(state, d)} drop={dropZone(`${d}|${wk}`, d, ps[0].devDeadline)}>
                   {ps.map((p) => (
                     <Line key={p.id} p={p} showDesigner={false} {...lineProps} />
                   ))}
@@ -344,7 +346,7 @@ function Group({ head, children, defaultOpen = true, drop = {} }: { head: React.
   const { className: dropClass, ...dropHandlers } = drop;
   return (
     <section className={`pf-week ${open ? 'open' : ''}`}>
-      <header className={`pf-week-head ${dropClass ?? ''}`} onClick={() => setOpen(!open)} {...dropHandlers}>
+      <header className={`pf-week-head ${dropClass ?? ''}`} {...pressable(() => setOpen(!open))} aria-expanded={open} {...dropHandlers}>
         {head}
         <span className="pf-chevron">{open ? <ChevronUp size={24} /> : <ChevronDown size={24} />}</span>
       </header>
@@ -372,7 +374,7 @@ function Line({ p, state, showDesigner, canAct, colorOf, onOpen, onUrgent, onDon
   return (
     <div
       className={`dev-line ${p.urgent ? 'is-urgent' : ''} ${draggable ? 'draggable' : ''}`}
-      onClick={() => onOpen(p)}
+      {...pressable(() => onOpen(p), `Ouvrir ${p.ref}`)}
       draggable={draggable}
       onDragStart={(e) => {
         e.dataTransfer.setData('text/plain', p.id);
@@ -442,22 +444,20 @@ function Line({ p, state, showDesigner, canAct, colorOf, onOpen, onUrgent, onDon
   );
 }
 
-/** Capacité de référence d'un designer (packs par semaine) */
-const CAPACITY = 40;
 
 /** Sous-groupe semaine repliable : semaines passées et en cours ouvertes par défaut */
-function WeekSub({ wk, items, children, drop = {} }: { wk: string; items: Product[]; children: React.ReactNode; drop?: Drop }) {
+function WeekSub({ wk, items, children, drop = {}, capacity }: { wk: string; items: Product[]; children: React.ReactNode; drop?: Drop; capacity: number }) {
   const { className: dropClass, ...dropHandlers } = drop;
   const [open, setOpen] = useState(wk <= weekKey(TODAY));
   const late = items.filter(isLate).length;
   return (
     <div className="dev-sub">
-      <div className={`dev-sub-head ${dropClass ?? ''}`} onClick={() => setOpen(!open)} {...dropHandlers}>
+      <div className={`dev-sub-head ${dropClass ?? ''}`} {...pressable(() => setOpen(!open))} aria-expanded={open} {...dropHandlers}>
         {open ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
         Semaine {weekLabel(items[0].devDeadline).slice(1)} <span>{weekRange(items[0].devDeadline)}</span>
         {late > 0 && <span className="pill red">{late} en retard</span>}
-        <span className={`cap ${items.length > CAPACITY ? 'over' : ''}`}>
-          {items.length}/{CAPACITY}
+        <span className={`cap ${items.length > capacity ? 'over' : ''}`}>
+          {items.length}/{capacity}
         </span>
         <b>{items.length}</b>
       </div>

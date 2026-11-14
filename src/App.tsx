@@ -1,24 +1,38 @@
+import { lazy, Suspense, type ReactNode } from 'react';
 import { HashRouter, MemoryRouter, Route, Routes } from 'react-router-dom';
+import { StoreProvider } from './data/StoreProvider';
+import Layout from './components/Layout';
+import Landing from './components/Landing';
+import PortalLayout from './portal/PortalLayout';
 
 // Dans un Artifact claude.ai, la navigation reste en mémoire (pas d'URL en #/chemin)
 const Router = import.meta.env.VITE_ARTIFACT ? MemoryRouter : HashRouter;
-import { StoreProvider } from './data/store';
-import Layout from './components/Layout';
-import Home from './pages/Home';
-import Proformas from './pages/Proformas';
-import ProformaDetail from './pages/ProformaDetail';
-import Products from './pages/Products';
-import ProductDetail from './pages/ProductDetail';
-import Development from './pages/Development';
-import Design from './pages/Design';
-import Containers from './pages/Containers';
-import Suppliers from './pages/Suppliers';
-import SupplierDetail from './pages/SupplierDetail';
-import Finance from './pages/Finance';
-import Settings from './pages/Settings';
-import Landing from './components/Landing';
-import PortalLayout from './portal/PortalLayout';
-import { PortalContainers, PortalFinance, PortalHome, PortalLoading, PortalPacks, PortalProducts, PortalProformas } from './portal/PortalPages';
+
+// Chaque écran est chargé à la demande (bundle initial plus léger)
+const Home = lazy(() => import('./pages/Home'));
+const Proformas = lazy(() => import('./pages/Proformas'));
+const ProformaDetail = lazy(() => import('./pages/ProformaDetail'));
+const Products = lazy(() => import('./pages/Products'));
+const ProductDetail = lazy(() => import('./pages/ProductDetail'));
+const Development = lazy(() => import('./pages/Development'));
+const Design = lazy(() => import('./pages/Design'));
+const Containers = lazy(() => import('./pages/Containers'));
+const Suppliers = lazy(() => import('./pages/Suppliers'));
+const SupplierDetail = lazy(() => import('./pages/SupplierDetail'));
+const Finance = lazy(() => import('./pages/Finance'));
+const Settings = lazy(() => import('./pages/Settings'));
+const Journal = lazy(() => import('./pages/Journal'));
+const portal = <K extends keyof typeof import('./portal/PortalPages')>(name: K) =>
+  lazy(() => import('./portal/PortalPages').then((m) => ({ default: m[name] as () => ReactNode })));
+const PortalHome = portal('PortalHome');
+const PortalProducts = portal('PortalProducts');
+const PortalProformas = portal('PortalProformas');
+const PortalPacks = portal('PortalPacks');
+const PortalLoading = portal('PortalLoading');
+const PortalContainers = portal('PortalContainers');
+const PortalFinance = portal('PortalFinance');
+
+const page = (el: ReactNode) => <Suspense fallback={<div className="page-loading">Chargement…</div>}>{el}</Suspense>;
 
 export default function App() {
   return (
@@ -27,27 +41,28 @@ export default function App() {
         <Routes>
           <Route element={<Layout />}>
             <Route index element={<Landing />} />
-            <Route path="performance" element={<Home />} />
-            <Route path="proformas" element={<Proformas />} />
-            <Route path="proformas/:id" element={<ProformaDetail />} />
-            <Route path="produits" element={<Products />} />
-            <Route path="produits/:id" element={<ProductDetail />} />
-            <Route path="developpement" element={<Development />} />
-            <Route path="design" element={<Design />} />
-            <Route path="conteneurs" element={<Containers />} />
-            <Route path="fournisseurs" element={<Suppliers />} />
-            <Route path="fournisseurs/:id" element={<SupplierDetail />} />
-            <Route path="finance" element={<Finance />} />
-            <Route path="parametres" element={<Settings />} />
+            <Route path="performance" element={page(<Home />)} />
+            <Route path="proformas" element={page(<Proformas />)} />
+            <Route path="proformas/:id" element={page(<ProformaDetail />)} />
+            <Route path="produits" element={page(<Products />)} />
+            <Route path="produits/:id" element={page(<ProductDetail />)} />
+            <Route path="developpement" element={page(<Development />)} />
+            <Route path="design" element={page(<Design />)} />
+            <Route path="conteneurs" element={page(<Containers />)} />
+            <Route path="fournisseurs" element={page(<Suppliers />)} />
+            <Route path="fournisseurs/:id" element={page(<SupplierDetail />)} />
+            <Route path="finance" element={page(<Finance />)} />
+            <Route path="parametres" element={page(<Settings />)} />
+            <Route path="journal" element={page(<Journal />)} />
           </Route>
           <Route path="portail" element={<PortalLayout />}>
-            <Route index element={<PortalHome />} />
-            <Route path="produits" element={<PortalProducts />} />
-            <Route path="proformas" element={<PortalProformas />} />
-            <Route path="packs" element={<PortalPacks />} />
-            <Route path="chargement" element={<PortalLoading />} />
-            <Route path="conteneurs" element={<PortalContainers />} />
-            <Route path="finance" element={<PortalFinance />} />
+            <Route index element={page(<PortalHome />)} />
+            <Route path="produits" element={page(<PortalProducts />)} />
+            <Route path="proformas" element={page(<PortalProformas />)} />
+            <Route path="packs" element={page(<PortalPacks />)} />
+            <Route path="chargement" element={page(<PortalLoading />)} />
+            <Route path="conteneurs" element={page(<PortalContainers />)} />
+            <Route path="finance" element={page(<PortalFinance />)} />
           </Route>
         </Routes>
       </Router>

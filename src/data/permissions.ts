@@ -11,7 +11,8 @@ export type Module =
   | 'conteneurs'
   | 'fournisseurs'
   | 'finance'
-  | 'parametres';
+  | 'parametres'
+  | 'journal';
 
 export type Perm =
   | 'proforma.sign' // signer une proforma (engagement d'achat)
@@ -34,7 +35,7 @@ export interface RoleDef {
   portal?: boolean;
 }
 
-const ALL_MODULES: Module[] = ['home', 'proformas', 'produits', 'developpement', 'design', 'conteneurs', 'fournisseurs', 'finance', 'parametres'];
+const ALL_MODULES: Module[] = ['home', 'proformas', 'produits', 'developpement', 'design', 'conteneurs', 'fournisseurs', 'finance', 'parametres', 'journal'];
 const ALL_PERMS: Perm[] = [
   'proforma.sign',
   'proforma.edit',
@@ -139,4 +140,5 @@ export const MODULE_LABELS: Record<Module, string> = {
   fournisseurs: 'Fournisseurs',
   finance: 'Finance',
   parametres: 'Paramètres',
+  journal: 'Journal d’activité',
 };

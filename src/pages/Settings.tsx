@@ -2,7 +2,8 @@ import { Check, Lock, RotateCcw, Users } from 'lucide-react';
 import { useAuth, useStore } from '../data/store';
 import { MODULE_LABELS, PERM_LABELS, ROLE_DEFS, ROLES, type Module, type Perm } from '../data/permissions';
 import { VALIDATION_LABELS, VALIDATION_STEPS, type Role, type ValidationStep } from '../data/types';
-import { Pill, toast } from '../components/ui';
+import { Pill } from '../components/ui';
+import { toast } from '../components/ui-shared';
 import { initials } from '../lib/format';
 
 export default function Settings() {
@@ -116,6 +117,72 @@ export default function Settings() {
               })}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <div className="grid2 mb">
+        <div className="card pad">
+          <div className="card-title">Capacité des designers</div>
+          <p className="small muted" style={{ marginTop: 0 }}>
+            Nombre de packs qu’un designer peut traiter par semaine. Sert au planning de charge (Design) et aux compteurs du Développement.
+          </p>
+          <div className="set-row">
+            <label htmlFor="cap-default">Par défaut</label>
+            <input
+              id="cap-default"
+              className="input"
+              type="number"
+              min={1}
+              max={200}
+              disabled={!admin}
+              value={state.settings.defaultCapacity}
+              onChange={(e) => +e.target.value > 0 && dispatch({ type: 'setDefaultCapacity', capacity: +e.target.value })}
+            />
+            <span className="small muted">packs / semaine</span>
+          </div>
+          {[...new Set(state.products.map((p) => p.pack.designer))].sort().map((d) => {
+            const own = state.settings.capacity[d];
+            return (
+              <div key={d} className="set-row">
+                <label htmlFor={`cap-${d}`}>{d}</label>
+                <input
+                  id={`cap-${d}`}
+                  className="input"
+                  type="number"
+                  min={1}
+                  max={200}
+                  disabled={!admin}
+                  placeholder={String(state.settings.defaultCapacity)}
+                  value={own ?? ''}
+                  onChange={(e) => dispatch({ type: 'setCapacity', designer: d, capacity: e.target.value ? Math.max(1, +e.target.value) : null })}
+                />
+                <span className="small muted">{own ? 'capacité propre' : 'par défaut'}</span>
+              </div>
+            );
+          })}
+        </div>
+        <div className="card pad">
+          <div className="card-title">Devises</div>
+          <p className="small muted" style={{ marginTop: 0 }}>
+            Cours utilisés pour convertir les proformas en dollars ou en yuans. Tous les totaux de l’application sont affichés en euros.
+          </p>
+          {(['USD', 'CNY'] as const).map((c) => (
+            <div key={c} className="set-row">
+              <label htmlFor={`fx-${c}`}>1 {c} =</label>
+              <input
+                id={`fx-${c}`}
+                className="input"
+                type="number"
+                step="0.0001"
+                min={0}
+                disabled={!auth.can('finance.pay')}
+                value={state.settings.fx[c]}
+                onChange={(e) => +e.target.value > 0 && dispatch({ type: 'setFx', currency: c, rate: +e.target.value })}
+              />
+              <span className="small muted">€</span>
+            </div>
+          ))}
+          <p className="xs muted">Modifiable par la Finance et le Pilote. À brancher plus tard sur un cours du jour automatique.</p>
         </div>
       </div>
 

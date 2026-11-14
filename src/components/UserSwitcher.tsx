@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Check, ChevronDown, LogIn } from 'lucide-react';
 import { currentUser, useStore } from '../data/store';
-import { ROLE_DEFS } from '../data/permissions';
 import { initials } from '../lib/format';
+import { useT } from '../i18n/context';
 
 /** Changement d'utilisateur (démo) — remplacé par une vraie authentification plus tard. */
 export default function UserSwitcher() {
@@ -12,6 +12,7 @@ export default function UserSwitcher() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const { t } = useT(); // français hors portail
 
   useEffect(() => {
     const close = (e: MouseEvent) => ref.current && !ref.current.contains(e.target as Node) && setOpen(false);
@@ -39,7 +40,7 @@ export default function UserSwitcher() {
         </div>
         <div className="grow">
           <div className="bold small">{u.name}</div>
-          <div className="xs muted">{sup ? sup.name : `${ROLE_DEFS[u.role].label} · ${u.title}`}</div>
+          <div className="xs muted">{sup ? sup.name : `${t(`role.${u.role}`)} · ${u.title}`}</div>
         </div>
         {u.id === me.id && <Check size={15} className="green" />}
       </div>
@@ -49,8 +50,8 @@ export default function UserSwitcher() {
   return (
     <div ref={ref} className="user-switch">
       <div className="user-btns">
-        <button className="role-btn" onClick={() => setOpen(!open)} title={`${me.name} · changer d’utilisateur`}>
-          {ROLE_DEFS[me.role].label} <ChevronDown size={18} />
+        <button className="role-btn" onClick={() => setOpen(!open)} title={t('us.change', { name: me.name })}>
+          {t(`role.${me.role}`)} <ChevronDown size={18} />
         </button>
         <button className="avatar avatar-lg" onClick={() => setOpen(!open)} title={me.name}>
           {initials(me.name === 'Yzerah' ? 'Y Z' : me.name)}
@@ -59,13 +60,13 @@ export default function UserSwitcher() {
       {open && (
         <div className="card menu">
           <div className="menu-title">
-            <LogIn size={13} /> Se connecter en tant que (démo)
+            <LogIn size={13} /> {t('us.loginAs')}
           </div>
-          <div className="menu-group">Équipe JONAS</div>
+          <div className="menu-group">{t('us.team')}</div>
           {team.map((u) => (
             <Row key={u.id} id={u.id} />
           ))}
-          <div className="menu-group">Portail fournisseurs</div>
+          <div className="menu-group">{t('us.portal')}</div>
           {suppliers.map((u) => (
             <Row key={u.id} id={u.id} />
           ))}

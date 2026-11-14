@@ -26,6 +26,9 @@ async function tx<T>(mode: IDBTransactionMode, run: (s: IDBObjectStore) => IDBRe
   });
 }
 
+/** Identifiant unique d'un fichier stocké */
+export const newFileId = (productId: string, i: number) => `${productId}-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 7)}`;
+
 export const putBlob = (id: string, blob: Blob) => tx('readwrite', (s) => s.put(blob, id));
 export const getBlob = (id: string) => tx<Blob | undefined>('readonly', (s) => s.get(id) as IDBRequest<Blob | undefined>);
 export const deleteBlob = (id: string) => tx('readwrite', (s) => s.delete(id));

@@ -12,11 +12,16 @@ import {
   containerQty,
   containerValue,
   lineCbm,
+  CONTAINER_PAYLOAD,
+  containerWeight,
   useAuth,
   useStore,
 } from '../data/store';
 import { CONTAINER_STATUSES, type Container, type ContainerStatus } from '../data/types';
-import { ContainerStatusPill, Kpi, Pill, ProductThumb, Progress, Seg, SupplierLogo, toast } from '../components/ui';
+import ReceptionDialog from '../components/ReceptionDialog';
+import { pressable } from '../lib/a11y';
+import { ContainerStatusPill, Kpi, Pill, ProductThumb, Progress, Seg, SupplierLogo } from '../components/ui';
+import { toast } from '../components/ui-shared';
 import { TODAY, addDays, dec, diffDays, eur, fshort, m3, monthKey, monthLabel, num, shiftMonth, weekKey, weekLabel, weekRange } from '../lib/format';
 
 const GROUP_COLOR: Record<ContainerStatus, string> = {
@@ -31,6 +36,7 @@ export default function Containers() {
   const { state, dispatch } = useStore();
   const auth = useAuth();
   const canBook = auth.can('logistics.booking');
+  const [receiving, setReceiving] = useState<string | null>(null);
   const [params, setParams] = useSearchParams();
   const selId = params.get('c');
   const [period, setPeriod] = useState<'mois' | 'semaine'>('mois');
@@ -230,7 +236,7 @@ export default function Containers() {
                         const cbm = containerCbm(state, c);
                         const left = diffDays(containerEta(c), TODAY);
                         return (
-                          <tr key={c.id} className={`clickable ${sel?.id === c.id ? 'selected' : ''}`} onClick={() => select(c.id)}>
+                          <tr key={c.id} className={`clickable ${sel?.id === c.id ? 'selected' : ''}`} {...pressable(() => select(c.id), `Conteneur ${c.number ?? c.id}`)}>
                             <td>
                               <div className="row" style={{ gap: 6 }}>
                                 <Square size={14} className="muted" />
@@ -291,7 +297,7 @@ export default function Containers() {
                               {s === 'en_transit' && (
                                 <div className="row" style={{ gap: 4 }}>
                                   <Pill color={left < 0 ? 'red' : left < 10 ? 'orange' : 'grey'}>{left < 0 ? `+${-left} j` : `J-${left}`}</Pill>
-                                  {canBook && <button className="btn sm" onClick={() => dispatch({ type: 'receive', containerId: c.id })}>
+                                  {canBook && <button className="btn sm" onClick={() => setReceiving(c.id)}>
                                     Réceptionner
                                   </button>}
                                 </div>
@@ -310,6 +316,7 @@ export default function Containers() {
         </div>
         <div className="sticky-panel">{sel ? <ContainerDetail c={sel} onClose={() => select(null)} /> : <div className="card empty">Sélectionnez un conteneur pour voir son détail.</div>}</div>
       </div>
+      {receiving && <ReceptionDialog c={state.containers.find((x) => x.id === receiving)!} onClose={() => setReceiving(null)} />}
     </>
   );
 }
@@ -481,7 +488,37 @@ function ContainerDetail({ c, onClose }: { c: Container; onClose: () => void }) 
           <dd>{c.warehouse}</dd>
           <dt>Valeur</dt>
           <dd>{eur(containerValue(state, c))}</dd>
+          <dt>Poids marchandise</dt>
+          <dd className={containerWeight(state, c) > CONTAINER_PAYLOAD[c.type] ? 'red' : ''}>
+            {dec(containerWeight(state, c) / 1000, 1)} t / {dec(CONTAINER_PAYLOAD[c.type] / 1000, 1)} t
+          </dd>
         </dl>
+        {containerWeight(state, c) > CONTAINER_PAYLOAD[c.type] && <div className="pill red mt">Charge utile dépassée : vérifier le plan de chargement</div>}
+        {c.reception && (
+          <div className="rc-result mt">
+            <div className="bold small">
+              Contrôle de réception · {c.reception.by} · {c.reception.at.slice(0, 10).split('-').reverse().join('/')}
+            </div>
+            {c.reception.lines.filter((l) => l.received !== l.expected).length === 0 ? (
+              <div className="small green">
+                <Check size={13} /> Conforme : {num(c.reception.lines.reduce((t, l) => t + l.received, 0))} pcs reçues
+              </div>
+            ) : (
+              c.reception.lines
+                .filter((l) => l.received !== l.expected)
+                .map((l) => (
+                  <div key={l.proformaId + l.productId} className="small">
+                    <b>{byId(state.products, l.productId).ref}</b> : {num(l.received)} reçues / {num(l.expected)} attendues{' '}
+                    <span className={l.received < l.expected ? 'red' : 'orange'}>
+                      ({l.received - l.expected > 0 ? '+' : ''}
+                      {num(l.received - l.expected)})
+                    </span>
+                  </div>
+                ))
+            )}
+            {c.reception.note && <div className="small muted">Réserves : {c.reception.note}</div>}
+          </div>
+        )}
         {c.status !== 'arrive' && auth.can('logistics.booking') && (
           <div className="row mt">
             <input className="input" type="date" value={eta} onChange={(e) => setEta(e.target.value)} />

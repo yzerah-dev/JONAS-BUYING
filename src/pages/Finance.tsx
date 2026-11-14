@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, Calendar, Check, Euro, Wallet } from 'lucide-react';
 import { byId, payments, useAuth, useStore } from '../data/store';
-import { Kpi, Pill, Seg, SupplierLogo, toast } from '../components/ui';
+import { Kpi, Pill, Seg, SupplierLogo } from '../components/ui';
+import { toast } from '../components/ui-shared';
 import { TODAY, addDays, eur, fdate, weekLabel } from '../lib/format';
 
 export default function Finance() {

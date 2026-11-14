@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useReducer, type ReactNode } from 'react';
+import { createContext, useContext } from 'react';
 import * as seed from './seed';
 import type {
   Brand,
@@ -8,8 +8,11 @@ import type {
   ISODate,
   Product,
   Proforma,
+  JournalEntry,
   PackFile,
   ProformaStatus,
+  ReceptionLine,
+  Settings,
   Role,
   Supplier,
   User,
@@ -27,9 +30,17 @@ export interface State {
   containers: Container[];
   users: User[];
   currentUserId: string;
+  settings: Settings;
+  journal: JournalEntry[];
 }
 
-const STORAGE_KEY = 'jonas-buying-state-v7';
+export const DEFAULT_SETTINGS: Settings = {
+  defaultCapacity: 40,
+  capacity: {},
+  fx: { EUR: 1, USD: 0.93, CNY: 0.128 },
+};
+
+export const STORAGE_KEY = 'jonas-buying-state-v7';
 
 export const currentUser = (s: State): User => s.users.find((u) => u.id === s.currentUserId) ?? s.users[0];
 
@@ -42,13 +53,19 @@ function initialState(): State {
     containers: seed.containers,
     users: seed.users,
     currentUserId: 'yzerah',
+    settings: DEFAULT_SETTINGS,
+    journal: [] as JournalEntry[],
   });
 }
 
-function load(): State {
+export function load(): State {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw) as State;
+    if (raw) {
+      const st = JSON.parse(raw) as State;
+      // Compatibilité : anciens états sans paramètres ni journal
+      return { ...st, settings: { ...DEFAULT_SETTINGS, ...(st.settings ?? {}) }, journal: st.journal ?? [] };
+    }
   } catch {
     /* stockage indisponible */
   }
@@ -80,7 +97,7 @@ export type Action =
   | { type: 'requestBooking'; containerId: string }
   | { type: 'confirmBooking'; containerId: string }
   | { type: 'ship'; containerId: string }
-  | { type: 'receive'; containerId: string }
+  | { type: 'receive'; containerId: string; lines?: ReceptionLine[]; note?: string }
   | { type: 'reviseEta'; containerId: string; eta: ISODate }
   | { type: 'advanceDev'; productId: string }
   | { type: 'toggleUrgent'; productId: string }
@@ -89,7 +106,11 @@ export type Action =
   | { type: 'startPack'; productId: string }
   | { type: 'planPack'; productId: string; date: ISODate | null }
   | { type: 'addPackFiles'; productId: string; kind: 'pack' | 'crea'; files: Omit<PackFile, 'kind' | 'version' | 'uploadedAt' | 'uploadedBy'>[] }
-  | { type: 'removePackFile'; productId: string; fileId: string };
+  | { type: 'removePackFile'; productId: string; fileId: string }
+  | { type: 'setCapacity'; designer: string; capacity: number | null }
+  | { type: 'setDefaultCapacity'; capacity: number }
+  | { type: 'setFx'; currency: 'USD' | 'CNY'; rate: number }
+  | { type: 'setProformaCurrency'; id: string; currency: 'EUR' | 'USD' | 'CNY' };
 
 /** Horodatage de démo : date du jour de l'application + heure réelle */
 const nowStamp = () => `${TODAY}T${new Date().toTimeString().slice(0, 5)}`;
@@ -154,6 +175,10 @@ const ACTION_PERM: Partial<Record<Action['type'], Perm>> = {
   markDeveloped: 'dev.advance',
   reassignPack: 'pack.assign',
   setUserRole: 'users.manage',
+  setCapacity: 'users.manage',
+  setDefaultCapacity: 'users.manage',
+  setFx: 'finance.pay',
+  setProformaCurrency: 'proforma.edit',
   toggleUser: 'users.manage',
 };
 
@@ -213,7 +238,7 @@ export function isAllowed(s: State, a: Action): boolean {
   }
 }
 
-function reducer(s: State, a: Action): State {
+function applyAction(s: State, a: Action): State {
   if (!isAllowed(s, a)) {
     console.warn(`Action refusée pour ${currentUser(s).name} : ${a.type}`);
     return s;
@@ -369,18 +394,48 @@ function reducer(s: State, a: Action): State {
       );
     case 'receive': {
       const c = s.containers.find((x) => x.id === a.containerId)!;
+      // Quantités reçues : saisies au contrôle, sinon conformes à l'attendu
+      const lines: ReceptionLine[] =
+        a.lines ?? c.allocations.map((al) => ({ proformaId: al.proformaId, productId: al.productId, expected: al.qty, received: al.qty }));
+      const gaps = lines.filter((l) => l.received !== l.expected);
       let next = mapC(s, a.containerId, (x) => ({
         ...x,
         status: 'arrive',
         etaReal: TODAY,
         receivedOn: TODAY,
-        dateHistory: [...x.dateHistory, hist('Entrepôt', `Réceptionné à ${x.warehouse}`)],
+        reception: { at: nowStamp(), by: me, lines, note: a.note },
+        dateHistory: [
+          ...x.dateHistory,
+          hist(me, `Réceptionné à ${x.warehouse}${gaps.length ? ` · ${gaps.length} écart(s)` : ' · conforme'}${a.note ? ` · ${a.note}` : ''}`),
+        ],
       }));
-      for (const al of c.allocations) {
-        next = mapP(next, al.productId, (p) => ({ ...p, stock: { ...p.stock, [c.warehouse]: (p.stock[c.warehouse] ?? 0) + al.qty } }));
+      for (const l of lines) {
+        next = mapP(next, l.productId, (p) => ({ ...p, stock: { ...p.stock, [c.warehouse]: (p.stock[c.warehouse] ?? 0) + l.received } }));
       }
       return syncProformaStatuses(next);
     }
+    case 'setCapacity': {
+      const capacity = { ...s.settings.capacity };
+      if (a.capacity === null) delete capacity[a.designer];
+      else capacity[a.designer] = a.capacity;
+      return { ...s, settings: { ...s.settings, capacity } };
+    }
+    case 'setDefaultCapacity':
+      return { ...s, settings: { ...s.settings, defaultCapacity: a.capacity } };
+    case 'setFx':
+      return { ...s, settings: { ...s.settings, fx: { ...s.settings.fx, [a.currency]: a.rate } } };
+    case 'setProformaCurrency':
+      return mapPF(s, a.id, (pf) => {
+        // Même valeur en € : les prix de ligne sont convertis dans la nouvelle devise
+        const from = s.settings.fx[pf.currency ?? 'EUR'];
+        const to = s.settings.fx[a.currency];
+        return {
+          ...pf,
+          currency: a.currency,
+          lines: pf.lines.map((l) => ({ ...l, price: (l.price * from) / to })),
+          history: [...pf.history, hist(me, `Devise → ${a.currency}`)],
+        };
+      });
     case 'startPack':
       return mapP(s, a.productId, (p) => (p.pack.startedAt ? p : { ...p, pack: { ...p.pack, startedAt: nowStamp() } }));
     case 'planPack':
@@ -446,22 +501,116 @@ function reducer(s: State, a: Action): State {
   }
 }
 
-const Ctx = createContext<{ state: State; dispatch: (a: Action) => void } | null>(null);
+// ---------------------------------------------------------------------------
+// Journal d'activité : chaque action acceptée est tracée (qui, quoi, quand)
 
-export function StoreProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, undefined, load);
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch {
-      /* ignore */
+const JOURNAL_MAX = 3000;
+let journalSeq = Date.now();
+
+function describe(s: State, a: Action): { target?: string; text: string } | null {
+  const ref = (id: string) => s.products.find((p) => p.id === id)?.ref ?? id;
+  const ctn = (id: string) => s.containers.find((x) => x.id === id)?.number ?? id;
+  switch (a.type) {
+    case 'login':
+    case 'reset':
+      return null;
+    case 'signProforma':
+      return { target: a.id, text: 'Proforma signée' };
+    case 'setProformaStatus':
+      return { target: a.id, text: `Statut → ${PROFORMA_STATUS_LABEL[a.status]}` };
+    case 'payDeposit':
+      return { target: a.id, text: 'Acompte payé' };
+    case 'payBalance':
+      return { target: a.id, text: 'Solde payé' };
+    case 'validatePack': {
+      const p = s.products.find((x) => x.id === a.productId);
+      const st = p && VALIDATION_STEPS.find((v) => p.pack.validations[v].state !== 'done');
+      return { target: ref(a.productId), text: `Pack validé${st ? ` (étape ${VALIDATION_LABELS[st]})` : ''}` };
     }
-  }, [state]);
-  return <Ctx.Provider value={{ state, dispatch }}>{children}</Ctx.Provider>;
+    case 'rejectPack':
+      return { target: ref(a.productId), text: 'Pack refusé, retour au designer' };
+    case 'requestDieCut':
+      return { target: ref(a.productId), text: 'Die cut demandé' };
+    case 'receiveDieCut':
+      return { target: ref(a.productId), text: 'Die cut reçu' };
+    case 'uploadArtwork':
+      return { target: ref(a.productId), text: 'Nouvelle version d’artwork' };
+    case 'forwardPack':
+      return { target: ref(a.productId), text: 'Pack transmis au fournisseur' };
+    case 'allocate':
+      return { target: ctn(a.containerId), text: `${a.qty} pcs ${ref(a.productId)} affectées (${a.proformaId})` };
+    case 'deallocate':
+      return { target: ctn(a.containerId), text: `${ref(a.productId)} retiré du conteneur` };
+    case 'createContainer':
+      return { text: 'Conteneur créé' };
+    case 'validatePlan':
+      return { target: ctn(a.containerId), text: 'Plan de chargement validé' };
+    case 'requestPlan':
+      return { target: ctn(a.containerId), text: 'Plan de chargement demandé au fournisseur' };
+    case 'proposePlan':
+      return { target: ctn(a.containerId), text: 'Plan de chargement proposé' };
+    case 'addContainerDoc':
+      return { target: ctn(a.containerId), text: `Document déposé : ${a.doc}` };
+    case 'requestBooking':
+      return { target: ctn(a.containerId), text: 'Booking demandé' };
+    case 'confirmBooking':
+      return { target: ctn(a.containerId), text: 'Booking confirmé' };
+    case 'ship':
+      return { target: ctn(a.containerId), text: 'Départ (en transit)' };
+    case 'receive': {
+      const gaps = (a.lines ?? []).filter((l) => l.received !== l.expected).length;
+      return { target: ctn(a.containerId), text: `Réception${gaps ? ` avec ${gaps} écart(s)` : ' conforme'}` };
+    }
+    case 'reviseEta':
+      return { target: ctn(a.containerId), text: `ETA révisée au ${a.eta}` };
+    case 'advanceDev':
+      return { target: ref(a.productId), text: 'Développement : étape suivante' };
+    case 'toggleUrgent': {
+      const p = s.products.find((x) => x.id === a.productId);
+      return { target: ref(a.productId), text: p?.urgent ? 'Retiré de PUSH URGENT' : 'Poussé en urgent' };
+    }
+    case 'markDeveloped':
+      return { target: ref(a.productId), text: 'Marqué développé' };
+    case 'reassignPack':
+      return { target: ref(a.productId), text: `Réaffecté${a.designer ? ` à ${a.designer}` : ''}${a.weekOf ? ` · semaine du ${a.weekOf}` : ''}` };
+    case 'startPack':
+      return { target: ref(a.productId), text: 'Pack commencé' };
+    case 'planPack':
+      return { target: ref(a.productId), text: a.date ? `Début prévu le ${a.date}` : 'Début prévu retiré' };
+    case 'addPackFiles':
+      return { target: ref(a.productId), text: a.kind === 'pack' ? `Pack uploadé (${a.files[0]?.name ?? ''})` : `${a.files.length} fichier(s) ajouté(s) au dossier créa` };
+    case 'removePackFile':
+      return { target: ref(a.productId), text: 'Fichier supprimé' };
+    case 'setUserRole':
+      return { target: a.userId, text: `Rôle → ${a.role}` };
+    case 'toggleUser':
+      return { target: a.userId, text: 'Compte activé / désactivé' };
+    case 'setCapacity':
+      return { target: a.designer, text: a.capacity === null ? 'Capacité par défaut' : `Capacité → ${a.capacity} packs / semaine` };
+    case 'setDefaultCapacity':
+      return { text: `Capacité par défaut → ${a.capacity} packs / semaine` };
+    case 'setFx':
+      return { text: `Cours ${a.currency} → ${a.rate} €` };
+    case 'setProformaCurrency':
+      return { target: a.id, text: `Devise → ${a.currency}` };
+  }
+  return null;
 }
 
+export function reducer(s: State, a: Action): State {
+  const next = applyAction(s, a);
+  if (next === s) return s;
+  const d = describe(s, a);
+  if (!d) return next;
+  const u = currentUser(s);
+  const entry: JournalEntry = { id: ++journalSeq, at: nowStamp(), user: u.name, role: u.role, type: a.type, ...d };
+  return { ...next, journal: [entry, ...(next.journal ?? [])].slice(0, JOURNAL_MAX) };
+}
+
+export const StoreContext = createContext<{ state: State; dispatch: (a: Action) => void } | null>(null);
+
 export function useStore() {
-  const ctx = useContext(Ctx);
+  const ctx = useContext(StoreContext);
   if (!ctx) throw new Error('StoreProvider manquant');
   return ctx;
 }
@@ -516,14 +665,30 @@ export function currentValidatorLabel(p: Product) {
   return s ? VALIDATION_LABELS[s] : null;
 }
 
+/** Charge utile maximale (kg) par type de conteneur */
+export const CONTAINER_PAYLOAD: Record<Container['type'], number> = { '40HC': 26500, '40': 26700, '20': 21700 };
+/** Poids de la marchandise chargée (kg) */
+export function containerWeight(s: State, c: Container) {
+  return c.allocations.reduce((sum, a) => sum + a.qty * (s.products.find((p) => p.id === a.productId)?.weight ?? 0), 0);
+}
+
+/** Capacité hebdomadaire d'un designer (packs) */
+export const capacityOf = (s: State, designer: string) => s.settings?.capacity?.[designer] ?? s.settings?.defaultCapacity ?? 40;
+
+/** Cours de la devise de la proforma (1 unité = x €) */
+export const fxOf = (s: State, pf: Proforma) => s.settings?.fx?.[pf.currency ?? 'EUR'] ?? 1;
+
 export function proformaTotals(s: State, pf: Proforma) {
+  const fx = fxOf(s, pf);
+  let amountCur = 0;
   let amount = 0;
   let qty = 0;
   let cbm = 0;
   let packsOk = 0;
   for (const l of pf.lines) {
     const p = byId(s.products, l.productId);
-    amount += l.qty * l.price;
+    amountCur += l.qty * l.price;
+    amount += l.qty * l.price * fx;
     qty += l.qty;
     cbm += l.cbm ?? lineCbm(p, l.qty);
     if (packDone(p)) packsOk++;
@@ -531,6 +696,8 @@ export function proformaTotals(s: State, pf: Proforma) {
   const deposit = pf.depositAmount ?? (amount * pf.depositPct) / 100;
   return {
     amount,
+    amountCur,
+    currency: pf.currency ?? 'EUR',
     qty,
     cbm,
     eq40: cbm / CONTAINER_CAPACITY['40HC'],
@@ -558,7 +725,7 @@ export function containerValue(s: State, c: Container) {
   return c.allocations.reduce((sum, a) => {
     const pf = byId(s.proformas, a.proformaId);
     const line = pf.lines.find((l) => l.productId === a.productId);
-    return sum + a.qty * (line?.price ?? 0);
+    return sum + a.qty * (line?.price ?? 0) * fxOf(s, pf);
   }, 0);
 }
 export const containerEta = (c: Container) => c.etaReal ?? c.etaRevised ?? c.etaPlanned;

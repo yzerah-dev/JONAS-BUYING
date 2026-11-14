@@ -2,10 +2,12 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, Box, Check, Download, FileText, Flame, History, Layers, Paperclip, Play, Scissors, Search, Send, X } from 'lucide-react';
 import PackFiles from '../components/PackFiles';
-import { byId, packDone, packLate, useAuth, useStore, type State } from '../data/store';
+import { pressable } from '../lib/a11y';
+import { byId, capacityOf, packDone, packLate, useAuth, useStore, type State } from '../data/store';
 import type { Product } from '../data/types';
 import { VALIDATION_LABELS, VALIDATION_STEPS } from '../data/types';
-import { designerColor, BrandLogo, Pill, ProductThumb, Tabs, ValidationCircuit, ValidationDot, toast } from '../components/ui';
+import { BrandLogo, Pill, ProductThumb, Tabs, ValidationCircuit, ValidationDot } from '../components/ui';
+import { designerColor, toast } from '../components/ui-shared';
 import { TODAY, addDays, fdate, fshort, fstamp, initials, weekKey, weekLabel, weekRange } from '../lib/format';
 
 
@@ -22,8 +24,6 @@ function proformaOf(s: State, p: Product) {
   return s.proformas.filter((pf) => pf.status !== 'arrive' && pf.lines.some((l) => l.productId === p.id)).sort((a, b) => a.etd.localeCompare(b.etd))[0];
 }
 
-/** Capacité de référence d'un designer (packs par semaine) */
-const CAPACITY = 40;
 
 type StatusKey = 'all' | 'retard' | 'a_traiter' | 'en_creation' | 'a_valider' | 'en_validation' | 'a_envoyer' | 'fournisseur' | 'valide';
 const STATUS_CHIPS: { id: StatusKey; label: string }[] = [
@@ -213,7 +213,9 @@ function DesignPage() {
     <div className="pf-page">
       <div className="row wrap" style={{ gap: 16 }}>
         <h1 className="pf-title">Espace Designer</h1>
-        <span className="muted">Capacité de référence : {CAPACITY} packs / designer / semaine</span>
+        <span className="muted">
+          Capacité par défaut : {state.settings.defaultCapacity} packs / designer / semaine{auth.can('users.manage') ? ' (réglable dans Paramètres)' : ''}
+        </span>
       </div>
 
       {/* Planning de charge designers × semaines */}
@@ -251,7 +253,7 @@ function DesignPage() {
                   const items = cell(d, w.key);
                   const ok = items.filter(packDone).length;
                   const lateN = items.filter(packLate).length;
-                  const cap = d === 'all' ? CAPACITY * designers.length : CAPACITY;
+                  const cap = d === 'all' ? designers.reduce((t, x) => t + capacityOf(state, x), 0) : capacityOf(state, d);
                   const over = items.length > cap;
                   const active = designer === d && week === w.key;
                   return (
@@ -310,8 +312,8 @@ function DesignPage() {
                 <b>{late}</b> en retard
               </span>
               {designer !== 'all' && (
-                <span className={scope.length > CAPACITY ? 'red' : 'muted'}>
-                  <b>{scope.length}</b>/{CAPACITY} capacité
+                <span className={scope.length > capacityOf(state, designer) ? 'red' : 'muted'}>
+                  <b>{scope.length}</b>/{capacityOf(state, designer)} capacité
                 </span>
               )}
             </div>
@@ -536,7 +538,12 @@ function PackRow({
   const [label, tone] = packStatus(p);
   const late = packLate(p);
   return (
-    <div className={`pk-row ${active ? 'active' : ''} ${late ? 'late' : ''} ${draggable ? 'draggable' : ''}`} onClick={onOpen} draggable={draggable} onDragStart={onDragStart}>
+    <div
+      className={`pk-row ${active ? 'active' : ''} ${late ? 'late' : ''} ${draggable ? 'draggable' : ''}`}
+      {...pressable(onOpen, `Ouvrir le pack ${p.ref}`)}
+      draggable={draggable}
+      onDragStart={onDragStart}
+    >
       <input type="checkbox" checked={checked} onClick={(e) => e.stopPropagation()} onChange={onCheck} aria-label={`Sélectionner ${p.ref}`} />
       <span className="pk-c-prod">
         <ProductThumb product={p} size={32} />

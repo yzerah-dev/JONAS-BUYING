@@ -137,6 +137,8 @@ export interface HistoryEntry {
 export interface Proforma {
   id: string; // PF-2026-0146
   supplierId: string;
+  /** Devise de la proforma (prix des lignes dans cette devise) ; EUR par défaut */
+  currency?: Currency;
   /** Intitulé de la commande (ex. « Brumes corps », « Mobilier jardin – Été 2027 ») */
   title?: string;
   poNumber: string;
@@ -181,6 +183,8 @@ export interface Container {
   etaRevised?: ISODate;
   etaReal?: ISODate;
   receivedOn?: ISODate;
+  /** Contrôle de réception : quantités reçues ligne à ligne, écarts, réserves */
+  reception?: Reception;
   warehouse: string;
   planValidated: boolean;
   /** JONAS a demandé un plan de chargement au fournisseur */
@@ -215,4 +219,41 @@ export interface User {
   /** Pour les comptes du portail fournisseur */
   supplierId?: string;
   active: boolean;
+}
+
+export interface ReceptionLine {
+  proformaId: string;
+  productId: string;
+  expected: number;
+  received: number;
+}
+export interface Reception {
+  at: string;
+  by: string;
+  lines: ReceptionLine[];
+  note?: string;
+}
+
+export type Currency = 'EUR' | 'USD' | 'CNY';
+
+/** Paramètres de pilotage */
+export interface Settings {
+  /** Capacité par défaut d'un designer (packs / semaine) */
+  defaultCapacity: number;
+  /** Capacité propre à un designer */
+  capacity: Record<string, number>;
+  /** Cours de change : 1 unité = x € */
+  fx: Record<Currency, number>;
+}
+
+/** Entrée du journal d'activité */
+export interface JournalEntry {
+  id: number;
+  at: string;
+  user: string;
+  role: string;
+  type: string;
+  /** Objet concerné : proforma, produit, conteneur, utilisateur */
+  target?: string;
+  text: string;
 }

@@ -39,8 +39,11 @@ import {
   type State,
 } from '../data/store';
 import type { Container, Proforma, ProformaStatus } from '../data/types';
-import { BrandLogo, ContainerStatusPill, PackPill, Pill, ProductThumb, ProformaStatusPill, Progress, Ring, Seg, SupplierLogo, Tabs, toast } from '../components/ui';
-import { addDays, dec, eur, eur2, fdate, fshort, m3, num, weekLabel } from '../lib/format';
+import { BrandLogo, ContainerStatusPill, PackPill, Pill, ProductThumb, ProformaStatusPill, Progress, Ring, Seg, SupplierLogo, Tabs } from '../components/ui';
+import { toast } from '../components/ui-shared';
+import { addDays, dec, eur, eur2, fdate, m3, num, weekLabel } from '../lib/format';
+import { useT, type I18n } from '../i18n/context';
+import type { Key } from '../i18n/dict';
 
 type Tab = 'produits' | 'details' | 'documents' | 'logistique' | 'historique';
 
@@ -326,6 +329,20 @@ function DetailsTab({ pf, state }: { pf: Proforma; state: State }) {
         <dl className="kv">
           <dt>Incoterm</dt>
           <dd>FOB {byId(state.suppliers, pf.supplierId).port}</dd>
+          <dt>Devise</dt>
+          <dd>
+            <select
+              className="input"
+              aria-label="Devise de la proforma"
+              disabled={!auth.can('proforma.edit')}
+              value={pf.currency ?? 'EUR'}
+              onChange={(e) => dispatch({ type: 'setProformaCurrency', id: pf.id, currency: e.target.value as 'EUR' | 'USD' | 'CNY' })}
+            >
+              <option value="EUR">EUR €</option>
+              <option value="USD">USD $</option>
+              <option value="CNY">CNY ¥</option>
+            </select>
+          </dd>
           <dt>Paiement</dt>
           <dd>
             {pf.depositPct} % acompte, solde à l’expédition
@@ -359,7 +376,14 @@ function DetailsTab({ pf, state }: { pf: Proforma; state: State }) {
         <div className="card-title">Finance</div>
         <dl className="kv">
           <dt>Montant total</dt>
-          <dd>{eur2(t.amount)}</dd>
+          <dd>
+            {eur2(t.amount)}
+            {t.currency !== 'EUR' && (
+              <div className="small violet-t">
+                {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: t.currency }).format(t.amountCur)} · 1 {t.currency} = {state.settings.fx[t.currency]} €
+              </div>
+            )}
+          </dd>
           <dt>Acompte ({pf.depositPct} %)</dt>
           <dd>
             {eur2(t.deposit)} {pf.depositPaid ? <Pill color="green">Payé</Pill> : <Pill color="red">À faire</Pill>}
@@ -406,15 +430,15 @@ function DocumentsTab({ pf }: { pf: Proforma }) {
 // ---------------------------------------------------------------------------
 // Suivi d'expédition + plan de chargement (drag & drop)
 
-const TRACK_STEPS: { label: string; reached: (pf: Proforma) => boolean; date: (pf: Proforma) => string }[] = [
-  { label: 'Proforma validée', reached: (p) => p.status !== 'a_signer', date: (p) => fshort(addDays(p.date, 2)) },
-  { label: 'Développement produit', reached: (p) => !['a_signer', 'en_dev'].includes(p.status), date: (p) => fshort(addDays(p.date, 5)) },
-  { label: 'Production en cours', reached: (p) => !['a_signer', 'en_dev'].includes(p.status), date: (p) => fshort(addDays(p.date, 9)) },
-  { label: 'Booking conteneur', reached: (p) => ['booke', 'en_transit', 'arrive'].includes(p.status), date: (p) => fshort(addDays(p.etd, -14)) },
-  { label: 'Prêt à charger', reached: (p) => ['en_transit', 'arrive'].includes(p.status), date: (p) => fshort(addDays(p.etd, -3)) },
-  { label: 'En transit', reached: (p) => ['en_transit', 'arrive'].includes(p.status), date: (p) => `Depuis le ${fshort(p.etd)}` },
-  { label: 'Arrivée port', reached: (p) => p.status === 'arrive', date: (p) => fshort(p.eta) },
-  { label: 'Réception', reached: (p) => p.status === 'arrive', date: (p) => weekLabel(addDays(p.eta, 3)) },
+const TRACK_STEPS: { label: string; reached: (pf: Proforma) => boolean; date: (pf: Proforma, i: I18n) => string }[] = [
+  { label: 'Proforma validée', reached: (p) => p.status !== 'a_signer', date: (p, { fmt }) => fmt.fshort(addDays(p.date, 2)) },
+  { label: 'Développement produit', reached: (p) => !['a_signer', 'en_dev'].includes(p.status), date: (p, { fmt }) => fmt.fshort(addDays(p.date, 5)) },
+  { label: 'Production en cours', reached: (p) => !['a_signer', 'en_dev'].includes(p.status), date: (p, { fmt }) => fmt.fshort(addDays(p.date, 9)) },
+  { label: 'Booking conteneur', reached: (p) => ['booke', 'en_transit', 'arrive'].includes(p.status), date: (p, { fmt }) => fmt.fshort(addDays(p.etd, -14)) },
+  { label: 'Prêt à charger', reached: (p) => ['en_transit', 'arrive'].includes(p.status), date: (p, { fmt }) => fmt.fshort(addDays(p.etd, -3)) },
+  { label: 'En transit', reached: (p) => ['en_transit', 'arrive'].includes(p.status), date: (p, { fmt, t }) => t('track.since', { date: fmt.fshort(p.etd) }) },
+  { label: 'Arrivée port', reached: (p) => p.status === 'arrive', date: (p, { fmt }) => fmt.fshort(p.eta) },
+  { label: 'Réception', reached: (p) => p.status === 'arrive', date: (p, { fmt }) => fmt.weekLabel(addDays(p.eta, 3)) },
 ];
 
 export function LogisticsTab({ pf, portal }: { pf: Proforma; portal?: boolean }) {
@@ -425,6 +449,9 @@ export function LogisticsTab({ pf, portal }: { pf: Proforma; portal?: boolean })
   const [dragOver, setDragOver] = useState<string | null>(null);
   // Alternative tactile au glisser-déposer : toucher une ligne, puis un conteneur
   const [picked, setPicked] = useState<string | null>(null);
+  const i18n = useT(); // français hors portail
+  const { t, fmt } = i18n;
+  const { dec, m3, num } = fmt;
 
   const lastReached = TRACK_STEPS.map((s) => s.reached(pf)).lastIndexOf(true);
 
@@ -453,15 +480,15 @@ export function LogisticsTab({ pf, portal }: { pf: Proforma; portal?: boolean })
     const line = src.lines.find((l) => l.productId === productId)!;
     const p = byId(state.products, productId);
     const remaining = line.qty - allocatedQty(state, proformaId, productId);
-    if (remaining <= 0) return toast('Cette ligne est déjà entièrement affectée');
-    if (!auth.allowed({ type: 'allocate', containerId: c.id, proformaId, productId, qty: 1 })) return toast('Ce conteneur n’est pas modifiable (droits ou plan déjà validé)');
-    if (['en_transit', 'arrive'].includes(c.status)) return toast('Conteneur déjà parti : affectation impossible');
+    if (remaining <= 0) return toast(t('log.toast.full'));
+    if (!auth.allowed({ type: 'allocate', containerId: c.id, proformaId, productId, qty: 1 })) return toast(t('log.toast.locked'));
+    if (['en_transit', 'arrive'].includes(c.status)) return toast(t('log.toast.gone'));
     const free = containerCapacity(c) - containerCbm(state, c);
     const maxCartons = Math.floor(free / p.cbmCarton);
     const qty = Math.min(remaining, maxCartons * p.pcb);
-    if (qty <= 0) return toast(`Capacité ${c.id} atteinte`);
+    if (qty <= 0) return toast(t('log.toast.capacity', { c: c.id }));
     dispatch({ type: 'allocate', containerId: c.id, proformaId, productId, qty });
-    toast(`${num(qty)} pcs ${p.ref} → ${c.number ?? c.id}${qty < remaining ? ' (capacité limitée)' : ''}`);
+    toast(`${num(qty)} pcs ${p.ref} → ${c.number ?? c.id}${qty < remaining ? t('log.toast.limited') : ''}`);
     setSelected(c.id);
   }
 
@@ -471,15 +498,15 @@ export function LogisticsTab({ pf, portal }: { pf: Proforma; portal?: boolean })
         <div className="row mb">
           <Truck className="green" />
           <span className="bold" style={{ fontSize: 16 }}>
-            Suivi d’expédition
+            {t('log.tracking')}
           </span>
         </div>
         <div className="stepper">
           {TRACK_STEPS.map((s, i) => (
             <div key={s.label} className={`step ${i < lastReached ? 'done' : i === lastReached ? 'current done' : ''}`}>
               <div className="bullet">{i <= lastReached ? <Check size={15} strokeWidth={3} /> : null}</div>
-              <div className="lbl">{s.label}</div>
-              <div className="muted xs">{s.date(pf)}</div>
+              <div className="lbl">{t(`track.${i}` as Key)}</div>
+              <div className="muted xs">{s.date(pf, i18n)}</div>
             </div>
           ))}
         </div>
@@ -488,7 +515,7 @@ export function LogisticsTab({ pf, portal }: { pf: Proforma; portal?: boolean })
       <div className="split3">
         <div className="card pad">
           <div className="card-title">
-            <Boxes size={18} className="green" /> Produits à consolider
+            <Boxes size={18} className="green" /> {t('log.toConsolidate')}
           </div>
           <div className="mb">
             <Seg
@@ -496,8 +523,8 @@ export function LogisticsTab({ pf, portal }: { pf: Proforma; portal?: boolean })
               onChange={setScope}
               options={[
                 { id: 'pf', label: `${pf.id.slice(-4)} (${pf.lines.length})` },
-                { id: 'others', label: `Autres proformas (${otherPfs.length})` },
-                { id: 'all', label: 'Tous' },
+                { id: 'others', label: t('log.otherPfs', { n: otherPfs.length }) },
+                { id: 'all', label: t('log.all') },
               ]}
             />
           </div>
@@ -506,11 +533,11 @@ export function LogisticsTab({ pf, portal }: { pf: Proforma; portal?: boolean })
               <thead>
                 <tr>
                   <th />
-                  <th>Réf.</th>
-                  <th className="num">Qté</th>
-                  <th className="num">Affecté</th>
-                  <th className="num">Restant</th>
-                  <th className="num">CBM</th>
+                  <th>{t('col.refShort')}</th>
+                  <th className="num">{t('col.qty')}</th>
+                  <th className="num">{t('col.allocated')}</th>
+                  <th className="num">{t('col.remaining')}</th>
+                  <th className="num">{t('col.cbm')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -525,7 +552,7 @@ export function LogisticsTab({ pf, portal }: { pf: Proforma; portal?: boolean })
                       className={`${rest > 0 ? 'clickable' : ''} ${picked === `${src.id}|${p.id}` ? 'selected' : ''}`}
                       onClick={() => rest > 0 && setPicked(picked === `${src.id}|${p.id}` ? null : `${src.id}|${p.id}`)}
                       onDragStart={(e) => e.dataTransfer.setData('text/plain', `${src.id}|${p.id}`)}
-                      title={rest > 0 ? 'Glisser vers un conteneur, ou toucher puis choisir le conteneur' : 'Entièrement affecté'}
+                      title={rest > 0 ? t('log.dragTitle') : t('log.fullyAllocated')}
                     >
                       <td>
                         <GripVertical size={14} className="drag-handle" />
@@ -550,19 +577,19 @@ export function LogisticsTab({ pf, portal }: { pf: Proforma; portal?: boolean })
             </table>
           </div>
           <div className="xs muted mt">
-            Glissez une ligne sur un conteneur, ou touchez-la puis touchez le conteneur : la quantité restante est affectée dans la limite de la capacité.
+            {t('log.help')}
           </div>
         </div>
 
         <div className="card pad">
           <div className="card-title">
-            <Ctn size={18} className="green" /> Plan de chargement – {containers.length} conteneur{containers.length > 1 ? 's' : ''}
+            <Ctn size={18} className="green" /> {t('log.planTitle', { n: containers.length, s: containers.length > 1 ? 's' : '' })}
             <div className="grow" />
-            <span className="pill grey">Capacité : {m3(containers.reduce((s, c) => s + containerCapacity(c), 0))}</span>
+            <span className="pill grey">{t('log.capacity', { v: m3(containers.reduce((s, c) => s + containerCapacity(c), 0)) })}</span>
           </div>
           {picked && (
             <div className="pill orange mb" style={{ whiteSpace: 'normal' }}>
-              {byId(state.products, picked.split('|')[1]).ref} sélectionné : touchez un conteneur pour l’affecter
+              {t('log.picked', { ref: byId(state.products, picked.split('|')[1]).ref })}
             </div>
           )}
           <div className="cgrid">
@@ -617,11 +644,11 @@ export function LogisticsTab({ pf, portal }: { pf: Proforma; portal?: boolean })
               style={{ justifyContent: 'center', alignItems: 'center', borderStyle: 'dashed', minHeight: 150 }}
               onClick={() => {
                 dispatch({ type: 'createContainer', supplierId: pf.supplierId, etd: pf.etd, eta: pf.eta });
-                toast('Conteneur 40HC créé');
+                toast(t('log.toast.created'));
               }}
             >
               <Plus className="green" />
-              <span className="bold small">Nouveau conteneur</span>
+              <span className="bold small">{t('log.newContainer')}</span>
             </div>}
           </div>
         </div>
@@ -630,7 +657,7 @@ export function LogisticsTab({ pf, portal }: { pf: Proforma; portal?: boolean })
           {sel ? (
             <ContainerPanel c={sel} index={containers.indexOf(sel) + 1} portal={portal} />
           ) : (
-            <div className="empty">Aucun conteneur. Créez-en un pour commencer la consolidation.</div>
+            <div className="empty">{t('log.noContainer')}</div>
           )}
         </div>
       </div>
@@ -639,19 +666,19 @@ export function LogisticsTab({ pf, portal }: { pf: Proforma; portal?: boolean })
         <Ring value={totalQty ? loadedQty / totalQty : 0} size={78} stroke={9} />
         <div className="col">
           <div className="bold" style={{ fontSize: 16 }}>
-            Consolidation {pf.id}
+            {t('log.consolidation', { pf: pf.id })}
           </div>
           <span className="small">
-            <Check size={13} className="green" /> Chargé : {num(loadedQty)} pcs ({m3(loadedCbm)})
+            <Check size={13} className="green" /> {t('log.loaded', { qty: num(loadedQty), cbm: m3(loadedCbm) })}
           </span>
           <span className="small orange">
-            ● Reste à consolider : {num(totalQty - loadedQty)} pcs ({m3(totalCbm - loadedCbm)})
+            {t('log.remaining', { qty: num(totalQty - loadedQty), cbm: m3(totalCbm - loadedCbm) })}
           </span>
         </div>
         <div className="grow" />
-        <Metric l="Conteneurs" v={`${containers.length} × 40HC`} />
-        <Metric l="Quantité totale" v={`${num(totalQty)} pcs`} />
-        <Metric l="CBM total" v={m3(totalCbm)} />
+        <Metric l={t('log.m.containers')} v={`${containers.length} × 40HC`} />
+        <Metric l={t('log.m.totalQty')} v={`${num(totalQty)} pcs`} />
+        <Metric l={t('log.m.totalCbm')} v={m3(totalCbm)} />
       </div>
     </>
   );
@@ -662,11 +689,13 @@ function ContainerPanel({ c, index, portal }: { c: Container; index: number; por
   const auth = useAuth();
   const cbm = containerCbm(state, c);
   const ratio = cbm / containerCapacity(c);
+  const { t, fmt } = useT(); // français hors portail
+  const { dec, num } = fmt;
   const editable = auth.allowed({ type: 'deallocate', containerId: c.id, proformaId: '', productId: '' }) && ['a_booker', 'booking_demande'].includes(c.status);
   return (
     <>
       <div className="card-title">
-        <Ctn size={18} className="green" /> Conteneur C{index} – Détail
+        <Ctn size={18} className="green" /> {t('cp.title', { n: index })}
       </div>
       <div className="row mb">
         <div className="grow">
@@ -678,19 +707,19 @@ function ContainerPanel({ c, index, portal }: { c: Container; index: number; por
         <span className="bold">{Math.round(ratio * 100)} %</span>
         <span className="bold">{num(containerQty(c))} pcs</span>
       </div>
-      {ratio > 1 && <div className="pill red mb">Dépassement de capacité</div>}
+      {ratio > 1 && <div className="pill red mb">{t('cp.over')}</div>}
       <div className="row wrap mb">
-        {c.planRequested && <Pill color="orange">Plan demandé au fournisseur</Pill>}
-        {c.planProposed && <Pill color="violet">Plan proposé par le fournisseur – à valider</Pill>}
-        {c.planValidated && <Pill color="green" icon={<Check size={12} />}>Plan validé par JONAS</Pill>}
+        {c.planRequested && <Pill color="orange">{t('cp.planRequested')}</Pill>}
+        {c.planProposed && <Pill color="violet">{t('cp.planProposed')}</Pill>}
+        {c.planValidated && <Pill color="green" icon={<Check size={12} />}>{t('cp.planValidated')}</Pill>}
       </div>
       <table className="tbl">
         <thead>
           <tr>
-            <th>Réf.</th>
-            <th className="num">Qté</th>
-            <th className="num">Cartons</th>
-            <th className="num">CBM</th>
+            <th>{t('col.refShort')}</th>
+            <th className="num">{t('col.qty')}</th>
+            <th className="num">{t('col.cartons')}</th>
+            <th className="num">{t('col.cbm')}</th>
             <th />
           </tr>
         </thead>
@@ -713,7 +742,7 @@ function ContainerPanel({ c, index, portal }: { c: Container; index: number; por
                 <td className="num">{dec(lineCbm(p, a.qty), 2)}</td>
                 <td>
                   {editable && (
-                    <button className="btn ghost sm danger" title="Retirer" onClick={() => dispatch({ type: 'deallocate', containerId: c.id, proformaId: a.proformaId, productId: a.productId })}>
+                    <button className="btn ghost sm danger" title={t('cp.remove')} onClick={() => dispatch({ type: 'deallocate', containerId: c.id, proformaId: a.proformaId, productId: a.productId })}>
                       <Trash2 size={14} />
                     </button>
                   )}
@@ -724,7 +753,7 @@ function ContainerPanel({ c, index, portal }: { c: Container; index: number; por
           {c.allocations.length === 0 && (
             <tr>
               <td colSpan={5} className="empty">
-                Déposez ici des produits
+                {t('cp.dropHere')}
               </td>
             </tr>
           )}
@@ -736,15 +765,15 @@ function ContainerPanel({ c, index, portal }: { c: Container; index: number; por
             className="btn"
             onClick={() => {
               dispatch({ type: 'requestPlan', containerId: c.id });
-              toast('Plan de chargement demandé au fournisseur');
+              toast(t('cp.requestToast'));
             }}
           >
-            <Send size={16} /> Demander le plan au fournisseur
+            <Send size={16} /> {t('cp.request')}
           </button>
         )}
         {c.status === 'a_booker' && !c.planValidated && auth.can('logistics.plan') && (
           <button className="btn" disabled={!c.allocations.length} onClick={() => dispatch({ type: 'validatePlan', containerId: c.id })}>
-            <Check size={16} /> {c.planProposed ? 'Valider le plan proposé' : 'Valider le plan de chargement'}
+            <Check size={16} /> {c.planProposed ? t('cp.validateProposed') : t('cp.validate')}
           </button>
         )}
         {auth.allowed({ type: 'proposePlan', containerId: c.id }) && (
@@ -753,10 +782,10 @@ function ContainerPanel({ c, index, portal }: { c: Container; index: number; por
             disabled={!c.allocations.length || ratio > 1 || c.planProposed}
             onClick={() => {
               dispatch({ type: 'proposePlan', containerId: c.id });
-              toast('Plan envoyé à JONAS pour validation');
+              toast(t('cp.proposeToast'));
             }}
           >
-            <Send size={16} /> {c.planProposed ? 'Plan envoyé – en attente JONAS' : 'Proposer ce plan à JONAS'}
+            <Send size={16} /> {c.planProposed ? t('cp.proposed') : t('cp.propose')}
           </button>
         )}
         {c.status === 'a_booker' && auth.can('logistics.booking') && (
@@ -765,20 +794,20 @@ function ContainerPanel({ c, index, portal }: { c: Container; index: number; por
             disabled={!c.allocations.length || ratio > 1}
             onClick={() => {
               dispatch({ type: 'requestBooking', containerId: c.id });
-              toast('Demande de booking envoyée');
+              toast(t('cp.bookingToast'));
             }}
           >
-            <Calendar size={16} /> Demande de booking
+            <Calendar size={16} /> {t('cp.booking')}
           </button>
         )}
         {c.status === 'booking_demande' && auth.can('logistics.booking') && (
           <button className="btn primary" onClick={() => dispatch({ type: 'confirmBooking', containerId: c.id })}>
-            <Check size={16} /> Confirmer le booking {c.bookingNo}
+            <Check size={16} /> {t('cp.confirmBooking', { no: c.bookingNo ?? '' })}
           </button>
         )}
         {!portal && auth.canSee('conteneurs') && (
           <Link to={`/conteneurs?c=${c.id}`} className="btn ghost sm">
-            Voir dans Conteneurs →
+            {t('cp.seeContainers')}
           </Link>
         )}
       </div>

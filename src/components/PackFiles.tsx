@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Archive, Download, File as FileIcon, FileImage, FileText, Folder, FolderUp, Loader2, Trash2, Upload, X } from 'lucide-react';
 import { useAuth, useStore } from '../data/store';
 import type { PackFile, Product } from '../data/types';
-import { deleteBlob, ext, fromDrop, fromInput, fsize, getBlob, putBlob, saveBlob, zipBlobs, type PickedFile } from '../lib/files';
+import { deleteBlob, newFileId, ext, fromDrop, fromInput, fsize, getBlob, putBlob, saveBlob, zipBlobs, type PickedFile } from '../lib/files';
 import { fstamp } from '../lib/format';
-import { toast } from './ui';
+import { toast } from './ui-shared';
 
 const IMAGE = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg']);
 const isImage = (f: PackFile) => IMAGE.has(ext(f.name));
@@ -57,7 +57,7 @@ export default function PackFiles({ p }: { p: Product }) {
     try {
       const metas = [];
       for (const [i, { file, path }] of picked.entries()) {
-        const id = `${p.id}-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 7)}`;
+        const id = newFileId(p.id, i);
         await putBlob(id, file);
         metas.push({ id, name: file.name, path, size: file.size, type: file.type });
       }

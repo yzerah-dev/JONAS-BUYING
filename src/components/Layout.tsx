@@ -1,7 +1,9 @@
-import { useRef } from 'react';
-import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { BarChart3, Bell, Box, Boxes, Euro, Layers, Palette, Settings, Truck } from 'lucide-react';
-import { currentUser, packLate, useStore } from '../data/store';
+import { useEffect, useRef, useState } from 'react';
+import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom';
+import { BarChart3, Box, Boxes, Euro, History, Layers, Palette, Search, Settings, Truck } from 'lucide-react';
+import NotificationBell from './NotificationBell';
+import SearchPalette from './SearchPalette';
+import { currentUser, useStore } from '../data/store';
 import { canSee, isSupplier, type Module } from '../data/permissions';
 import { useTableLabels } from './useTableLabels';
 import { ContainerGlyph, Toaster } from './ui';
@@ -36,6 +38,7 @@ function moduleOf(path: string): Module {
     fournisseurs: 'fournisseurs',
     finance: 'finance',
     parametres: 'parametres',
+    journal: 'journal',
   };
   return map[seg] ?? 'home';
 }
@@ -45,9 +48,19 @@ export default function Layout() {
   const user = currentUser(state);
   const mainRef = useRef<HTMLElement>(null);
   useTableLabels(mainRef);
-  const navigate = useNavigate();
   const location = useLocation();
-  const alerts = state.products.filter(packLate).length + state.proformas.filter((p) => p.status === 'a_signer').length;
+  const [searchOpen, setSearchOpen] = useState(false);
+  // Recherche globale : Ctrl/Cmd + K
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setSearchOpen((o) => !o);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   // Les comptes fournisseurs n'accèdent qu'au portail
   if (isSupplier(user)) return <Navigate to="/portail" replace />;
@@ -61,10 +74,7 @@ export default function Layout() {
         </NavLink>
         <div className="grow" />
         <div className="top-actions">
-          <button className="icon-btn" title={`${alerts} alertes`} onClick={() => navigate('/performance')}>
-            <Bell size={26} />
-            {alerts > 0 && <span className="dot" />}
-          </button>
+          <NotificationBell key={user.id} />
           <UserSwitcher />
         </div>
       </header>
@@ -81,6 +91,14 @@ export default function Layout() {
           </NavLink>
         ))}
         <div className="spacer" />
+        <button className="nav-search" onClick={() => setSearchOpen(true)}>
+          <Search size={20} strokeWidth={1.8} /> Rechercher <kbd>Ctrl K</kbd>
+        </button>
+        {canSee(user, 'journal') && (
+          <NavLink to="/journal" className="nav-more">
+            <History size={20} strokeWidth={1.8} /> Journal
+          </NavLink>
+        )}
         <NavLink to="/parametres">
           <Settings size={22} strokeWidth={1.8} /> Paramètres
         </NavLink>
@@ -89,6 +107,7 @@ export default function Layout() {
         {allowedHere ? <Outlet /> : <Forbidden />}
       </main>
       <Toaster />
+      {searchOpen && <SearchPalette onClose={() => setSearchOpen(false)} />}
     </div>
   );
 }

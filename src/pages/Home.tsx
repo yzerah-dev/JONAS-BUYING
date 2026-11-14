@@ -15,7 +15,9 @@ import {
   currentUser,
 } from '../data/store';
 import { PROFORMA_STATUSES } from '../data/types';
-import { Kpi, Pill, ProductThumb, PROFORMA_COLOR } from '../components/ui';
+import { Kpi, Pill, ProductThumb } from '../components/ui';
+import { PROFORMA_COLOR } from '../components/ui-shared';
+import DirectionKpis from '../components/DirectionKpis';
 import type { Module } from '../data/permissions';
 import { PROFORMA_STATUS_LABEL } from '../data/store';
 import { TODAY, addDays, diffDays, eur, fdate, fshort, num, weekLabel } from '../lib/format';
@@ -100,6 +102,8 @@ export default function Home() {
         <Kpi icon={<Box size={18} />} value={`${packsOk}/${state.products.length}`} label="Packs validés (4/4)" />
         <Kpi icon={<Ctn size={18} />} value={`${num(state.containers.reduce((s, c) => s + containerCbm(state, c), 0))} m³`} label="Volume planifié" />
       </div>
+
+      {money && <DirectionKpis />}
 
       <div className="grid2 mb">
         <div className="card pad">

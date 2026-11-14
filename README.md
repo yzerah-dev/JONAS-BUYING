@@ -69,10 +69,31 @@ src/
   pages/           écrans
 ```
 
-## Prochaines étapes
+## Pilotage et qualité
 
-- Backend & persistance (ex. Supabase/Postgres) avec le modèle de `types.ts`.
-- Authentification réelle (comptes, invitations fournisseurs).
-- Upload réel de documents (artwork, die cut, BL, Invoice, Packing List).
-- Notifications et relances.
-- Connexion ERP TCI (stock, réceptions).
+- **Notifications** (cloche) calculées selon le rôle : proformas à signer, packs à valider à mon étape, packs non commencés à J-2 / en retard / poussés en urgent, bookings à faire ou en attente, ETA révisées, arrivées à J-7, plans proposés par les fournisseurs, échéances de paiement.
+- **Recherche globale** : `Ctrl/Cmd + K` ou « Rechercher » dans le menu.
+- **Journal d’activité** (`/journal`, Pilote et Direction) : chaque action acceptée est tracée (qui, quoi, quand, objet), filtrable ; l’historique d’un produit reprend ses entrées.
+- **Réception contrôlée** : quantités reçues ligne à ligne, écarts, réserves ; le stock prend les quantités réellement reçues.
+- **Indicateurs Direction** (Performance) : conteneurs à l’heure, réceptions conformes, packs rendus à temps, valeur engagée au m³, charge des designers, tableau fournisseurs.
+- **Paramètres** : capacité par designer (défaut 40 packs / semaine) et cours des devises (USD, CNY) ; proformas en EUR, USD ou CNY, totaux convertis en euros.
+- **Conteneurs** : poids de la marchandise comparé à la charge utile.
+- **Portail fournisseur bilingue** anglais / français (anglais par défaut).
+- **Accessibilité** : lignes et en-têtes activables au clavier, focus visible.
+- **Écrans chargés à la demande** ; lint sans avertissement.
+
+## Tests
+
+```bash
+npm run test:e2e     # Playwright (navigateur Chromium)
+```
+
+La CI GitHub (`.github/workflows/ci.yml`) lance lint, typage, build et tests à chaque push.
+
+## Prochaines étapes (nécessitent vos accès / décisions)
+
+- Serveur et base partagée (ex. Supabase : Postgres + Storage) à partir du modèle de `types.ts`.
+- Authentification réelle (comptes JONAS, invitations fournisseurs) et droits appliqués côté serveur (RLS reprenant `permissions.ts`).
+- Stockage partagé des fichiers (packs, dossiers créa, BL, factures).
+- Import des données réelles (Excel / ERP TCI) et suppression des données de démo.
+- Envoi réel des notifications (e-mail) et cours de change automatique.

@@ -1,9 +1,11 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Box, Check, CheckCircle2, Circle, Clock, Code2, PenLine, Settings, Truck, type LucideIcon } from 'lucide-react';
+import { CONTAINER_COLOR, PROFORMA_COLOR, PROFORMA_ICON, onToast } from './ui-shared';
+import { Check, Circle, Clock } from 'lucide-react';
 import type { Brand, ContainerStatus, Product, ProformaStatus, Supplier, ValidationStep } from '../data/types';
-import { VALIDATION_LABELS, VALIDATION_STEPS } from '../data/types';
-import { CONTAINER_STATUS_LABEL, PROFORMA_STATUS_LABEL, packLate, packState, type PackState } from '../data/store';
-import { fshort, initials } from '../lib/format';
+import { VALIDATION_STEPS } from '../data/types';
+import { packLate, packState, type PackState } from '../data/store';
+import { initials } from '../lib/format';
+import { useT } from '../i18n/context';
 
 export function Pill({ color, children, icon }: { color: string; children: ReactNode; icon?: ReactNode }) {
   return (
@@ -14,30 +16,14 @@ export function Pill({ color, children, icon }: { color: string; children: React
   );
 }
 
-export const PROFORMA_COLOR: Record<ProformaStatus, string> = {
-  a_signer: 'red',
-  en_dev: 'violet',
-  en_production: 'orange',
-  booke: 'blue',
-  en_transit: 'yellow',
-  arrive: 'green',
-};
-/** Icône et couleur de chaque statut (maquette JONAS) */
-export const PROFORMA_ICON: Record<ProformaStatus, { icon: LucideIcon; color: string }> = {
-  a_signer: { icon: PenLine, color: 'var(--red)' },
-  en_dev: { icon: Code2, color: 'var(--violet)' },
-  en_production: { icon: Settings, color: 'var(--orange)' },
-  booke: { icon: Box, color: 'var(--blue)' },
-  en_transit: { icon: Truck, color: 'var(--yellow)' },
-  arrive: { icon: CheckCircle2, color: 'var(--ink-2)' },
-};
 
 export function ProformaStatusPill({ status, big }: { status: ProformaStatus; big?: boolean }) {
   const Icon = PROFORMA_ICON[status].icon;
+  const { t } = useT(); // hors portail : libellés français de PROFORMA_STATUS_LABEL
   return (
     <span className={`pill ${PROFORMA_COLOR[status]} ${big ? 'pill-big' : ''}`}>
       <Icon size={big ? 17 : 13} />
-      {PROFORMA_STATUS_LABEL[status]}
+      {t(`ps.${status}`)}
     </span>
   );
 }
@@ -61,31 +47,26 @@ export function SupplierMark({ supplier, size = 30 }: { supplier: Supplier; size
   );
 }
 
-export const CONTAINER_COLOR: Record<ContainerStatus, string> = {
-  a_booker: 'orange',
-  booking_demande: 'violet',
-  booke: 'green',
-  en_transit: 'blue',
-  arrive: 'green',
-};
 export function ContainerStatusPill({ status }: { status: ContainerStatus }) {
-  return <Pill color={CONTAINER_COLOR[status]}>{CONTAINER_STATUS_LABEL[status]}</Pill>;
+  const { t } = useT(); // hors portail : libellés français de CONTAINER_STATUS_LABEL
+  return <Pill color={CONTAINER_COLOR[status]}>{t(`cs.${status}`)}</Pill>;
 }
 
-const PACK_LABEL: Record<PackState, [string, string]> = {
-  ok: ['OK', 'green'],
-  en_cours: ['En cours', 'orange'],
-  a_faire: ['À faire', 'red'],
+const PACK_COLOR: Record<PackState, string> = {
+  ok: 'green',
+  en_cours: 'orange',
+  a_faire: 'red',
 };
 export function PackPill({ product, prefix }: { product: Product; prefix?: boolean }) {
   const st = packState(product);
   const late = packLate(product);
-  const [label, color] = PACK_LABEL[st];
+  const color = PACK_COLOR[st];
+  const { t } = useT();
   return (
     <Pill color={late ? 'red' : color} icon={st === 'ok' ? <Check size={13} /> : undefined}>
-      {prefix ? 'État pack : ' : ''}
-      {label}
-      {late ? ' · en retard' : ''}
+      {prefix ? t('pack.prefix') : ''}
+      {t(`pack.${st}`)}
+      {late ? t('pack.late') : ''}
     </Pill>
   );
 }
@@ -125,11 +106,12 @@ export function ValidationDot({ state }: { state: 'done' | 'pending' | 'todo' })
 
 export function ValidationCircuit({ product, compact }: { product: Product; compact?: boolean }) {
   const v = product.pack.validations;
+  const { t, fmt } = useT();
   if (compact)
     return (
       <div className="row" style={{ gap: 4 }}>
         {VALIDATION_STEPS.map((s) => (
-          <span key={s} title={VALIDATION_LABELS[s]}>
+          <span key={s} title={t(`vs.${s}`)}>
             <ValidationDot state={v[s].state} />
           </span>
         ))}
@@ -142,9 +124,9 @@ export function ValidationCircuit({ product, compact }: { product: Product; comp
         return (
           <div key={s} className={`step ${st === 'done' ? 'done' : st === 'pending' ? 'pending' : ''}`}>
             <div className="bullet">{st === 'done' ? <Check size={16} strokeWidth={3} /> : st === 'pending' ? <Clock size={15} /> : null}</div>
-            <div className="lbl">{VALIDATION_LABELS[s]}</div>
+            <div className="lbl">{t(`vs.${s}`)}</div>
             <div className={st === 'pending' ? 'orange xs' : 'muted xs'}>
-              {st === 'done' ? fshort(v[s].date) : st === 'pending' ? 'En attente' : 'À venir'}
+              {st === 'done' ? fmt.fshort(v[s].date) : st === 'pending' ? t('vstate.pending') : t('vstate.todo')}
             </div>
           </div>
         );
@@ -226,20 +208,16 @@ export function Seg<T extends string>({ options, value, onChange }: { options: {
   );
 }
 
-// Petit système de notification
-let pushToast: (m: string) => void = () => {};
-export function toast(m: string) {
-  pushToast(m);
-}
+// Petit système de notification (émetteur dans ui-shared.ts)
 export function Toaster() {
   const [msg, setMsg] = useState<string | null>(null);
   useEffect(() => {
     let t: ReturnType<typeof setTimeout>;
-    pushToast = (m) => {
+    return onToast((m) => {
       setMsg(m);
       clearTimeout(t);
       t = setTimeout(() => setMsg(null), 2600);
-    };
+    });
   }, []);
   return msg ? <div className="toast">{msg}</div> : null;
 }
@@ -254,12 +232,3 @@ export function ContainerGlyph({ size = 18, strokeWidth = 1.8, className }: { si
   );
 }
 
-/** Couleur fixe par designer (identique sur tous les écrans) */
-const DESIGNER_FIXED: Record<string, string> = { Léa: '#d6336c', Sarah: '#7048e8', Hugo: '#1c7ed6' };
-const DESIGNER_PALETTE = ['#e8590c', '#0ca678', '#ae3ec9', '#f08c00', '#1098ad'];
-export function designerColor(name: string): string {
-  if (DESIGNER_FIXED[name]) return DESIGNER_FIXED[name];
-  let h = 0;
-  for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  return DESIGNER_PALETTE[h % DESIGNER_PALETTE.length];
-}

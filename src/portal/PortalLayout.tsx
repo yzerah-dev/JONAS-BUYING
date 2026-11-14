@@ -1,27 +1,48 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { Navigate, NavLink, Outlet } from 'react-router-dom';
 import { Bell, Boxes, Container as Ctn, Euro, FileText, Home, Package, Truck } from 'lucide-react';
 import { isSupplier } from '../data/permissions';
 import { useTableLabels } from '../components/useTableLabels';
 import { Toaster } from '../components/ui';
 import UserSwitcher from '../components/UserSwitcher';
+import { I18nProvider, LangToggle, useT } from '../i18n';
+import '../i18n/i18n.css';
 import { usePortal } from './usePortal';
 
+/** Le portail fournisseur est bilingue (anglais par défaut) ; le reste de l'application reste en français. */
 export default function PortalLayout() {
+  return (
+    <I18nProvider defaultLang="en">
+      <PortalShell />
+    </I18nProvider>
+  );
+}
+
+function PortalShell() {
   const { user, supplier, packsToValidate, dieCutsRequested, plansRequested, docsMissing } = usePortal();
+  const { t, td, lang } = useT();
   const mainRef = useRef<HTMLElement>(null);
   useTableLabels(mainRef);
+  // Les libellés de colonnes (data-label, vue téléphone) sont recalculés sur mutation du DOM :
+  // un changement de langue ne modifie que des nœuds texte, on provoque donc une mutation.
+  useEffect(() => {
+    const el = mainRef.current;
+    if (!el) return;
+    const n = document.createComment('');
+    el.appendChild(n);
+    n.remove();
+  }, [lang]);
   if (!isSupplier(user) || !supplier) return <Navigate to="/" replace />;
   const todo = packsToValidate.length + dieCutsRequested.length + plansRequested.length + docsMissing.length;
 
   const NAV = [
-    { to: '/portail', label: 'Tableau de bord', icon: Home, end: true },
-    { to: '/portail/produits', label: 'Mes produits', icon: Boxes },
-    { to: '/portail/proformas', label: 'Mes proformas', icon: FileText },
-    { to: '/portail/packs', label: 'Packs & die cuts', icon: Package, badge: packsToValidate.length + dieCutsRequested.length },
-    { to: '/portail/chargement', label: 'Plans de chargement', icon: Truck, badge: plansRequested.length },
-    { to: '/portail/conteneurs', label: 'Conteneurs & documents', icon: Ctn, badge: docsMissing.length },
-    { to: '/portail/finance', label: 'Factures & paiements', icon: Euro },
+    { to: '/portail', label: t('nav.home'), icon: Home, end: true },
+    { to: '/portail/produits', label: t('nav.products'), icon: Boxes },
+    { to: '/portail/proformas', label: t('nav.proformas'), icon: FileText },
+    { to: '/portail/packs', label: t('nav.packs'), icon: Package, badge: packsToValidate.length + dieCutsRequested.length },
+    { to: '/portail/chargement', label: t('nav.loading'), icon: Truck, badge: plansRequested.length },
+    { to: '/portail/conteneurs', label: t('nav.containers'), icon: Ctn, badge: docsMissing.length },
+    { to: '/portail/finance', label: t('nav.finance'), icon: Euro },
   ];
 
   return (
@@ -30,14 +51,15 @@ export default function PortalLayout() {
         <div className="logo">
           <span className="logo-mark">J</span> JONAS BUYING
         </div>
-        <span className="portal-badge">PORTAIL FOURNISSEUR</span>
+        <span className="portal-badge">{t('layout.badge')}</span>
         <span className="bold">{supplier.name}</span>
         <span className="muted small">
-          {supplier.flag} {supplier.city}
+          {supplier.flag} {td(supplier.city)}
         </span>
         <div className="grow" />
         <div className="top-actions">
-          <span className="icon-btn" title={`${todo} action(s) en attente`}>
+          <LangToggle />
+          <span className="icon-btn" title={t('layout.pending', { n: todo })}>
             <Bell size={22} />
             {todo > 0 && <span className="dot" />}
           </span>
@@ -53,7 +75,7 @@ export default function PortalLayout() {
         ))}
         <div className="spacer" />
         <div className="xs muted" style={{ padding: '8px 12px' }}>
-          Vous ne voyez que les données de {supplier.shortName}.
+          {t('layout.scope', { name: supplier.shortName })}
         </div>
       </nav>
       <main className="main" ref={mainRef}>

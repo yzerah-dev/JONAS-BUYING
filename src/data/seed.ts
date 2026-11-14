@@ -497,6 +497,23 @@ export const containers: Container[] = containerPlan.flatMap(([pfId, cov, st]) =
   }
 }
 
+// Contrôles de réception des conteneurs arrivés (un avec écart, pour la démo)
+containers
+  .filter((x) => x.status === 'arrive')
+  .forEach((c, i) => {
+    c.reception = {
+      at: `${c.receivedOn ?? c.etaPlanned}T09:30`,
+      by: 'Logistique',
+      lines: c.allocations.map((a, j) => ({
+        proformaId: a.proformaId,
+        productId: a.productId,
+        expected: a.qty,
+        received: i === 1 && j === 0 ? a.qty - 48 : a.qty,
+      })),
+      note: i === 1 ? '2 cartons écrasés, refusés au déchargement' : undefined,
+    };
+  });
+
 // Stock : alimenté par les conteneurs réceptionnés
 for (const c of containers.filter((x) => x.status === 'arrive')) {
   for (const a of c.allocations) {

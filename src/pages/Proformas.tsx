@@ -16,8 +16,10 @@ import {
 } from 'lucide-react';
 import { byId, proformaTotals, useAuth, useStore, PROFORMA_STATUS_LABEL, type State } from '../data/store';
 import { PROFORMA_STATUSES, type Proforma, type ProformaStatus } from '../data/types';
-import { ContainerGlyph, PROFORMA_ICON, ProformaStatusPill, SupplierMark, toast } from '../components/ui';
+import { ContainerGlyph, ProformaStatusPill, SupplierMark } from '../components/ui';
+import { PROFORMA_ICON, toast } from '../components/ui-shared';
 import { TODAY, dec, eur, weekKey, weekLabel, weekRange } from '../lib/format';
+import { pressable } from '../lib/a11y';
 
 type View = 'liste' | 'semaine' | 'fournisseur';
 
@@ -190,7 +192,7 @@ function Group({
 
   return (
     <section className={`pf-week ${open ? 'open' : ''}`}>
-      <header className="pf-week-head" onClick={() => setOpen(!open)}>
+      <header className="pf-week-head" {...pressable(() => setOpen(!open), `${title} : ${open ? 'replier' : 'déplier'}`)} aria-expanded={open}>
         <Calendar className="pf-week-cal" size={38} strokeWidth={1.8} />
         <div className="pf-week-title">
           <h2>{title}</h2>
@@ -301,10 +303,15 @@ function StatusCell({ p, onSign }: { p: Proforma; onSign?: (id: string) => void 
   return <ProformaStatusPill status={p.status} big />;
 }
 
-function AmountCell({ p, amount, deposit }: { p: Proforma; amount: number; deposit: number }) {
+function AmountCell({ p, amount, deposit, amountCur, currency }: { p: Proforma; amount: number; deposit: number; amountCur?: number; currency?: string }) {
   return (
     <div className="pf-amount">
       <b>{eur(amount)}</b>
+      {currency && currency !== 'EUR' && amountCur !== undefined && (
+        <small className="pf-cur">
+          {new Intl.NumberFormat('fr-FR', { style: 'currency', currency, maximumFractionDigits: 0 }).format(amountCur)}
+        </small>
+      )}
       <small>Acompte : {eur(deposit)}</small>
       {p.depositPaid ? (
         <span className="ok">
@@ -330,7 +337,7 @@ function PackCell({ ok, total, done }: { ok: number; total: number; done: boolea
 function Row({ p, state, showMoney, onSign, onOpen }: RowProps) {
   const { t, sup, title, packsDone } = useRowData(p, state);
   return (
-    <tr onClick={onOpen}>
+    <tr {...pressable(onOpen, `Ouvrir ${p.id}`)}>
       <td>
         <div className="pf-ref">
           <SupplierMark supplier={sup} size={30} />
@@ -362,7 +369,7 @@ function Row({ p, state, showMoney, onSign, onOpen }: RowProps) {
       <td className="c pf-week-no">{weekLabel(p.eta)}</td>
       {showMoney && (
         <td className="c">
-          <AmountCell p={p} amount={t.amount} deposit={t.deposit} />
+          <AmountCell p={p} amount={t.amount} deposit={t.deposit} amountCur={t.amountCur} currency={t.currency} />
         </td>
       )}
       <td className="pf-go">
@@ -421,7 +428,7 @@ function Card({ p, state, showMoney, onSign, onOpen }: RowProps) {
           </div>
           <div className="pf-card-bottom">
             <StatusCell p={p} onSign={onSign} />
-            {showMoney && <AmountCell p={p} amount={t.amount} deposit={t.deposit} />}
+            {showMoney && <AmountCell p={p} amount={t.amount} deposit={t.deposit} amountCur={t.amountCur} currency={t.currency} />}
           </div>
           <button className="pf-btn pf-line-open" onClick={onOpen}>
             Ouvrir la proforma <ChevronRight size={18} />

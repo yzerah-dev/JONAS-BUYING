@@ -33,7 +33,8 @@ import {
 import { DEV_STAGES, type Product } from '../data/types';
 import { SITES } from '../data/seed';
 import PackFiles from '../components/PackFiles';
-import { BrandLogo, ContainerStatusPill, PackPill, Pill, ProformaStatusPill, Progress, Tabs, ValidationCircuit, toast } from '../components/ui';
+import { BrandLogo, ContainerStatusPill, PackPill, Pill, ProformaStatusPill, Progress, Tabs, ValidationCircuit } from '../components/ui';
+import { toast } from '../components/ui-shared';
 import { dec, eur, eur2, fdate, fshort, num, weekLabel } from '../lib/format';
 
 type Tab = 'overview' | 'design' | 'dev' | 'commandes' | 'production' | 'logistique' | 'stock' | 'docs';
@@ -559,6 +560,7 @@ function DocsCard({ p, state }: { p: Product; state: State }) {
     ...Object.entries(p.pack.validations)
       .filter(([, v]) => v.state === 'done')
       .map(([k, v]) => ({ date: v.date!, user: k, text: `Pack validé (${k})` })),
+    ...(state.journal ?? []).filter((e) => e.target === p.ref).map((e) => ({ date: e.at.slice(0, 10), user: e.user, text: `${e.text} · ${e.at.slice(11, 16)}` })),
   ].sort((a, b) => b.date.localeCompare(a.date));
   return (
     <div className="grid2">
