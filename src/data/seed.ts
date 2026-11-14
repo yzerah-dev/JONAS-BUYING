@@ -103,6 +103,17 @@ const productDefs: P[] = [
   // Seoul Cosmetic
   ['JB-K001', 'K-Beauty coffret', 'jbeauty', 'seoul', 'Beauté', '🎀', '#fde3ea', 5.9, 24, 0.06, 'Coffret rigide', 'Sarah'],
   ['JB-K005', 'Masques tissu ×10', 'jbeauty', 'seoul', 'Beauté', '🧖', '#e2f1f8', 2.4, 48, 0.04, 'Étui', 'Sarah', false],
+  // Produits à développer (répartis entre les designers)
+  ['CP-S055', 'Sandale corde femme', 'camille', 'jinfa', 'Chaussures', '👡', '#f6e7d4', 5.9, 24, 0.12, 'Boîte + étiquette', 'Léa', false],
+  ['CP-T010', 'Tong strass', 'camille', 'tide', 'Chaussures', '🩴', '#fde1ef', 2.4, 48, 0.12, 'Carte + crochet', 'Léa', false],
+  ['AB-M040', 'Mocassin cuir velours', 'bellami', 'jinfa', 'Chaussures', '👞', '#e9ddd0', 13.9, 12, 0.06, 'Boîte + papier de soie', 'Léa', false],
+  ['YD-S020', 'Sneaker toile homme', 'dorsey', 'wenzhoutex', 'Chaussures', '👟', '#e1e8f0', 7.8, 12, 0.08, 'Boîte', 'Sarah', false],
+  ['PF-P030', 'Eau de toilette agrumes', 'perfumo', 'nova', 'Parfumerie', '🍋', '#fff5cc', 3.2, 24, 0.035, 'Étui + coffret', 'Sarah', false],
+  ['JB-K010', 'Patchs yeux hydrogel', 'jbeauty', 'seoul', 'Beauté', '👁️', '#e5f3fb', 1.9, 48, 0.03, 'Étui', 'Sarah', false],
+  ['JO-J220', 'Hamac XXL', 'jonas', 'horizon', 'Jardin', '🏝️', '#e3f2e5', 16.5, 4, 0.08, 'Housse + étiquette', 'Hugo', false],
+  ['JO-R320', 'Paniers jacinthe ×3', 'jonas', 'northbay', 'Maison', '🧺', '#f1e6d2', 8.9, 4, 0.12, 'Hangtag', 'Hugo', false],
+  ['TR-B010', 'Cabas paille', 'tropaya', 'yiwu', 'Bagagerie', '👜', '#f7ebcf', 4.6, 24, 0.14, 'Hangtag + étiquette', 'Hugo', false],
+  ['JO-T050', 'Fouta rayée', 'jonas', 'wenzhoutex', 'Maison', '🧣', '#dff0f3', 3.8, 24, 0.07, 'Bandeau', 'Hugo', false],
 ];
 
 function ean(i: number) {
@@ -122,6 +133,24 @@ function validations(level: number, base: string): Record<ValidationStep, Valida
 
 // Échéances artwork réparties sur les semaines à venir
 const deadlines = ['2026-11-13', '2026-11-20', '2026-11-27', '2026-11-27', '2026-12-04', '2026-12-11', '2026-12-18', '2027-01-08'];
+
+// Échéances de développement (et urgences) des produits à développer
+const DEV: Record<string, [deadline: string, urgent: boolean]> = {
+  'AB-M030': ['2026-11-12', true],
+  'YD-S020': ['2026-11-10', false],
+  'CP-S055': ['2026-11-18', false],
+  'CP-S050': ['2026-11-19', false],
+  'JB-K010': ['2026-11-20', true],
+  'CP-T010': ['2026-11-25', false],
+  'YD-B012': ['2026-11-26', true],
+  'JO-J220': ['2026-11-27', false],
+  'JO-R320': ['2026-12-02', false],
+  'JB-K005': ['2026-12-03', false],
+  'AB-M040': ['2026-12-09', false],
+  'TR-B010': ['2026-12-10', false],
+  'PF-P030': ['2026-12-16', false],
+  'JO-T050': ['2027-01-06', false],
+};
 
 // Niveaux de validation pack imposés pour la démo (proformas de la semaine 49)
 const PACK_LEVEL: Record<string, number> = {
@@ -167,7 +196,8 @@ export const products: Product[] = productDefs.map((d, i) => {
     weight: Math.round((0.2 + rnd() * 0.8) * 100) / 100,
     developed,
     devStage: stage,
-    devDeadline: addDays('2026-11-20', i * 5),
+    devDeadline: DEV[ref]?.[0] ?? addDays('2026-11-20', i * 5),
+    urgent: DEV[ref]?.[1] ?? false,
     nextAction: developed ? 'Réassort à planifier' : ['Valider le brief', 'Recevoir l’échantillon', 'Valider l’échantillon', 'Négocier le prix'][i % 4],
     targetQty: developed ? 0 : 6000 + (i % 3) * 3000,
     pack,

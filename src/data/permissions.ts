@@ -68,8 +68,8 @@ export const ROLE_DEFS: Record<Role, RoleDef> = {
   },
   designer: {
     label: 'Designer',
-    description: 'Ses packs par semaine : artwork, die cut, envoi au circuit de validation.',
-    modules: ['home', 'produits', 'design', 'parametres'],
+    description: 'Ses produits à développer et ses packs par semaine : artwork, die cut, envoi au circuit de validation.',
+    modules: ['home', 'produits', 'developpement', 'design', 'parametres'],
     perms: ['pack.design'],
   },
   validateur: {

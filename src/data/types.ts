@@ -91,6 +91,8 @@ export interface Product {
   devDeadline: ISODate;
   nextAction: string;
   targetQty: number;
+  /** Poussé en urgence par l'acheteur (onglet PUSH URGENT) */
+  urgent?: boolean;
   pack: Pack;
   stock: Record<string, number>; // par site
 }

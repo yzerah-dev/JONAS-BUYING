@@ -28,7 +28,7 @@ export interface State {
   currentUserId: string;
 }
 
-const STORAGE_KEY = 'jonas-buying-state-v3';
+const STORAGE_KEY = 'jonas-buying-state-v4';
 
 export const currentUser = (s: State): User => s.users.find((u) => u.id === s.currentUserId) ?? s.users[0];
 
@@ -81,7 +81,9 @@ export type Action =
   | { type: 'ship'; containerId: string }
   | { type: 'receive'; containerId: string }
   | { type: 'reviseEta'; containerId: string; eta: ISODate }
-  | { type: 'advanceDev'; productId: string };
+  | { type: 'advanceDev'; productId: string }
+  | { type: 'toggleUrgent'; productId: string }
+  | { type: 'markDeveloped'; productId: string };
 
 const hist = (user: string, text: string): HistoryEntry => ({ date: TODAY, user, text });
 
@@ -139,6 +141,8 @@ const ACTION_PERM: Partial<Record<Action['type'], Perm>> = {
   receive: 'logistics.booking',
   reviseEta: 'logistics.booking',
   advanceDev: 'dev.advance',
+  toggleUrgent: 'dev.advance',
+  markDeveloped: 'dev.advance',
   setUserRole: 'users.manage',
   toggleUser: 'users.manage',
 };
@@ -359,6 +363,10 @@ function reducer(s: State, a: Action): State {
       }
       return syncProformaStatuses(next);
     }
+    case 'toggleUrgent':
+      return mapP(s, a.productId, (p) => ({ ...p, urgent: !p.urgent }));
+    case 'markDeveloped':
+      return mapP(s, a.productId, (p) => ({ ...p, developed: true, urgent: false, devStage: DEV_STAGES.length - 1, nextAction: 'Passer commande' }));
     case 'advanceDev':
       return mapP(s, a.productId, (p) => {
         const devStage = Math.min(p.devStage + 1, DEV_STAGES.length - 1);
