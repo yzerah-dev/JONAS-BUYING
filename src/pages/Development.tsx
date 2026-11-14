@@ -181,33 +181,27 @@ function DevelopmentPage() {
           .map((d) => ({ d, items: todo.filter((p) => p.pack.designer === d) }))
           .filter((g) => g.items.length)
           .map(({ d, items }) => (
-            <Group
+            <DesignerBlock
               key={d}
+              name={d}
+              title={state.users.find((u) => u.designerName === d)?.title ?? 'Designer'}
+              color={colorOf(d)}
+              items={items}
               drop={dropZone(`grp-${d}`, d)}
-              head={
-                <>
-                  <span className="dev-avatar lg" style={{ background: colorOf(d) }}>
-                    {initials(d)}
-                  </span>
-                  <div className="pf-week-title">
-                    <h2>{d}</h2>
-                    <span>{state.users.find((u) => u.designerName === d)?.title ?? 'Designer'}</span>
-                  </div>
-                  <span className="pf-count">
-                    {items.length} à développer
-                  </span>
-                  <GroupStats items={items} />
-                </>
-              }
             >
               {weeksOf(items).map(([wk, ps]) => (
-                <WeekSub key={wk} wk={wk} items={ps} capacity={capacityOf(state, d)} drop={dropZone(`${d}|${wk}`, d, ps[0].devDeadline)}>
+                <Group
+                  key={wk}
+                  defaultOpen={wk <= weekKey(TODAY)}
+                  drop={dropZone(`${d}|${wk}`, d, ps[0].devDeadline)}
+                  head={<WeekHead wk={wk} items={ps} capacity={capacityOf(state, d)} />}
+                >
                   {ps.map((p) => (
                     <Line key={p.id} p={p} showDesigner={false} {...lineProps} />
                   ))}
-                </WeekSub>
+                </Group>
               ))}
-            </Group>
+            </DesignerBlock>
           ))}
 
       {tab === 'semaine' &&
@@ -216,36 +210,21 @@ function DevelopmentPage() {
             key={wk}
             drop={dropZone(`wk-${wk}`, undefined, items[0].devDeadline)}
             defaultOpen={wk <= weekKey(TODAY)}
-            head={
-              <>
-                <Calendar className="pf-week-cal" size={38} strokeWidth={1.8} />
-                <div className="pf-week-title">
-                  <h2>
-                    Semaine {weekLabel(items[0].devDeadline).slice(1)}
-                    {wk === weekKey(TODAY) && <span className="dev-now">en cours</span>}
-                  </h2>
-                  <span>{weekRange(items[0].devDeadline)}</span>
-                </div>
-                <span className="pf-count">
-                  {items.length} produit{items.length > 1 ? 's' : ''}
-                </span>
-                <div className="dev-week-designers">
-                  {designers
-                    .map((d) => [d, items.filter((p) => p.pack.designer === d).length] as const)
-                    .filter(([, n]) => n)
-                    .map(([d, n]) => (
-                      <span key={d} className="dev-chip">
-                        <span className="dev-avatar" style={{ background: colorOf(d) }}>
-                          {initials(d)}
-                        </span>
-                        {d} <b>{n}</b>
-                      </span>
-                    ))}
-                </div>
-                <GroupStats items={items} />
-              </>
-            }
+            head={<WeekHead wk={wk} items={items} capacity={designers.reduce((t, d) => t + (items.some((p) => p.pack.designer === d) ? capacityOf(state, d) : 0), 0)} />}
           >
+            <div className="dev-week-designers">
+              {designers
+                .map((d) => [d, items.filter((p) => p.pack.designer === d).length] as const)
+                .filter(([, n]) => n)
+                .map(([d, n]) => (
+                  <span key={d} className="dev-chip">
+                    <span className="dev-avatar" style={{ background: colorOf(d) }}>
+                      {initials(d)}
+                    </span>
+                    {d} <b>{n}</b>
+                  </span>
+                ))}
+            </div>
             {items.map((p) => (
               <Line key={p.id} p={p} showDesigner {...lineProps} />
             ))}
@@ -445,23 +424,76 @@ function Line({ p, state, showDesigner, canAct, colorOf, onOpen, onUrgent, onDon
 }
 
 
-/** Sous-groupe semaine repliable : semaines passées et en cours ouvertes par défaut */
-function WeekSub({ wk, items, children, drop = {}, capacity }: { wk: string; items: Product[]; children: React.ReactNode; drop?: Drop; capacity: number }) {
-  const { className: dropClass, ...dropHandlers } = drop;
-  const [open, setOpen] = useState(wk <= weekKey(TODAY));
+/** En-tête de semaine identique à la page Proformas */
+function WeekHead({ wk, items, capacity }: { wk: string; items: Product[]; capacity: number }) {
   const late = items.filter(isLate).length;
+  const urgent = items.filter((p) => p.urgent).length;
   return (
-    <div className="dev-sub">
-      <div className={`dev-sub-head ${dropClass ?? ''}`} {...pressable(() => setOpen(!open))} aria-expanded={open} {...dropHandlers}>
-        {open ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-        Semaine {weekLabel(items[0].devDeadline).slice(1)} <span>{weekRange(items[0].devDeadline)}</span>
-        {late > 0 && <span className="pill red">{late} en retard</span>}
-        <span className={`cap ${items.length > capacity ? 'over' : ''}`}>
-          {items.length}/{capacity}
-        </span>
-        <b>{items.length}</b>
+    <>
+      <Calendar className="pf-week-cal" size={38} strokeWidth={1.8} />
+      <div className="pf-week-title">
+        <h2>
+          Semaine {weekLabel(items[0].devDeadline).slice(1)}
+          {wk === weekKey(TODAY) && <span className="dev-now">en cours</span>}
+        </h2>
+        <span>{weekRange(items[0].devDeadline)}</span>
       </div>
-      {open && children}
-    </div>
+      <span className="pf-count">
+        {items.length} produit{items.length > 1 ? 's' : ''}
+      </span>
+      <div className="pf-metrics">
+        <div className="pf-metric">
+          <small>En retard</small>
+          <b className={late ? 'red' : ''}>{late}</b>
+        </div>
+        <div className="pf-metric">
+          <small>Urgents</small>
+          <b className={urgent ? 'red' : ''}>{urgent}</b>
+        </div>
+        <div className="pf-metric">
+          <small>Capacité</small>
+          <b className={items.length > capacity ? 'red' : ''}>
+            {items.length}/{capacity}
+          </b>
+        </div>
+      </div>
+    </>
+  );
+}
+
+/** Bloc d'un designer : en-tête (repliable) puis ses cartes semaine */
+function DesignerBlock({
+  name,
+  title,
+  color,
+  items,
+  drop = {},
+  children,
+}: {
+  name: string;
+  title: string;
+  color: string;
+  items: Product[];
+  drop?: Drop;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(true);
+  const { className: dropClass, ...dropHandlers } = drop;
+  return (
+    <section className="dev-dblock">
+      <header className={`dev-dhead ${dropClass ?? ''}`} {...pressable(() => setOpen(!open), `${name} : ${open ? 'replier' : 'déplier'}`)} aria-expanded={open} {...dropHandlers}>
+        <span className="dev-avatar lg" style={{ background: color }}>
+          {initials(name)}
+        </span>
+        <div className="dev-dname">
+          <h2>{name}</h2>
+          <span>{title}</span>
+        </div>
+        <span className="pf-count">{items.length} à développer</span>
+        <GroupStats items={items} />
+        <span className="pf-chevron">{open ? <ChevronUp size={24} /> : <ChevronDown size={24} />}</span>
+      </header>
+      {open && <div className="dev-dweeks">{children}</div>}
+    </section>
   );
 }
