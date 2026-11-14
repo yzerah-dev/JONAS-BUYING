@@ -32,6 +32,7 @@ import {
 } from '../data/store';
 import { DEV_STAGES, type Product } from '../data/types';
 import { SITES } from '../data/seed';
+import PackFiles from '../components/PackFiles';
 import { BrandLogo, ContainerStatusPill, PackPill, Pill, ProformaStatusPill, Progress, Tabs, ValidationCircuit, toast } from '../components/ui';
 import { dec, eur, eur2, fdate, fshort, num, weekLabel } from '../lib/format';
 
@@ -274,6 +275,11 @@ function DesignCard({ p, full }: { p: Product; full?: boolean }) {
           </button>
         )}
       </div>
+      {full && (
+        <div className="mt">
+          <PackFiles p={p} />
+        </div>
+      )}
       <div className="small muted mt">
         Designer : <b>{p.pack.designer}</b> · Date limite artwork : <b className={p.pack.artworkDeadline < '2026-11-14' && !packDone(p) ? 'red' : ''}>{fdate(p.pack.artworkDeadline)}</b>
       </div>

@@ -8,6 +8,7 @@ import type {
   ISODate,
   Product,
   Proforma,
+  PackFile,
   ProformaStatus,
   Role,
   Supplier,
@@ -86,7 +87,9 @@ export type Action =
   | { type: 'markDeveloped'; productId: string }
   | { type: 'reassignPack'; productId: string; designer?: string; weekOf?: ISODate }
   | { type: 'startPack'; productId: string }
-  | { type: 'planPack'; productId: string; date: ISODate | null };
+  | { type: 'planPack'; productId: string; date: ISODate | null }
+  | { type: 'addPackFiles'; productId: string; kind: 'pack' | 'crea'; files: Omit<PackFile, 'kind' | 'version' | 'uploadedAt' | 'uploadedBy'>[] }
+  | { type: 'removePackFile'; productId: string; fileId: string };
 
 /** Horodatage de démo : date du jour de l'application + heure réelle */
 const nowStamp = () => `${TODAY}T${new Date().toTimeString().slice(0, 5)}`;
@@ -179,6 +182,8 @@ export function isAllowed(s: State, a: Action): boolean {
       if (isSupplier(u)) return p.supplierId === u.supplierId && p.pack.validations.fournisseur.state === 'pending' && p.pack.sentToSupplier;
       return can(u, 'pack.reject');
     }
+    case 'addPackFiles':
+    case 'removePackFile':
     case 'startPack':
     case 'planPack': {
       // Le designer du pack (ou le Pilote) annonce son démarrage
@@ -380,6 +385,29 @@ function reducer(s: State, a: Action): State {
       return mapP(s, a.productId, (p) => (p.pack.startedAt ? p : { ...p, pack: { ...p.pack, startedAt: nowStamp() } }));
     case 'planPack':
       return mapP(s, a.productId, (p) => ({ ...p, pack: { ...p.pack, plannedStart: a.date ?? undefined } }));
+    case 'addPackFiles':
+      return mapP(s, a.productId, (p) => {
+        const files = p.pack.files ?? [];
+        const stamp = nowStamp();
+        let version = Math.max(0, ...files.filter((f) => f.kind === 'pack').map((f) => f.version ?? 0));
+        const added: PackFile[] = a.files.map((f) => ({
+          ...f,
+          kind: a.kind,
+          version: a.kind === 'pack' ? ++version : undefined,
+          uploadedAt: stamp,
+          uploadedBy: me,
+        }));
+        const pack = { ...p.pack, files: [...files, ...added], startedAt: p.pack.startedAt ?? stamp };
+        if (a.kind === 'pack') {
+          // Nouvelle version du pack = soumise au circuit (David)
+          const v = { ...pack.validations };
+          if (VALIDATION_STEPS.every((st) => v[st].state === 'todo')) v.david = { state: 'pending' };
+          return { ...p, pack: { ...pack, validations: v, artworkVersions: Math.max(p.pack.artworkVersions, version) } };
+        }
+        return { ...p, pack };
+      });
+    case 'removePackFile':
+      return mapP(s, a.productId, (p) => ({ ...p, pack: { ...p.pack, files: (p.pack.files ?? []).filter((f) => f.id !== a.fileId) } }));
     case 'reassignPack':
       return mapP(s, a.productId, (p) => {
         let deadline = p.pack.artworkDeadline;

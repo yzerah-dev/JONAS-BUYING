@@ -60,6 +60,22 @@ export interface Pack {
   startedAt?: string;
   /** Date de début annoncée par le designer */
   plannedStart?: ISODate;
+  /** Fichiers uploadés : versions du pack et dossier créa */
+  files?: PackFile[];
+}
+
+export interface PackFile {
+  id: string; // clé du contenu dans le stockage de fichiers
+  kind: 'pack' | 'crea';
+  name: string;
+  /** Chemin relatif dans le dossier créa (ex. « Rendus/vue-face.jpg ») */
+  path: string;
+  size: number;
+  type: string;
+  /** Numéro de version (fichiers pack) */
+  version?: number;
+  uploadedAt: string;
+  uploadedBy: string;
 }
 
 export const DEV_STAGES = [

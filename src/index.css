@@ -896,3 +896,38 @@ th.pk-drop { background: var(--green-softer); border-radius: 10px; }
   .pk-row:has(.pk-start) .pk-c-val, .pk-row:has(.pk-start) .pk-c-due { display: none; }
   .pk-row:has(.pk-start) .pk-c-st { display: flex; }
 }
+
+/* =====================================================================
+   Fichiers du pack : versions + dossier créa
+   ===================================================================== */
+.pf-files { display: grid; gap: 10px; }
+.pf-drop { border: 1.5px dashed #cdd8d4; border-radius: 12px; padding: 10px; display: grid; gap: 6px; background: #fff; transition: background 0.12s, border-color 0.12s; }
+.pf-drop.over { border-color: var(--green); background: var(--green-softer); }
+.pf-drop header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pf-drop header .btn { margin-left: auto; }
+.pf-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.pf-hint { font-size: 12px; color: var(--muted); padding: 6px 2px; }
+.pf-file { display: flex; align-items: center; gap: 8px; padding: 5px 4px; border-radius: 8px; }
+.pf-file:hover { background: var(--grey-soft); }
+.pf-file-ico { width: 34px; height: 34px; border-radius: 8px; background: var(--green-softer); color: var(--green-dark); display: grid; place-items: center; flex-shrink: 0; }
+.pf-file-thumb { width: 34px; height: 34px; border-radius: 8px; object-fit: cover; flex-shrink: 0; cursor: zoom-in; border: 1px solid var(--line); }
+.pf-file-name { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
+.pf-file-name b { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 6px; }
+.pf-file-name small { font-size: 11px; color: var(--muted); }
+.pf-file .icon-btn { padding: 5px; color: var(--ink-2); }
+.danger-ico:hover { color: var(--red); }
+.pf-ver { font-size: 11px; font-weight: 800; padding: 1px 6px; border-radius: 6px; background: var(--grey-soft); color: var(--ink-2); flex-shrink: 0; }
+.pf-ver.on { background: var(--green); color: #fff; }
+.pf-old { opacity: 0.7; }
+.pf-folder { display: grid; gap: 2px; }
+.pf-folder-name { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--green-dark); padding: 6px 4px 2px; }
+.pf-folder-name small { color: var(--muted); font-weight: 600; }
+.pf-folder:has(.pf-folder-name) .pf-file { padding-left: 18px; }
+.pf-busy { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--green-dark); }
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+.pf-preview { position: fixed; inset: 0; z-index: 100; background: rgba(10, 20, 16, 0.75); display: grid; place-items: center; padding: 24px; cursor: zoom-out; }
+.pf-preview img { max-width: min(92vw, 1200px); max-height: 86vh; border-radius: 12px; background: #fff; }
+.pf-preview .icon-btn { position: absolute; top: calc(16px + env(safe-area-inset-top, 0px)); right: 16px; color: #fff; }
+.pk-clip { display: inline-flex; align-items: center; gap: 2px; font-size: 11px; font-weight: 700; color: var(--green-dark); background: var(--green-soft); padding: 0 5px; border-radius: 6px; }

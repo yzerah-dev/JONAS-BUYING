@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, Box, Check, Download, FileText, Flame, History, Layers, Play, Scissors, Search, Send, Upload, X } from 'lucide-react';
+import { AlertTriangle, Box, Check, Download, FileText, Flame, History, Layers, Paperclip, Play, Scissors, Search, Send, X } from 'lucide-react';
+import PackFiles from '../components/PackFiles';
 import { byId, packDone, packLate, useAuth, useStore, type State } from '../data/store';
 import type { Product } from '../data/types';
 import { VALIDATION_LABELS, VALIDATION_STEPS } from '../data/types';
@@ -540,7 +541,14 @@ function PackRow({
       <span className="pk-c-prod">
         <ProductThumb product={p} size={32} />
         <span className="pk-id">
-          <b>{p.ref}</b>
+          <b>
+            {p.ref}
+            {!!p.pack.files?.length && (
+              <span className="pk-clip" title={`${p.pack.files.length} fichier(s)`}>
+                <Paperclip size={11} /> {p.pack.files.length}
+              </span>
+            )}
+          </b>
           <small>
             {p.name} · {p.collection}
           </small>
@@ -601,7 +609,7 @@ function PackRow({
 function PackPanel({ p }: { p: Product }) {
   const { state, dispatch } = useStore();
   const auth = useAuth();
-  const [sub, setSub] = useState<'pack' | 'diecut' | 'brief' | 'fichiers'>('pack');
+  const [sub, setSub] = useState<'pack' | 'diecut' | 'brief' | 'fichiers'>('fichiers');
   const sup = byId(state.suppliers, p.supplierId);
   const pf = proformaOf(state, p);
   const done = packDone(p);
@@ -681,7 +689,7 @@ function PackPanel({ p }: { p: Product }) {
           { id: 'pack', label: 'Pack', icon: <Box size={14} /> },
           { id: 'diecut', label: 'Die cut', icon: <Scissors size={14} /> },
           { id: 'brief', label: 'Brief', icon: <FileText size={14} /> },
-          { id: 'fichiers', label: 'Fichiers', icon: <Layers size={14} /> },
+          { id: 'fichiers', label: `Fichiers (${(p.pack.files ?? []).length})`, icon: <Layers size={14} /> },
         ]}
       />
       {sub === 'pack' && (
@@ -719,15 +727,7 @@ function PackPanel({ p }: { p: Product }) {
           Pack {p.pack.type.toLowerCase()} pour la marque {byId(state.brands, p.brandId).name}, collection {p.collection}. Rendu attendu le {fdate(p.pack.artworkDeadline)} (designer : {p.pack.designer}).
         </div>
       )}
-      {sub === 'fichiers' && (
-        <div>
-          {Array.from({ length: p.pack.artworkVersions }, (_, i) => (
-            <div key={i} className="alert-line small">
-              <FileText size={14} className="green" /> {p.ref}_pack_v{i + 1}.ai
-            </div>
-          ))}
-        </div>
-      )}
+      {sub === 'fichiers' && <PackFiles p={p} />}
 
       <div className="pk-startbox mt">
         <div className="bold small">Démarrage du pack</div>
@@ -781,15 +781,6 @@ function PackPanel({ p }: { p: Product }) {
           }}
         >
           <Scissors size={15} /> Demander le die cut
-        </button>}
-        {auth.can('pack.design') && <button
-          className="btn"
-          onClick={() => {
-            dispatch({ type: 'uploadArtwork', productId: p.id });
-            toast(`Version v${p.pack.artworkVersions + 1} déposée`);
-          }}
-        >
-          <Upload size={15} /> Déposer une version
         </button>}
         {!done && pendingStep && auth.allowed({ type: 'validatePack', productId: p.id }) && (
           <button
