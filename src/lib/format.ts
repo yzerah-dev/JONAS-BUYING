@@ -101,3 +101,10 @@ export function initials(name: string) {
     .slice(0, 2)
     .toUpperCase();
 }
+
+/** « 12 nov. à 10:15 » depuis un horodatage ISO « 2026-11-12T10:15 » */
+export function fstamp(stamp?: string): string {
+  if (!stamp) return '—';
+  const [d, t] = stamp.split('T');
+  return t ? `${fshort(d)} à ${t.slice(0, 5)}` : fshort(d);
+}

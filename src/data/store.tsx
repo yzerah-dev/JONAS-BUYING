@@ -28,7 +28,7 @@ export interface State {
   currentUserId: string;
 }
 
-const STORAGE_KEY = 'jonas-buying-state-v6';
+const STORAGE_KEY = 'jonas-buying-state-v7';
 
 export const currentUser = (s: State): User => s.users.find((u) => u.id === s.currentUserId) ?? s.users[0];
 
@@ -84,7 +84,12 @@ export type Action =
   | { type: 'advanceDev'; productId: string }
   | { type: 'toggleUrgent'; productId: string }
   | { type: 'markDeveloped'; productId: string }
-  | { type: 'reassignPack'; productId: string; designer?: string; weekOf?: ISODate };
+  | { type: 'reassignPack'; productId: string; designer?: string; weekOf?: ISODate }
+  | { type: 'startPack'; productId: string }
+  | { type: 'planPack'; productId: string; date: ISODate | null };
+
+/** Horodatage de démo : date du jour de l'application + heure réelle */
+const nowStamp = () => `${TODAY}T${new Date().toTimeString().slice(0, 5)}`;
 
 const hist = (user: string, text: string): HistoryEntry => ({ date: TODAY, user, text });
 
@@ -173,6 +178,12 @@ export function isAllowed(s: State, a: Action): boolean {
       if (!p) return false;
       if (isSupplier(u)) return p.supplierId === u.supplierId && p.pack.validations.fournisseur.state === 'pending' && p.pack.sentToSupplier;
       return can(u, 'pack.reject');
+    }
+    case 'startPack':
+    case 'planPack': {
+      // Le designer du pack (ou le Pilote) annonce son démarrage
+      const p = s.products.find((x) => x.id === a.productId);
+      return !!p && (u.role === 'pilote' || (u.role === 'designer' && u.designerName === p.pack.designer));
     }
     case 'receiveDieCut': {
       const p = s.products.find((x) => x.id === a.productId);
@@ -279,7 +290,7 @@ function reducer(s: State, a: Action): State {
       return mapP(s, a.productId, (p) => {
         const v = { ...p.pack.validations };
         if (VALIDATION_STEPS.every((st) => v[st].state === 'todo')) v.david = { state: 'pending' };
-        return { ...p, pack: { ...p.pack, artworkVersions: p.pack.artworkVersions + 1, validations: v } };
+        return { ...p, pack: { ...p.pack, artworkVersions: p.pack.artworkVersions + 1, validations: v, startedAt: p.pack.startedAt ?? nowStamp() } };
       });
     case 'forwardPack':
       return mapP(s, a.productId, (p) => ({ ...p, pack: { ...p.pack, sentToSupplier: true } }));
@@ -365,6 +376,10 @@ function reducer(s: State, a: Action): State {
       }
       return syncProformaStatuses(next);
     }
+    case 'startPack':
+      return mapP(s, a.productId, (p) => (p.pack.startedAt ? p : { ...p, pack: { ...p.pack, startedAt: nowStamp() } }));
+    case 'planPack':
+      return mapP(s, a.productId, (p) => ({ ...p, pack: { ...p.pack, plannedStart: a.date ?? undefined } }));
     case 'reassignPack':
       return mapP(s, a.productId, (p) => {
         let deadline = p.pack.artworkDeadline;

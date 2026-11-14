@@ -249,6 +249,9 @@ const FAMILIES: Family[] = [
   },
 ];
 const pick = <T,>(a: T[]) => a[Math.floor(rnd() * a.length)];
+const minDate = (a: string, b: string) => (a < b ? a : b);
+const minDateMax = (a: string, floor: string) => (a > floor ? a : floor);
+const notStarted = (): Record<ValidationStep, Validation> => ({ david: { state: 'todo' }, direction: { state: 'todo' }, moinard: { state: 'todo' }, fournisseur: { state: 'todo' } });
 
 let genSeq = 200;
 GEN_WEEKS.forEach((weekMonday, wi) => {
@@ -269,6 +272,9 @@ GEN_WEEKS.forEach((weekMonday, wi) => {
         wi === 3 ? (r < 0.15 ? 2 : r < 0.45 ? 1 : 0) :
         r < 0.15 ? 1 : 0;
       const pcb = pick([12, 24, 36, 48]);
+      // Niveau 0 : artwork pas encore soumis (circuit « à venir »), sauf une partie déjà envoyée à David
+      const submitted = level > 0 || rnd() < (wi <= 1 ? 0.25 : 0.08);
+      const started = submitted || (wi <= 2 && rnd() < 0.5);
       products.push({
         id: ref,
         ref,
@@ -296,10 +302,13 @@ GEN_WEEKS.forEach((weekMonday, wi) => {
           type: pick(fam.packs),
           designer,
           artworkDeadline: deadline,
-          validations: validations(level, addDays(deadline, -6)),
-          dieCut: level >= 2 ? 'received' : level === 1 || rnd() < 0.2 ? 'requested' : 'none',
+          validations: submitted ? validations(level, addDays(deadline, -6)) : notStarted(),
+          dieCut: level >= 2 ? 'received' : level === 1 || (started && rnd() < 0.3) ? 'requested' : 'none',
           artworkVersions: Math.max(1, level),
           sentToSupplier: level >= 4 || (level === 3 && rnd() < 0.5),
+          // Packs pas encore rendus : certains commencés, d'autres avec un début annoncé
+          startedAt: started ? `${minDate(addDays(deadline, submitted ? -5 : -3), '2026-11-13')}T${10 + Math.floor(rnd() * 7)}:${pick(['00', '15', '30', '45'])}` : undefined,
+          plannedStart: !started && wi >= 2 && rnd() < 0.35 ? minDateMax(addDays(deadline, -4), '2026-11-16') : undefined,
         },
         stock: { Péronne: 0, Meaux: 0, Lillois: 0 },
       });

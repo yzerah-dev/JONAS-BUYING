@@ -4,7 +4,7 @@ import { AlertTriangle, Calendar, Check, ChevronDown, ChevronUp, Flame, Search, 
 import { byId, useAuth, useStore, type State } from '../data/store';
 import type { Product } from '../data/types';
 import { designerColor, BrandLogo, Pill, ProductThumb, toast } from '../components/ui';
-import { TODAY, diffDays, eur2, fshort, initials, num, weekKey, weekLabel, weekRange } from '../lib/format';
+import { TODAY, diffDays, eur2, fshort, fstamp, initials, num, weekKey, weekLabel, weekRange } from '../lib/format';
 
 type Tab = 'designer' | 'semaine' | 'urgent';
 
@@ -410,7 +410,17 @@ function Line({ p, state, showDesigner, canAct, colorOf, onOpen, onUrgent, onDon
         <b>{weekLabel(p.devDeadline)}</b>
         <small>{late ? `retard ${-days} j` : fshort(p.devDeadline)}</small>
       </span>
-      <span className="dev-flags">{p.urgent && <span className="pill red-solid"><Flame size={12} /> URGENT</span>}</span>
+      <span className="dev-flags">
+        {p.urgent ? (
+          <span className="pill red-solid">
+            <Flame size={12} /> URGENT
+          </span>
+        ) : p.pack.startedAt ? (
+          <span className="pill violet" title={`Commencé le ${fstamp(p.pack.startedAt)}`}>
+            Commencé
+          </span>
+        ) : null}
+      </span>
       <span className="dev-actions" onClick={(e) => e.stopPropagation()}>
         {canAct && (
           <>

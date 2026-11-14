@@ -1,17 +1,17 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, Box, Check, Download, FileText, Flame, History, Layers, Scissors, Search, Send, Upload, X } from 'lucide-react';
+import { AlertTriangle, Box, Check, Download, FileText, Flame, History, Layers, Play, Scissors, Search, Send, Upload, X } from 'lucide-react';
 import { byId, packDone, packLate, useAuth, useStore, type State } from '../data/store';
 import type { Product } from '../data/types';
 import { VALIDATION_LABELS, VALIDATION_STEPS } from '../data/types';
 import { designerColor, BrandLogo, Pill, ProductThumb, Tabs, ValidationCircuit, ValidationDot, toast } from '../components/ui';
-import { TODAY, addDays, fdate, fshort, initials, weekKey, weekLabel, weekRange } from '../lib/format';
+import { TODAY, addDays, fdate, fshort, fstamp, initials, weekKey, weekLabel, weekRange } from '../lib/format';
 
 
 function packStatus(p: Product): [string, string] {
   const v = p.pack.validations;
   if (packDone(p)) return ['Validé', 'green'];
-  if (v.david.state === 'todo') return ['À traiter', 'grey'];
+  if (v.david.state === 'todo') return p.pack.startedAt ? ['En création', 'violet'] : p.pack.plannedStart ? ['Début prévu', 'yellow'] : ['À traiter', 'grey'];
   if (v.david.state === 'pending') return ['À valider', 'orange'];
   if (v.fournisseur.state === 'pending') return p.pack.sentToSupplier ? ['Chez fournisseur', 'blue'] : ['À envoyer', 'blue'];
   return ['En validation', 'orange'];
@@ -24,11 +24,12 @@ function proformaOf(s: State, p: Product) {
 /** Capacité de référence d'un designer (packs par semaine) */
 const CAPACITY = 40;
 
-type StatusKey = 'all' | 'retard' | 'a_traiter' | 'a_valider' | 'en_validation' | 'a_envoyer' | 'fournisseur' | 'valide';
+type StatusKey = 'all' | 'retard' | 'a_traiter' | 'en_creation' | 'a_valider' | 'en_validation' | 'a_envoyer' | 'fournisseur' | 'valide';
 const STATUS_CHIPS: { id: StatusKey; label: string }[] = [
   { id: 'all', label: 'Tous' },
   { id: 'retard', label: 'En retard' },
-  { id: 'a_traiter', label: 'À traiter' },
+  { id: 'a_traiter', label: 'Pas commencés' },
+  { id: 'en_creation', label: 'En création' },
   { id: 'a_valider', label: 'À valider' },
   { id: 'en_validation', label: 'En validation' },
   { id: 'a_envoyer', label: 'À envoyer' },
@@ -38,6 +39,8 @@ const STATUS_CHIPS: { id: StatusKey; label: string }[] = [
 const LABEL_TO_KEY: Record<string, StatusKey> = {
   Validé: 'valide',
   'À traiter': 'a_traiter',
+  'Début prévu': 'a_traiter',
+  'En création': 'en_creation',
   'À valider': 'a_valider',
   'En validation': 'en_validation',
   'À envoyer': 'a_envoyer',
@@ -46,7 +49,7 @@ const LABEL_TO_KEY: Record<string, StatusKey> = {
 const statusKey = (p: Product) => LABEL_TO_KEY[packStatus(p)[0]];
 const matches = (p: Product, k: StatusKey) => k === 'all' || (k === 'retard' ? packLate(p) : statusKey(p) === k);
 // Ordre de traitement : retards d'abord, puis par avancement, puis par date
-const ORDER: StatusKey[] = ['a_traiter', 'a_valider', 'en_validation', 'a_envoyer', 'fournisseur', 'valide'];
+const ORDER: StatusKey[] = ['a_traiter', 'en_creation', 'a_valider', 'en_validation', 'a_envoyer', 'fournisseur', 'valide'];
 const sortPacks = (a: Product, b: Product) =>
   Number(packLate(b)) - Number(packLate(a)) || ORDER.indexOf(statusKey(a)) - ORDER.indexOf(statusKey(b)) || a.pack.artworkDeadline.localeCompare(b.pack.artworkDeadline);
 
@@ -196,6 +199,7 @@ function DesignPage() {
   const chosen = list.filter((p) => selected.has(p.id));
   const canValidate = chosen.filter((p) => !packDone(p) && auth.allowed({ type: 'validatePack', productId: p.id }));
   const canDieCut = chosen.filter((p) => p.pack.dieCut === 'none' && auth.allowed({ type: 'requestDieCut', productId: p.id }));
+  const canStart = chosen.filter((p) => !p.pack.startedAt && p.pack.validations.david.state === 'todo' && auth.allowed({ type: 'startPack', productId: p.id }));
   const canForward = chosen.filter((p) => p.pack.validations.moinard.state === 'done' && !p.pack.sentToSupplier && auth.allowed({ type: 'forwardPack', productId: p.id }));
   const bulk = (items: Product[], type: 'validatePack' | 'requestDieCut' | 'forwardPack', msg: string) => {
     items.forEach((p) => dispatch({ type, productId: p.id }));
@@ -298,6 +302,9 @@ function DesignPage() {
               <span className="green">
                 <b>{done}</b> validés
               </span>
+              <span className="violet-t">
+                <b>{scope.filter((p) => statusKey(p) === 'en_creation').length}</b> en création
+              </span>
               <span className={late ? 'red' : ''}>
                 <b>{late}</b> en retard
               </span>
@@ -363,6 +370,18 @@ function DesignPage() {
                   <Scissors size={14} /> Demander die cut ({canDieCut.length})
                 </button>
               )}
+              {canStart.length > 0 && (
+                <button
+                  className="btn sm primary"
+                  onClick={() => {
+                    canStart.forEach((p) => dispatch({ type: 'startPack', productId: p.id }));
+                    toast(`${canStart.length} pack(s) commencé(s)`);
+                    setSelected(new Set());
+                  }}
+                >
+                  <Play size={14} /> Je commence ({canStart.length})
+                </button>
+              )}
               {canForward.length > 0 && (
                 <button className="btn sm" onClick={() => bulk(canForward, 'forwardPack', 'pack(s) envoyé(s) aux fournisseurs')}>
                   <Send size={14} /> Forwarder ({canForward.length})
@@ -406,7 +425,7 @@ function DesignPage() {
                   </button>
                 </span>
               )}
-              {canValidate.length + canDieCut.length + canForward.length === 0 && !canPush && !canAssign && (
+              {canValidate.length + canDieCut.length + canForward.length + canStart.length === 0 && !canPush && !canAssign && (
                 <span className="small muted">Aucune action possible pour votre rôle sur cette sélection.</span>
               )}
               <button className="btn sm ghost" onClick={() => setSelected(new Set())}>
@@ -456,6 +475,14 @@ function DesignPage() {
                           }
                         : undefined
                     }
+                    onStart={
+                      !p.pack.startedAt && p.pack.validations.david.state === 'todo' && auth.allowed({ type: 'startPack', productId: p.id })
+                        ? () => {
+                            dispatch({ type: 'startPack', productId: p.id });
+                            toast(`${p.ref} : pack commencé`);
+                          }
+                        : undefined
+                    }
                     onCheck={() => toggle(p.id)}
                     onOpen={() => {
                       setSelId(p.id);
@@ -488,6 +515,7 @@ function PackRow({
   draggable,
   onDragStart,
   onUrgent,
+  onStart,
   onCheck,
   onOpen,
 }: {
@@ -500,6 +528,7 @@ function PackRow({
   draggable: boolean;
   onDragStart: (e: React.DragEvent) => void;
   onUrgent?: () => void;
+  onStart?: () => void;
   onCheck: () => void;
   onOpen: () => void;
 }) {
@@ -548,7 +577,22 @@ function PackRow({
       </span>
       <span className={`pk-c-due ${late ? 'red' : ''}`}>{fshort(p.pack.artworkDeadline)}</span>
       <span className="pk-c-st">
-        <Pill color={late ? 'red' : tone}>{late ? 'En retard' : label}</Pill>
+        {onStart ? (
+          <button
+            className="pk-start"
+            onClick={(e) => {
+              e.stopPropagation();
+              onStart();
+            }}
+            title="Indiquer que je commence ce pack"
+          >
+            <Play size={13} /> Commencer
+          </button>
+        ) : (
+          <Pill color={late ? 'red' : tone}>{late ? 'En retard' : label}</Pill>
+        )}
+        {p.pack.startedAt && !packDone(p) && p.pack.validations.david.state === 'todo' && <small className="pk-when">depuis {fstamp(p.pack.startedAt)}</small>}
+        {!p.pack.startedAt && p.pack.plannedStart && <small className="pk-when">prévu {fshort(p.pack.plannedStart)}</small>}
       </span>
     </div>
   );
@@ -684,6 +728,45 @@ function PackPanel({ p }: { p: Product }) {
           ))}
         </div>
       )}
+
+      <div className="pk-startbox mt">
+        <div className="bold small">Démarrage du pack</div>
+        {p.pack.startedAt ? (
+          <div className="small">
+            <Play size={13} className="violet-t" /> Commencé par <b>{p.pack.designer}</b> le <b>{fstamp(p.pack.startedAt)}</b>
+          </div>
+        ) : (
+          <div className="small muted">
+            Pas encore commencé{p.pack.plannedStart ? ` · début prévu le ${fdate(p.pack.plannedStart)}` : ''}
+          </div>
+        )}
+        {!p.pack.startedAt && auth.allowed({ type: 'startPack', productId: p.id }) && (
+          <div className="pk-startrow">
+            <button
+              className="btn sm primary"
+              onClick={() => {
+                dispatch({ type: 'startPack', productId: p.id });
+                toast(`${p.ref} : pack commencé`);
+              }}
+            >
+              <Play size={14} /> Je commence maintenant
+            </button>
+            <label className="small row" style={{ gap: 6 }} htmlFor={`plan-${p.id}`}>
+              ou début prévu le
+              <input
+                id={`plan-${p.id}`}
+                className="input"
+                type="date"
+                value={p.pack.plannedStart ?? ''}
+                onChange={(e) => {
+                  dispatch({ type: 'planPack', productId: p.id, date: e.target.value || null });
+                  if (e.target.value) toast(`Début prévu le ${fdate(e.target.value)}`);
+                }}
+              />
+            </label>
+          </div>
+        )}
+      </div>
 
       <div className="bold mt mb">Circuit de validation (4 étapes)</div>
       <ValidationCircuit product={p} />

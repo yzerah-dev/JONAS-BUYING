@@ -56,6 +56,10 @@ export interface Pack {
   dieCut: DieCutState;
   artworkVersions: number;
   sentToSupplier: boolean;
+  /** Le designer a commencé le pack (date + heure, ISO) */
+  startedAt?: string;
+  /** Date de début annoncée par le designer */
+  plannedStart?: ISODate;
 }
 
 export const DEV_STAGES = [
