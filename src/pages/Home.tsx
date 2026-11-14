@@ -30,7 +30,9 @@ export default function Home() {
     const st = currentValidator(p);
     return st && st !== 'fournisseur' && me.validationStep === st;
   });
-  const myPacks = me.designerName ? state.products.filter((p) => p.pack.designer === me.designerName && !packDone(p)) : [];
+  const myPacks = me.designerName
+    ? state.products.filter((p) => p.pack.designer === me.designerName && !packDone(p)).sort((a, b) => a.pack.artworkDeadline.localeCompare(b.pack.artworkDeadline))
+    : [];
   const toSign = state.proformas.filter((p) => p.status === 'a_signer');
   const latePacks = state.products.filter(packLate);
   const pays = payments(state);
@@ -66,7 +68,7 @@ export default function Home() {
           <div className="card-title">
             <Box size={18} className="green" /> Mes actions
           </div>
-          {myValidations.map((p) => (
+          {myValidations.slice(0, 6).map((p) => (
             <Link key={p.id} to="/design" className="alert-line">
               <ProductThumb product={p} size={30} />
               <span className="bold small">{p.ref}</span>
@@ -75,7 +77,7 @@ export default function Home() {
               <Pill color="orange">Validation {me.name} attendue</Pill>
             </Link>
           ))}
-          {myPacks.map((p) => (
+          {myPacks.slice(0, 6).map((p) => (
             <Link key={p.id} to="/design" className="alert-line">
               <ProductThumb product={p} size={30} />
               <span className="bold small">{p.ref}</span>
@@ -84,6 +86,11 @@ export default function Home() {
               <span className={`small ${packLate(p) ? 'red bold' : 'muted'}`}>limite {fshort(p.pack.artworkDeadline)}</span>
             </Link>
           ))}
+          {myValidations.length + myPacks.length > 12 && (
+            <Link to="/design" className="alert-line green bold">
+              Voir les {myValidations.length + myPacks.length} packs dans l’Espace Designer →
+            </Link>
+          )}
         </div>
       )}
 
@@ -158,7 +165,12 @@ export default function Home() {
             <Box size={18} className="red" /> Packs en retard
           </div>
           {latePacks.length === 0 && <div className="empty">Aucun pack en retard 🎉</div>}
-          {latePacks.map((p) => (
+          {latePacks.length > 8 && (
+            <Link to="/design" className="alert-line green bold">
+              + {latePacks.length - 8} autres packs en retard → Espace Designer
+            </Link>
+          )}
+          {latePacks.slice(0, 8).map((p) => (
             <Link key={p.id} to={`/produits/${p.id}`} className="alert-line">
               <ProductThumb product={p} size={30} />
               <span className="bold small">{p.ref}</span>

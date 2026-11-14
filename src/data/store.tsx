@@ -28,7 +28,7 @@ export interface State {
   currentUserId: string;
 }
 
-const STORAGE_KEY = 'jonas-buying-state-v4';
+const STORAGE_KEY = 'jonas-buying-state-v5';
 
 export const currentUser = (s: State): User => s.users.find((u) => u.id === s.currentUserId) ?? s.users[0];
 

@@ -205,6 +205,108 @@ export const products: Product[] = productDefs.map((d, i) => {
   };
 });
 
+// ---- Volume réaliste : ~40 packs par designer et par semaine ------------------
+// Produits de collection générés (photo = pictogramme), répartis entre Léa, Sarah et Hugo.
+const GEN_WEEKS = ['2026-11-02', '2026-11-09', '2026-11-16', '2026-11-23', '2026-11-30', '2026-12-07'];
+const GEN_DESIGNERS = ['Léa', 'Sarah', 'Hugo'];
+type Family = { rayon: string; items: [string, string][]; variants: string[]; suppliers: string[]; brands: [string, string][]; packs: string[]; tints: string[] };
+const FAMILIES: Family[] = [
+  {
+    rayon: 'Chaussures',
+    items: [['Tong', '🩴'], ['Claquette', '🩴'], ['Sandale', '👡'], ['Mule', '🥿'], ['Espadrille', '👟'], ['Mocassin', '👞'], ['Basket', '👟'], ['Sabot', '🥿']],
+    variants: ['paillettes', 'tressée', 'EVA', 'palmier', 'bicolore', 'dorée', 'léopard', 'corde', 'pastel', 'strass', 'raphia', 'perlée'],
+    suppliers: ['jinfa', 'tide', 'wenzhoutex'],
+    brands: [['camille', 'CP'], ['bellami', 'AB'], ['dorsey', 'YD'], ['ora', 'ORA']],
+    packs: ['Carte + crochet', 'Boîte + étiquette', 'Bandeau + cintre', 'Boîte + papier de soie'],
+    tints: ['#ffe3ec', '#fde9d6', '#e6eef8', '#fff1d6', '#e9f5ee'],
+  },
+  {
+    rayon: 'Beauté',
+    items: [['Brume', '🧴'], ['Gel douche', '🧴'], ['Crème mains', '🧴'], ['Eau de toilette', '💐'], ['Coffret', '🎁'], ['Baume lèvres', '💄']],
+    variants: ['coco', 'vanille', 'fleur d’oranger', 'monoï', 'agrumes', 'fruits rouges', 'musc blanc', 'figue', 'pêche'],
+    suppliers: ['nova', 'gzbeauty', 'seoul'],
+    brands: [['perfumo', 'PF'], ['jbeauty', 'JB'], ['camille', 'CP'], ['jardin', 'JD']],
+    packs: ['Étui', 'Étui + coffret', 'Coffret rigide', 'Hangtag'],
+    tints: ['#fdf0d9', '#f6e3f6', '#e5f3fb', '#fde4e4'],
+  },
+  {
+    rayon: 'Maison',
+    items: [['Panier', '🧺'], ['Coussin', '🛋️'], ['Bougie', '🕯️'], ['Plaid', '🧣'], ['Lanterne', '🏮'], ['Pot', '🪴'], ['Fouta', '🏖️'], ['Serviette', '🧻']],
+    variants: ['rayé', 'jacinthe', 'bambou', 'terracotta', 'lin', 'bohème', 'marin', 'sable', 'olive'],
+    suppliers: ['northbay', 'horizon', 'wenzhoutex'],
+    brands: [['jonas', 'JO']],
+    packs: ['Étiquette', 'Hangtag', 'Carton imprimé', 'Bandeau'],
+    tints: ['#efe6d6', '#e3f2e5', '#e6f0f5', '#f6ecd8'],
+  },
+  {
+    rayon: 'Accessoires',
+    items: [['Cabas', '👜'], ['Chapeau', '👒'], ['Éventail', '🪭'], ['Trousse', '👝'], ['Pochette', '👛'], ['Lunettes', '🕶️']],
+    variants: ['paille', 'raphia', 'paillettes', 'imprimé', 'perles', 'tie & dye', 'crochet', 'velours'],
+    suppliers: ['yiwu', 'tide'],
+    brands: [['tropaya', 'TR'], ['camille', 'CP']],
+    packs: ['Hangtag + étiquette', 'Carte + blister', 'Étiquette + boîte'],
+    tints: ['#fbecc9', '#ffe1f0', '#f2ecdf'],
+  },
+];
+const pick = <T,>(a: T[]) => a[Math.floor(rnd() * a.length)];
+
+let genSeq = 200;
+GEN_WEEKS.forEach((weekMonday, wi) => {
+  GEN_DESIGNERS.forEach((designer) => {
+    const count = 34 + Math.floor(rnd() * 13); // 34 à 46 packs
+    for (let k = 0; k < count; k++) {
+      const fam = FAMILIES[Math.floor(rnd() * FAMILIES.length)];
+      const [item, emoji] = pick(fam.items);
+      const [brandId, code] = pick(fam.brands);
+      const ref = `${code}-N${genSeq++}`;
+      const deadline = addDays(weekMonday, Math.floor(rnd() * 5));
+      // Avancement selon la semaine : passées presque finies, à venir peu commencées
+      const r = rnd();
+      const level =
+        wi === 0 ? (r < 0.9 ? 4 : Math.floor(rnd() * 3)) :
+        wi === 1 ? (r < 0.55 ? 4 : r < 0.8 ? 3 : Math.floor(rnd() * 3)) :
+        wi === 2 ? (r < 0.15 ? 4 : r < 0.35 ? 3 : r < 0.6 ? 2 : r < 0.8 ? 1 : 0) :
+        wi === 3 ? (r < 0.15 ? 2 : r < 0.45 ? 1 : 0) :
+        r < 0.15 ? 1 : 0;
+      const pcb = pick([12, 24, 36, 48]);
+      products.push({
+        id: ref,
+        ref,
+        ean: ean(1000 + genSeq),
+        name: `${item} ${pick(fam.variants)}`,
+        brandId,
+        supplierId: pick(fam.suppliers),
+        rayon: fam.rayon,
+        collection: 'Été 2027',
+        gender: 'Mixte',
+        material: 'Divers',
+        emoji,
+        tint: pick(fam.tints),
+        pa: Math.round((1.2 + rnd() * 9) * 20) / 20,
+        pcb,
+        cbmCarton: Math.round((0.03 + rnd() * 0.12) * 1000) / 1000,
+        weight: Math.round((0.1 + rnd() * 0.6) * 100) / 100,
+        developed: level === 4,
+        devStage: level === 4 ? 6 : 1,
+        devDeadline: deadline,
+        nextAction: level === 4 ? 'Passer commande' : 'Rendre le pack',
+        targetQty: pcb * (100 + Math.floor(rnd() * 400)),
+        urgent: level < 4 && rnd() < 0.04,
+        pack: {
+          type: pick(fam.packs),
+          designer,
+          artworkDeadline: deadline,
+          validations: validations(level, addDays(deadline, -6)),
+          dieCut: level >= 2 ? 'received' : level === 1 || rnd() < 0.2 ? 'requested' : 'none',
+          artworkVersions: Math.max(1, level),
+          sentToSupplier: level >= 4 || (level === 3 && rnd() < 0.5),
+        },
+        stock: { Péronne: 0, Meaux: 0, Lillois: 0 },
+      });
+    }
+  });
+});
+
 const pid = (ref: string) => ref;
 
 // ---- Proformas -------------------------------------------------------------

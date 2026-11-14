@@ -1,17 +1,16 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, Calendar, Check, ChevronDown, ChevronUp, Flame, Users } from 'lucide-react';
+import { AlertTriangle, Calendar, Check, ChevronDown, ChevronUp, Flame, Search, Users } from 'lucide-react';
 import { byId, useAuth, useStore, type State } from '../data/store';
 import type { Product } from '../data/types';
-import { BrandLogo, Pill, ProductThumb, toast } from '../components/ui';
+import { designerColor, BrandLogo, Pill, ProductThumb, toast } from '../components/ui';
 import { TODAY, diffDays, eur2, fshort, initials, num, weekKey, weekLabel, weekRange } from '../lib/format';
 
 type Tab = 'designer' | 'semaine' | 'urgent';
 
-const DESIGNER_COLORS = ['#d6336c', '#7048e8', '#1c7ed6', '#e8590c', '#0ca678', '#ae3ec9'];
 
 const isLate = (p: Product) => p.devDeadline < TODAY;
-const isPushed = (p: Product) => !!p.urgent || isLate(p);
+const isPushed = (p: Product) => !!p.urgent;
 
 /** La page repart de zéro à chaque changement d'utilisateur (filtre designer par défaut). */
 export default function Development() {
@@ -31,20 +30,24 @@ function DevelopmentPage() {
     state.products.forEach((p) => names.add(p.pack.designer));
     return [...names];
   }, [state.users, state.products]);
-  const colorOf = (d: string) => DESIGNER_COLORS[Math.max(0, designers.indexOf(d)) % DESIGNER_COLORS.length];
+  const colorOf = designerColor;
 
   const [tab, setTab] = useState<Tab>('designer');
   // Un designer voit d'abord ses propres produits
   const [designer, setDesigner] = useState(auth.user.designerName ?? 'all');
   const [showDone, setShowDone] = useState(false);
+  const [q, setQ] = useState('');
+  const qs = q.trim().toLowerCase();
 
   const todo = state.products
     .filter((p) => !p.developed)
     .filter((p) => designer === 'all' || p.pack.designer === designer)
+    .filter((p) => !qs || `${p.ref} ${p.name} ${byId(state.suppliers, p.supplierId).name}`.toLowerCase().includes(qs))
     .sort((a, b) => a.devDeadline.localeCompare(b.devDeadline));
   const done = state.products.filter((p) => p.developed && (designer === 'all' || p.pack.designer === designer));
   const pushed = todo.filter(isPushed).sort((a, b) => Number(isLate(b)) - Number(isLate(a)) || a.devDeadline.localeCompare(b.devDeadline));
   const late = todo.filter(isLate);
+  const lateNotPushed = late.filter((p) => !p.urgent);
   const thisWeek = todo.filter((p) => weekKey(p.devDeadline) === weekKey(TODAY));
 
   const lineProps = {
@@ -113,6 +116,11 @@ function DevelopmentPage() {
         </div>
       </div>
 
+      <label className="pf-search dev-search">
+        <Search size={18} />
+        <input placeholder="Rechercher une référence, un produit, un fournisseur…" value={q} onChange={(e) => setQ(e.target.value)} />
+      </label>
+
       {todo.length === 0 && <div className="card empty">Aucun produit à développer{designer !== 'all' ? ` pour ${designer}` : ''}.</div>}
 
       {tab === 'designer' &&
@@ -139,24 +147,20 @@ function DevelopmentPage() {
               }
             >
               {weeksOf(items).map(([wk, ps]) => (
-                <div key={wk} className="dev-sub">
-                  <div className="dev-sub-head">
-                    <Calendar size={15} /> Semaine {weekLabel(ps[0].devDeadline).slice(1)} <span>{weekRange(ps[0].devDeadline)}</span>
-                    <b>{ps.length}</b>
-                  </div>
+                <WeekSub key={wk} wk={wk} items={ps}>
                   {ps.map((p) => (
                     <Line key={p.id} p={p} showDesigner={false} {...lineProps} />
                   ))}
-                </div>
+                </WeekSub>
               ))}
             </Group>
           ))}
 
       {tab === 'semaine' &&
-        weeksOf(todo).map(([wk, items], i) => (
+        weeksOf(todo).map(([wk, items]) => (
           <Group
             key={wk}
-            defaultOpen={i < 2}
+            defaultOpen={wk <= weekKey(TODAY)}
             head={
               <>
                 <Calendar className="pf-week-cal" size={38} strokeWidth={1.8} />
@@ -199,7 +203,7 @@ function DevelopmentPage() {
             <Flame size={34} className="red" />
             <div className="pf-week-title">
               <h2>PUSH URGENT</h2>
-              <span>Produits poussés en urgence et développements en retard</span>
+              <span>Produits poussés en urgence par l’acheteur, à traiter en priorité</span>
             </div>
             <span className="pf-count red-count">{pushed.length} à pousser</span>
           </header>
@@ -210,6 +214,25 @@ function DevelopmentPage() {
             ))}
           </div>
         </section>
+      )}
+      {tab === 'urgent' && lateNotPushed.length > 0 && (
+        <Group
+          defaultOpen={false}
+          head={
+            <>
+              <AlertTriangle size={30} className="red" />
+              <div className="pf-week-title">
+                <h2>En retard (non poussés)</h2>
+                <span>À pousser en urgent si besoin</span>
+              </div>
+              <span className="pf-count red-count">{lateNotPushed.length}</span>
+            </>
+          }
+        >
+          {lateNotPushed.map((p) => (
+            <Line key={p.id} p={p} showDesigner {...lineProps} />
+          ))}
+        </Group>
       )}
 
       <button className="btn sm" style={{ alignSelf: 'flex-start' }} onClick={() => setShowDone(!showDone)}>
@@ -327,7 +350,7 @@ function Line({ p, state, showDesigner, canAct, colorOf, onOpen, onUrgent, onDon
             <button className={`btn sm ${p.urgent ? 'danger' : ''}`} onClick={() => onUrgent(p)} title={p.urgent ? 'Retirer de PUSH URGENT' : 'Pousser en urgent'}>
               <Flame size={14} /> {p.urgent ? 'Retirer' : 'Push'}
             </button>
-            {isPushed(p) && (
+            {(isPushed(p) || isLate(p)) && (
               <button className="btn sm dev-remind" onClick={() => onRemind(p)}>
                 Relancer
               </button>
@@ -338,6 +361,29 @@ function Line({ p, state, showDesigner, canAct, colorOf, onOpen, onUrgent, onDon
           </>
         )}
       </span>
+    </div>
+  );
+}
+
+/** Capacité de référence d'un designer (packs par semaine) */
+const CAPACITY = 40;
+
+/** Sous-groupe semaine repliable : semaines passées et en cours ouvertes par défaut */
+function WeekSub({ wk, items, children }: { wk: string; items: Product[]; children: React.ReactNode }) {
+  const [open, setOpen] = useState(wk <= weekKey(TODAY));
+  const late = items.filter(isLate).length;
+  return (
+    <div className="dev-sub">
+      <div className="dev-sub-head" onClick={() => setOpen(!open)}>
+        {open ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+        Semaine {weekLabel(items[0].devDeadline).slice(1)} <span>{weekRange(items[0].devDeadline)}</span>
+        {late > 0 && <span className="pill red">{late} en retard</span>}
+        <span className={`cap ${items.length > CAPACITY ? 'over' : ''}`}>
+          {items.length}/{CAPACITY}
+        </span>
+        <b>{items.length}</b>
+      </div>
+      {open && children}
     </div>
   );
 }

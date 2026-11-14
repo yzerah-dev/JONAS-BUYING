@@ -10,6 +10,7 @@ export default function Products() {
   const navigate = useNavigate();
   const [mode, setMode] = useState<'galerie' | 'liste'>('galerie');
   const [q, setQ] = useState('');
+  const [limit, setLimit] = useState(60);
   const [f, setF] = useState({ brand: 'all', rayon: 'all', supplier: 'all', collection: 'all', pack: 'all', dev: 'all', flow: 'all' });
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLSelectElement>) => setF({ ...f, [k]: e.target.value });
 
@@ -103,7 +104,7 @@ export default function Products() {
 
       {mode === 'galerie' ? (
         <div className="gallery">
-          {rows.map(({ p, qty }) => (
+          {rows.slice(0, limit).map(({ p, qty }) => (
             <div key={p.id} className="pcard" onClick={() => navigate(`/produits/${p.id}`)}>
               <div className="photo" style={{ background: p.tint }}>
                 {p.emoji}
@@ -166,7 +167,7 @@ export default function Products() {
               </tr>
             </thead>
             <tbody>
-              {rows.map(({ p, qty }) => (
+              {rows.slice(0, limit).map(({ p, qty }) => (
                 <tr key={p.id} className="clickable" onClick={() => navigate(`/produits/${p.id}`)}>
                   <td>
                     <div className="row">
@@ -195,6 +196,11 @@ export default function Products() {
             </tbody>
           </table>
         </div>
+      )}
+      {rows.length > limit && (
+        <button className="btn mt" style={{ alignSelf: 'center', margin: '16px auto 0', display: 'flex' }} onClick={() => setLimit(limit + 60)}>
+          Afficher plus ({rows.length - limit} restants)
+        </button>
       )}
     </>
   );

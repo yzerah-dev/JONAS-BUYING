@@ -302,7 +302,10 @@ export function PortalPacks() {
   const { state, dispatch, products, packsToValidate, dieCutsRequested } = usePortal();
   const [params, setParams] = useSearchParams();
   const view = (params.get('vue') as 'valider' | 'diecut' | 'tous' | null) ?? 'valider';
-  const list = view === 'valider' ? packsToValidate : view === 'diecut' ? dieCutsRequested : products;
+  const list = (view === 'valider' ? packsToValidate : view === 'diecut' ? dieCutsRequested : products)
+    .slice()
+    .sort((a, b) => a.pack.artworkDeadline.localeCompare(b.pack.artworkDeadline));
+  const [limit, setLimit] = useState(30);
   return (
     <>
       <div className="page-head">
@@ -322,7 +325,7 @@ export function PortalPacks() {
       </div>
       {list.length === 0 && <div className="card empty">Rien en attente ici 👍</div>}
       <div className="gallery" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))' }}>
-        {list.map((p) => {
+        {list.slice(0, limit).map((p) => {
           const canValidate = p.pack.sentToSupplier && p.pack.validations.fournisseur.state === 'pending' && !packDone(p);
           return (
             <div key={p.id} className="card pad col" style={{ gap: 10 }}>
@@ -389,6 +392,11 @@ export function PortalPacks() {
           );
         })}
       </div>
+      {list.length > limit && (
+        <button className="btn mt" style={{ margin: '16px auto 0', display: 'flex' }} onClick={() => setLimit(limit + 30)}>
+          Afficher plus ({list.length - limit} restants)
+        </button>
+      )}
     </>
   );
 }
