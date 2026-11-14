@@ -44,6 +44,12 @@ export function ProformaStatusPill({ status, big }: { status: ProformaStatus; bi
 
 /** Monogramme fournisseur façon logo (lettre en dégradé), utilisé dans les listes */
 export function SupplierMark({ supplier, size = 30 }: { supplier: Supplier; size?: number }) {
+  if (supplier.mark === 'badge')
+    return (
+      <span className="supplier-badge" title={supplier.name} style={{ width: size, height: size, background: supplier.color, fontSize: size * 0.62 }}>
+        {supplier.shortName[0]}
+      </span>
+    );
   return (
     <span
       className="supplier-mark"
@@ -236,4 +242,14 @@ export function Toaster() {
     };
   }, []);
   return msg ? <div className="toast">{msg}</div> : null;
+}
+
+/** Pictogramme conteneur de la maquette (rectangle à barres verticales) */
+export function ContainerGlyph({ size = 18, strokeWidth = 1.8, className }: { size?: number; strokeWidth?: number; className?: string }) {
+  return (
+    <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="2.5" y="5.5" width="19" height="13" rx="2.5" fill="none" />
+      <path d="M7 9v6M10.3 9v6M13.7 9v6M17 9v6" />
+    </svg>
+  );
 }

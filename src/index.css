@@ -598,3 +598,26 @@ tr[draggable='true'] { cursor: grab; }
 }
 @media (max-width: 820px) { .portal .topbar > .bold { display: none; } }
 @media (max-width: 820px) { .portal .role-btn { display: none; } }
+
+/* --- Maquette v2 : cartouche semaine sans encadrés, séparateurs fins --- */
+.pf-week-title { width: 250px; min-width: 0; }
+.pf-metrics { margin-left: 40px; }
+.pf-metrics > .pf-metric { border-left: 1px solid #b9c5c1; padding: 0 26px; }
+.pf-metrics > .pf-metric-amount { align-items: flex-start; }
+.pf-chevron { margin-left: auto; }
+.supplier-badge { display: inline-grid; place-items: center; border-radius: 50%; color: #fff; font-weight: 900; line-height: 1; flex-shrink: 0; }
+.nav-sep { height: 1px; background: var(--line); margin: 8px 6px; }
+.sidebar a.nav-more { font-size: 15px; font-weight: 500; color: var(--ink-2); padding: 10px 14px; }
+.sidebar a.nav-more.active { color: var(--green-dark); font-weight: 600; }
+.pf-table tbody td .pf-big { font-size: 21px; font-weight: 800; }
+
+@media (max-width: 1350px) {
+  .pf-week-title { width: auto; }
+  .pf-metrics { margin-left: 0; }
+}
+@media (max-width: 820px) {
+  .pf-metrics > .pf-metric { border-left: 0; padding: 6px 4px; }
+  .pf-metrics > .pf-metric-amount { align-items: center; }
+  .pf-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .nav-sep { width: 1px; height: auto; margin: 6px 4px; }
+}

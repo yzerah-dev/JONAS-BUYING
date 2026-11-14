@@ -1,33 +1,23 @@
-import { useMemo, useRef, useState } from 'react';
+import { useRef } from 'react';
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import {
-  Bell,
-  Boxes,
-  Container as ContainerIcon,
-  Euro,
-  FileText,
-  FlaskConical,
-  Home,
-  Layers,
-  Palette,
-  Search,
-  Settings,
-  Truck,
-} from 'lucide-react';
+import { BarChart3, Bell, Box, Boxes, Euro, Layers, Palette, Settings, Truck } from 'lucide-react';
 import { currentUser, packLate, useStore } from '../data/store';
 import { canSee, isSupplier, type Module } from '../data/permissions';
 import { useTableLabels } from './useTableLabels';
-import { Toaster } from './ui';
+import { ContainerGlyph, Toaster } from './ui';
 import UserSwitcher from './UserSwitcher';
 import { Forbidden } from './Guard';
 
-const NAV: { to: string; label: string; icon: typeof Home; module: Module; end?: boolean }[] = [
-  { to: '/', label: 'Mon espace', icon: Home, module: 'home', end: true },
-  { to: '/proformas', label: 'Proformas', icon: FileText, module: 'proformas' },
+// Menu principal (maquette) puis modules complémentaires
+const NAV: { to: string; label: string; icon: typeof Layers; module: Module }[] = [
+  { to: '/proformas', label: 'Proformas', icon: Layers, module: 'proformas' },
+  { to: '/developpement', label: 'Développement', icon: Box, module: 'developpement' },
+  { to: '/conteneurs', label: 'Conteneurs', icon: ContainerGlyph as unknown as typeof Layers, module: 'conteneurs' },
+  { to: '/performance', label: 'Performance', icon: BarChart3, module: 'home' },
+];
+const NAV_MORE: typeof NAV = [
   { to: '/produits', label: 'Total – Produits', icon: Boxes, module: 'produits' },
-  { to: '/developpement', label: 'Développement', icon: FlaskConical, module: 'developpement' },
   { to: '/design', label: 'Design', icon: Palette, module: 'design' },
-  { to: '/conteneurs', label: 'Conteneurs', icon: ContainerIcon, module: 'conteneurs' },
   { to: '/fournisseurs', label: 'Fournisseurs', icon: Truck, module: 'fournisseurs' },
   { to: '/finance', label: 'Factures & Finance', icon: Euro, module: 'finance' },
 ];
@@ -37,6 +27,7 @@ function moduleOf(path: string): Module {
   const seg = path.split('/')[1] ?? '';
   const map: Record<string, Module> = {
     '': 'home',
+    performance: 'home',
     proformas: 'proformas',
     produits: 'produits',
     developpement: 'developpement',
@@ -52,29 +43,11 @@ function moduleOf(path: string): Module {
 export default function Layout() {
   const { state } = useStore();
   const user = currentUser(state);
-  const [q, setQ] = useState('');
-  const [searchOpen, setSearchOpen] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
   useTableLabels(mainRef);
   const navigate = useNavigate();
   const location = useLocation();
   const alerts = state.products.filter(packLate).length + state.proformas.filter((p) => p.status === 'a_signer').length;
-
-  const results = useMemo(() => {
-    const s = q.trim().toLowerCase();
-    if (s.length < 2) return [];
-    const out: { label: string; sub: string; to: string; module: Module }[] = [];
-    for (const p of state.products)
-      if (`${p.ref} ${p.name} ${p.ean}`.toLowerCase().includes(s)) out.push({ label: `${p.ref} – ${p.name}`, sub: 'Produit', to: `/produits/${p.id}`, module: 'produits' });
-    for (const p of state.proformas)
-      if (`${p.id} ${p.poNumber}`.toLowerCase().includes(s)) out.push({ label: p.id, sub: `Proforma · ${p.poNumber}`, to: `/proformas/${p.id}`, module: 'proformas' });
-    for (const sup of state.suppliers)
-      if (sup.name.toLowerCase().includes(s)) out.push({ label: sup.name, sub: 'Fournisseur', to: `/fournisseurs/${sup.id}`, module: 'fournisseurs' });
-    for (const c of state.containers)
-      if (`${c.id} ${c.number ?? ''} ${c.bookingNo ?? ''}`.toLowerCase().includes(s))
-        out.push({ label: c.number ?? c.id, sub: `Conteneur · ${c.bookingNo ?? c.id}`, to: `/conteneurs?c=${c.id}`, module: 'conteneurs' });
-    return out.filter((r) => canSee(user, r.module)).slice(0, 8);
-  }, [q, state, user]);
 
   // Les comptes fournisseurs n'accèdent qu'au portail
   if (isSupplier(user)) return <Navigate to="/portail" replace />;
@@ -83,40 +56,12 @@ export default function Layout() {
   return (
     <div className="app">
       <header className="topbar">
-        <NavLink to="/" className="logo">
+        <NavLink to="/proformas" className="logo">
           <span className="logo-mark">J</span> JONAS BUYING
         </NavLink>
         <div className="grow" />
         <div className="top-actions">
-          <div style={{ position: 'relative' }}>
-            <button className="icon-btn" title="Rechercher" onClick={() => setSearchOpen(!searchOpen)}>
-              <Search size={24} />
-            </button>
-            {searchOpen && (
-              <div className="card search-pop">
-                <div className="search">
-                  <Search size={16} className="muted" />
-                  <input autoFocus placeholder="Référence, proforma, fournisseur, conteneur…" value={q} onChange={(e) => setQ(e.target.value)} />
-                </div>
-                {results.map((r) => (
-                  <div
-                    key={r.to + r.label}
-                    className="menu-row"
-                    onMouseDown={() => {
-                      navigate(r.to);
-                      setQ('');
-                      setSearchOpen(false);
-                    }}
-                  >
-                    <span className="bold small grow">{r.label}</span>
-                    <span className="muted xs">{r.sub}</span>
-                  </div>
-                ))}
-                {q.trim().length >= 2 && results.length === 0 && <div className="small muted" style={{ padding: 8 }}>Aucun résultat.</div>}
-              </div>
-            )}
-          </div>
-          <button className="icon-btn" title={`${alerts} alertes`} onClick={() => navigate('/')}>
+          <button className="icon-btn" title={`${alerts} alertes`} onClick={() => navigate('/performance')}>
             <Bell size={26} />
             {alerts > 0 && <span className="dot" />}
           </button>
@@ -125,17 +70,20 @@ export default function Layout() {
       </header>
       <nav className="sidebar">
         {NAV.filter((n) => canSee(user, n.module)).map((n) => (
-          <NavLink key={n.to} to={n.to} end={n.end}>
-            <n.icon size={19} /> {n.label}
+          <NavLink key={n.to} to={n.to}>
+            <n.icon size={22} strokeWidth={1.8} /> {n.label}
+          </NavLink>
+        ))}
+        {NAV_MORE.some((n) => canSee(user, n.module)) && <div className="nav-sep" />}
+        {NAV_MORE.filter((n) => canSee(user, n.module)).map((n) => (
+          <NavLink key={n.to} to={n.to} className="nav-more">
+            <n.icon size={20} strokeWidth={1.8} /> {n.label}
           </NavLink>
         ))}
         <div className="spacer" />
         <NavLink to="/parametres">
-          <Settings size={19} /> Paramètres
+          <Settings size={22} strokeWidth={1.8} /> Paramètres
         </NavLink>
-        <div className="xs muted" style={{ padding: '8px 12px' }}>
-          <Layers size={11} /> Données de démonstration
-        </div>
       </nav>
       <main className="main" ref={mainRef}>
         {allowedHere ? <Outlet /> : <Forbidden />}

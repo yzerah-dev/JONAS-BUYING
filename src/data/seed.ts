@@ -31,7 +31,7 @@ export const suppliers: Supplier[] = [
     contact: { name: 'Mr. Chen', role: 'Export Manager', phone: '+86 138 0000 0000', email: 'chen@tideliving.com', wechat: 'wxid_tideliving' } },
   { id: 'nova', name: 'Shenzhen Nova Beauty', shortName: 'Nova Beauty', country: 'Chine', flag: '🇨🇳', city: 'Shenzhen', port: 'Yantian', color: '#f72585', active: true,
     contact: { name: 'Ms. Lin Yu', role: 'Account Manager', phone: '+86 139 1111 2222', email: 'lin@novabeauty.cn', wechat: 'wxid_novabeauty' } },
-  { id: 'horizon', name: 'Ningbo Horizon Home', shortName: 'Horizon Home', country: 'Chine', flag: '🇨🇳', city: 'Ningbo', port: 'Ningbo', color: '#2a9d8f', active: true,
+  { id: 'horizon', name: 'Ningbo Horizon Home', shortName: 'Horizon Home', country: 'Chine', flag: '🇨🇳', city: 'Ningbo', port: 'Ningbo', color: '#1a9a3e', mark: 'badge', active: true,
     contact: { name: 'Mr. Wang Lei', role: 'Sales Director', phone: '+86 137 3333 4444', email: 'wang@horizonhome.cn' } },
   { id: 'northbay', name: 'Qingdao Northbay', shortName: 'Northbay', country: 'Chine', flag: '🇨🇳', city: 'Qingdao', port: 'Qingdao', color: '#264de4', active: true,
     contact: { name: 'Ms. Zhao Min', role: 'Sales Manager', phone: '+86 136 5555 6666', email: 'zhao@northbay.cn' } },
@@ -123,9 +123,19 @@ function validations(level: number, base: string): Record<ValidationStep, Valida
 // Échéances artwork réparties sur les semaines à venir
 const deadlines = ['2026-11-13', '2026-11-20', '2026-11-27', '2026-11-27', '2026-12-04', '2026-12-11', '2026-12-18', '2027-01-08'];
 
+// Niveaux de validation pack imposés pour la démo (proformas de la semaine 49)
+const PACK_LEVEL: Record<string, number> = {
+  'CP-B110': 1, // Brumes corps : 0/1
+  'JO-J201': 2, // Mobilier jardin : 0/2
+  'JO-J205': 0,
+  'JO-R301': 4, // Rangement maison : OK
+  'JO-R305': 4,
+  'JO-R310': 4,
+};
+
 export const products: Product[] = productDefs.map((d, i) => {
   const [ref, name, brandId, supplierId, rayon, emoji, tint, pa, pcb, cbmCarton, packType, designer, developed = true] = d;
-  const level = developed ? [4, 4, 3, 2, 4, 1, 3, 0, 4, 2][i % 10] : 0;
+  const level = PACK_LEVEL[ref] ?? (developed ? [4, 4, 3, 2, 4, 1, 3, 0, 4, 2][i % 10] : 0);
   const deadline = deadlines[i % deadlines.length];
   const pack: Pack = {
     type: packType,
@@ -169,25 +179,44 @@ const pid = (ref: string) => ref;
 
 // ---- Proformas -------------------------------------------------------------
 
-type PFDef = [id: string, supplier: string, status: ProformaStatus, date: string, etd: string, transitDays: number,
-  lines: [string, number][], depositPct: number, depositPaid: boolean];
+// Proformas de démonstration alignées sur la maquette (S49 → S52).
+// Chaque ligne : [référence, CBM déclaré, montant €] → quantité au carton près, prix = montant ÷ quantité.
+type PFDef = {
+  id: string;
+  supplier: string;
+  title: string;
+  status: ProformaStatus;
+  etd: string;
+  eta: string;
+  lines: [string, number, number][];
+  deposit: number;
+  paid: boolean;
+};
+
+const S49 = '2026-12-02';
+const S50 = '2026-12-09';
+const S51 = '2026-12-16';
+const S52 = '2026-12-23';
 
 const pfDefs: PFDef[] = [
-  ['PF-2026-0118', 'jinfa', 'arrive', '2026-08-12', '2026-09-28', 35, [['AB-M026', 12000], ['CP-C015', 7200]], 30, true],
-  ['PF-2026-0121', 'wenzhoutex', 'arrive', '2026-08-20', '2026-10-05', 33, [['YD-C003', 9600], ['JO-T040', 7200]], 30, true],
-  ['PF-2026-0127', 'gzbeauty', 'en_transit', '2026-09-02', '2026-10-19', 38, [['PF-P020', 14400], ['JB-T010', 9600]], 30, true],
-  ['PF-2026-0130', 'jinfa', 'en_transit', '2026-09-10', '2026-10-30', 35, [['AB-M026', 12000], ['CP-A001', 4800], ['CP-C015', 3600]], 30, true],
-  ['PF-2026-0132', 'yiwu', 'en_transit', '2026-09-15', '2026-11-06', 34, [['TR-B002', 6000], ['TR-T001', 9600], ['CP-EV01', 9600]], 30, true],
-  ['PF-2026-0137', 'tide', 'booke', '2026-09-28', '2026-11-23', 34, [['CP-T001', 4800], ['CP-C042', 2400], ['YD-H008', 1440], ['AB-M025', 720], ['ORA-C006', 1200], ['CP-E021', 960], ['JO-P100', 2880], ['JO-T035', 3200]], 30, true],
-  ['PF-2026-0140', 'seoul', 'en_production', '2026-10-01', '2026-12-09', 36, [['JB-K001', 9600]], 30, true],
-  ['PF-2026-0145', 'northbay', 'en_production', '2026-10-05', '2026-12-02', 33, [['JO-R301', 7200], ['JO-R305', 4800], ['JO-R310', 1400]], 30, true],
-  ['PF-2026-0146', 'nova', 'a_signer', '2026-11-03', '2026-12-02', 36, [['CP-B110', 24000], ['CP-B112', 19200], ['PF-P014', 9600]], 20, false],
-  ['PF-2026-0148', 'horizon', 'en_dev', '2026-10-21', '2026-12-04', 32, [['JO-J201', 240], ['JO-J205', 800], ['JO-J210', 2400]], 20, true],
-  ['PF-2026-0150', 'wenzhoutex', 'en_dev', '2026-10-27', '2026-12-16', 33, [['CP-PL03', 9600], ['YD-C003', 7200]], 30, true],
-  ['PF-2026-0152', 'jinfa', 'a_signer', '2026-11-09', '2026-12-23', 35, [['AB-M026', 12000], ['CP-C015', 7200]], 30, false],
-  ['PF-2026-0155', 'yiwu', 'a_signer', '2026-11-12', '2026-12-30', 34, [['TR-B002', 4800], ['CP-EV01', 9600]], 30, false],
-  ['PF-2026-0156', 'tide', 'en_production', '2026-10-14', '2026-12-11', 34, [['ORA-C006', 6000], ['CP-C042', 9600], ['CP-T001', 9600]], 30, true],
-  ['PF-2027-0003', 'jinfa', 'en_dev', '2026-11-10', '2027-01-06', 35, [['AB-M026', 12000], ['CP-A001', 4800]], 30, false],
+  // Semaine 49 — 5 proformas · 352,9 m³ · 620 000 €
+  { id: 'PF-2026-0146', supplier: 'nova', title: 'Brumes corps', status: 'a_signer', etd: S49, eta: S51, lines: [['CP-B110', 68.5, 100000]], deposit: 20000, paid: false },
+  { id: 'PF-2026-0148', supplier: 'horizon', title: 'Mobilier jardin – Été 2027', status: 'en_dev', etd: S49, eta: S50, lines: [['JO-J201', 100, 170000], ['JO-J205', 42, 80000]], deposit: 50000, paid: true },
+  { id: 'PF-2026-0145', supplier: 'northbay', title: 'Rangement maison', status: 'en_production', etd: S49, eta: S52, lines: [['JO-R301', 50, 90000], ['JO-R305', 30, 60000], ['JO-R310', 18.4, 30000]], deposit: 30000, paid: true },
+  { id: 'PF-2026-0141', supplier: 'tide', title: 'Claquettes été', status: 'booke', etd: S49, eta: addDays(S49, 35), lines: [['CP-C042', 14, 30000], ['YD-H008', 10, 20000]], deposit: 15000, paid: true },
+  { id: 'PF-2026-0139', supplier: 'jinfa', title: 'Mocassins été', status: 'en_transit', etd: S49, eta: addDays(S49, 35), lines: [['AB-M026', 20, 40000]], deposit: 12000, paid: true },
+  // Semaine 50 — 4 proformas · 214,4 m³ · 490 000 €
+  { id: 'PF-2026-0150', supplier: 'wenzhoutex', title: 'Plateformes & claquettes', status: 'a_signer', etd: S50, eta: addDays(S50, 35), lines: [['CP-PL03', 35.4, 80000], ['YD-C003', 25, 60000]], deposit: 28000, paid: false },
+  { id: 'PF-2026-0151', supplier: 'nova', title: 'Parfums collection', status: 'en_dev', etd: S50, eta: addDays(S50, 35), lines: [['PF-P014', 30, 70000], ['CP-B112', 26.4, 50000]], deposit: 30000, paid: true },
+  { id: 'PF-2026-0136', supplier: 'yiwu', title: 'Sacs de plage', status: 'en_transit', etd: S50, eta: addDays(S50, 35), lines: [['TR-B002', 52.6, 110000]], deposit: 33000, paid: true },
+  { id: 'PF-2026-0129', supplier: 'gzbeauty', title: 'Coffrets parfum', status: 'arrive', etd: S50, eta: addDays(S50, 35), lines: [['PF-P020', 25, 70000], ['JB-T010', 20, 50000]], deposit: 36000, paid: true },
+  // Semaine 51 — 3 proformas · 126,8 m³ · 240 000 €
+  { id: 'PF-2026-0153', supplier: 'jinfa', title: 'Chapeaux & claquettes', status: 'a_signer', etd: S51, eta: addDays(S51, 35), lines: [['CP-A001', 20, 40000], ['CP-C015', 30, 60000]], deposit: 30000, paid: false },
+  { id: 'PF-2026-0143', supplier: 'seoul', title: 'K-Beauty coffrets', status: 'en_production', etd: S51, eta: addDays(S51, 35), lines: [['JB-K001', 38.8, 80000]], deposit: 24000, paid: true },
+  { id: 'PF-2026-0131', supplier: 'tide', title: 'Tongs & sabots', status: 'en_transit', etd: S51, eta: addDays(S51, 35), lines: [['CP-T001', 20, 30000], ['ORA-C006', 18, 30000]], deposit: 18000, paid: true },
+  // Semaine 52 — 2 proformas · 74,0 m³ · 120 000 €
+  { id: 'PF-2026-0124', supplier: 'wenzhoutex', title: 'Draps de plage', status: 'arrive', etd: S52, eta: addDays(S52, 35), lines: [['JO-T040', 40, 70000]], deposit: 21000, paid: true },
+  { id: 'PF-2026-0122', supplier: 'yiwu', title: 'Éventails & tongs', status: 'arrive', etd: S52, eta: addDays(S52, 35), lines: [['CP-EV01', 14, 20000], ['TR-T001', 20, 30000]], deposit: 15000, paid: true },
 ];
 
 const docsFor = (st: ProformaStatus) => {
@@ -199,29 +228,33 @@ const docsFor = (st: ProformaStatus) => {
 };
 
 export const proformas: Proforma[] = pfDefs.map((d, i) => {
-  const [id, supplierId, status, date, etd, transit, lines, depositPct, depositPaid] = d;
-  const eta = addDays(etd, transit);
+  const date = addDays(d.etd, -56);
   const history = [{ date, user: 'Yzerah', text: 'Proforma créée' }];
-  if (status !== 'a_signer') history.push({ date: addDays(date, 2), user: 'Direction', text: 'Proforma signée' });
-  if (depositPaid) history.push({ date: addDays(date, 6), user: 'Finance', text: `Acompte ${depositPct} % versé` });
-  if (['booke', 'en_transit', 'arrive'].includes(status)) history.push({ date: addDays(etd, -14), user: 'Logistique', text: 'Booking confirmé' });
+  if (d.status !== 'a_signer') history.push({ date: addDays(date, 2), user: 'Direction', text: 'Proforma signée' });
+  if (d.paid) history.push({ date: addDays(date, 6), user: 'Finance', text: 'Acompte versé' });
+  if (['booke', 'en_transit', 'arrive'].includes(d.status)) history.push({ date: addDays(d.etd, -14), user: 'Logistique', text: 'Booking confirmé' });
+  const lines = d.lines.map(([ref, cbm, amount]) => {
+    const p = products.find((x) => x.id === pid(ref))!;
+    const qty = Math.max(1, Math.round(cbm / p.cbmCarton)) * p.pcb;
+    return { productId: p.id, qty, price: amount / qty, cbm };
+  });
+  const amount = d.lines.reduce((s, l) => s + l[2], 0);
   return {
-    id,
-    supplierId,
+    id: d.id,
+    supplierId: d.supplier,
+    title: d.title,
     poNumber: `PO-JONAS-${26800 + i * 13}`,
     date,
-    status,
-    etd,
-    eta,
-    lines: lines.map(([ref, qty]) => {
-      const p = products.find((x) => x.id === pid(ref))!;
-      return { productId: p.id, qty, price: p.pa };
-    }),
-    depositPct,
-    depositPaid,
-    balancePaid: status === 'arrive',
-    balanceDue: addDays(etd, 7),
-    documents: docsFor(status),
+    status: d.status,
+    etd: d.etd,
+    eta: d.eta,
+    lines,
+    depositPct: Math.round((d.deposit / amount) * 100),
+    depositAmount: d.deposit,
+    depositPaid: d.paid,
+    balancePaid: d.status === 'arrive',
+    balanceDue: addDays(d.etd, 7),
+    documents: docsFor(d.status),
     history,
   };
 });
@@ -299,15 +332,15 @@ function buildContainers(pf: Proforma, coverage: number, status: ContainerStatus
 }
 
 const containerPlan: [string, number, ContainerStatus][] = [
-  ['PF-2026-0118', 1, 'arrive'],
-  ['PF-2026-0121', 1, 'arrive'],
-  ['PF-2026-0127', 1, 'en_transit'],
-  ['PF-2026-0130', 1, 'en_transit'],
-  ['PF-2026-0132', 1, 'en_transit'],
-  ['PF-2026-0137', 1, 'booke'],
+  ['PF-2026-0122', 1, 'arrive'],
+  ['PF-2026-0124', 1, 'arrive'],
+  ['PF-2026-0129', 1, 'arrive'],
+  ['PF-2026-0131', 1, 'en_transit'],
+  ['PF-2026-0136', 1, 'en_transit'],
+  ['PF-2026-0139', 1, 'en_transit'],
+  ['PF-2026-0141', 1, 'booke'],
   ['PF-2026-0145', 1, 'booking_demande'],
-  ['PF-2026-0140', 1, 'a_booker'],
-  ['PF-2026-0156', 0.8, 'a_booker'],
+  ['PF-2026-0143', 0.8, 'a_booker'],
 ];
 
 export const containers: Container[] = containerPlan.flatMap(([pfId, cov, st]) =>
@@ -357,6 +390,6 @@ export const users: User[] = [
 
 // Un plan de chargement demandé au fournisseur pour la démo du portail
 {
-  const c = containers.find((x) => x.status === 'a_booker' && x.supplierId === 'tide');
+  const c = containers.find((x) => x.status === 'a_booker');
   if (c) c.planRequested = true;
 }

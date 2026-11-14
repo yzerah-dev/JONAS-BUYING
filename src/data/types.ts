@@ -21,6 +21,8 @@ export interface Supplier {
   port: string;
   contact: Contact;
   color: string;
+  /** Style du logo dans les listes : lettre en dégradé ou pastille ronde */
+  mark?: 'letter' | 'badge';
   active: boolean;
 }
 
@@ -100,6 +102,8 @@ export interface ProformaLine {
   productId: string;
   qty: number;
   price: number;
+  /** CBM déclaré sur la proforma (sinon calculé depuis le carton) */
+  cbm?: number;
 }
 
 export interface HistoryEntry {
@@ -111,6 +115,8 @@ export interface HistoryEntry {
 export interface Proforma {
   id: string; // PF-2026-0146
   supplierId: string;
+  /** Intitulé de la commande (ex. « Brumes corps », « Mobilier jardin – Été 2027 ») */
+  title?: string;
   poNumber: string;
   date: ISODate;
   status: ProformaStatus;
@@ -118,6 +124,8 @@ export interface Proforma {
   eta: ISODate;
   lines: ProformaLine[];
   depositPct: number;
+  /** Montant d'acompte négocié, s'il n'est pas un pourcentage rond */
+  depositAmount?: number;
   depositPaid: boolean;
   balancePaid: boolean;
   balanceDue: ISODate;

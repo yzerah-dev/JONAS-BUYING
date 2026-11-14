@@ -1,14 +1,12 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  Box,
   Calendar,
   Check,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
   ChevronUp,
-  Container as Ctn,
   Landmark,
   Layers,
   List,
@@ -18,7 +16,7 @@ import {
 } from 'lucide-react';
 import { byId, proformaTotals, useAuth, useStore, PROFORMA_STATUS_LABEL, type State } from '../data/store';
 import { PROFORMA_STATUSES, type Proforma, type ProformaStatus } from '../data/types';
-import { PROFORMA_ICON, ProformaStatusPill, SupplierMark, toast } from '../components/ui';
+import { ContainerGlyph, PROFORMA_ICON, ProformaStatusPill, SupplierMark, toast } from '../components/ui';
 import { TODAY, dec, eur, weekKey, weekLabel, weekRange } from '../lib/format';
 
 type View = 'liste' | 'semaine' | 'fournisseur';
@@ -189,9 +187,6 @@ function Group({
   const totals = items.map((p) => proformaTotals(state, p));
   const cbm = totals.reduce((s, t) => s + t.cbm, 0);
   const amount = totals.reduce((s, t) => s + t.amount, 0);
-  const packsOk = totals.reduce((s, t) => s + t.packsOk, 0);
-  const packsTotal = totals.reduce((s, t) => s + t.packsTotal, 0);
-  const depositTodo = items.reduce((s, p, i) => s + (p.depositPaid ? 0 : totals[i].deposit), 0);
 
   return (
     <section className={`pf-week ${open ? 'open' : ''}`}>
@@ -205,36 +200,21 @@ function Group({
           {items.length} proforma{items.length > 1 ? 's' : ''}
         </span>
         <div className="pf-metrics">
-          <div className="pf-pack">
-            <Box size={22} strokeWidth={1.8} />
-            <div>
-              <small>État pack</small>
-              <b>
-                {packsOk}/{packsTotal}
-              </b>
-            </div>
-          </div>
           <div className="pf-metric">
             <small>CBM</small>
             <b>{dec(cbm)}</b>
           </div>
           <div className="pf-metric">
             <small>
-              <Ctn size={15} />
+              <ContainerGlyph size={18} />
             </small>
             <b>≈ {dec(cbm / 69)}</b>
           </div>
           {showMoney && (
-            <>
-              <div className="pf-metric">
-                <small>Montant</small>
-                <b>{eur(amount)}</b>
-              </div>
-              <div className={`pf-deposit ${depositTodo > 0 ? '' : 'none'}`}>
-                <small>Acompte à faire</small>
-                <b>{depositTodo > 0 ? eur(depositTodo) : '—'}</b>
-              </div>
-            </>
+            <div className="pf-metric pf-metric-amount">
+              <small>Montant</small>
+              <b>{eur(amount)}</b>
+            </div>
           )}
         </div>
         <span className="pf-chevron">{open ? <ChevronUp size={24} /> : <ChevronDown size={24} />}</span>
@@ -288,9 +268,9 @@ interface RowProps {
 function useRowData(p: Proforma, state: State) {
   const t = proformaTotals(state, p);
   const sup = byId(state.suppliers, p.supplierId);
-  const names = p.lines.map((l) => byId(state.products, l.productId).name);
-  const validated = ['en_production', 'booke', 'en_transit', 'arrive'].includes(p.status);
-  return { t, sup, names, validated };
+  const title = p.title ?? byId(state.products, p.lines[0].productId).name;
+  const packsDone = t.packsOk === t.packsTotal;
+  return { t, sup, title, packsDone };
 }
 
 function StatusCell({ p, onSign }: { p: Proforma; onSign?: (id: string) => void }) {
@@ -331,8 +311,18 @@ function AmountCell({ p, amount, deposit }: { p: Proforma; amount: number; depos
   );
 }
 
+function PackCell({ ok, total, done }: { ok: number; total: number; done: boolean }) {
+  return done ? (
+    <span className="pf-ok">OK</span>
+  ) : (
+    <span className="pf-big">
+      {ok}/{total}
+    </span>
+  );
+}
+
 function Row({ p, state, showMoney, onSign, onOpen }: RowProps) {
-  const { t, sup, names, validated } = useRowData(p, state);
+  const { t, sup, title, packsDone } = useRowData(p, state);
   return (
     <tr onClick={onOpen}>
       <td>
@@ -342,19 +332,20 @@ function Row({ p, state, showMoney, onSign, onOpen }: RowProps) {
         </div>
       </td>
       <td className="pf-prod">
-        <b>{names[0]}</b>
-        {names.length > 1 && <small>+ {names.length - 1} réf.</small>}
+        <b>{title}</b>
       </td>
       <td className="pf-sup">{sup.name}</td>
-      <td className="c pf-big">
-        {t.packsOk}/{t.packsTotal}
+      <td className="c">
+        <PackCell ok={t.packsOk} total={t.packsTotal} done={packsDone} />
       </td>
-      <td className="c">{validated ? <span className="pf-ok">OK</span> : <CheckCircle2 className="pf-check" size={26} strokeWidth={1.8} />}</td>
+      <td className="c">
+        <CheckCircle2 className="pf-check" size={28} strokeWidth={1.8} />
+      </td>
       <td className="c">
         <div className="pf-cbm">
           <b>{dec(t.cbm)}</b>
           <small>
-            {dec(t.eq40)} <Ctn size={15} />
+            {dec(t.eq40)} <ContainerGlyph size={18} />
           </small>
         </div>
       </td>
@@ -376,17 +367,14 @@ function Row({ p, state, showMoney, onSign, onOpen }: RowProps) {
 }
 
 function Card({ p, state, showMoney, onSign, onOpen }: RowProps) {
-  const { t, sup, names, validated } = useRowData(p, state);
+  const { t, sup, title, packsDone } = useRowData(p, state);
   return (
     <article className="pf-card" onClick={onOpen}>
       <div className="pf-card-top">
         <SupplierMark supplier={sup} size={28} />
         <div className="grow">
           <b>{p.id}</b>
-          <div className="small">
-            {names[0]}
-            {names.length > 1 ? ` + ${names.length - 1}` : ''}
-          </div>
+          <div className="small">{title}</div>
           <div className="xs muted">{sup.name}</div>
         </div>
         <ChevronRight size={20} className="muted" />
@@ -394,13 +382,11 @@ function Card({ p, state, showMoney, onSign, onOpen }: RowProps) {
       <div className="pf-card-grid">
         <div>
           <small>Pack</small>
-          <b>
-            {t.packsOk}/{t.packsTotal}
-          </b>
+          <PackCell ok={t.packsOk} total={t.packsTotal} done={packsDone} />
         </div>
         <div>
           <small>Validation</small>
-          {validated ? <span className="pf-ok">OK</span> : <CheckCircle2 className="pf-check" size={22} strokeWidth={1.8} />}
+          <CheckCircle2 className="pf-check" size={22} strokeWidth={1.8} />
         </div>
         <div>
           <small>CBM</small>

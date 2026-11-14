@@ -16,6 +16,7 @@ import Suppliers from './pages/Suppliers';
 import SupplierDetail from './pages/SupplierDetail';
 import Finance from './pages/Finance';
 import Settings from './pages/Settings';
+import Landing from './components/Landing';
 import PortalLayout from './portal/PortalLayout';
 import { PortalContainers, PortalFinance, PortalHome, PortalLoading, PortalPacks, PortalProducts, PortalProformas } from './portal/PortalPages';
 
@@ -25,7 +26,8 @@ export default function App() {
       <Router>
         <Routes>
           <Route element={<Layout />}>
-            <Route index element={<Home />} />
+            <Route index element={<Landing />} />
+            <Route path="performance" element={<Home />} />
             <Route path="proformas" element={<Proformas />} />
             <Route path="proformas/:id" element={<ProformaDetail />} />
             <Route path="produits" element={<Products />} />

@@ -458,10 +458,10 @@ export function proformaTotals(s: State, pf: Proforma) {
     const p = byId(s.products, l.productId);
     amount += l.qty * l.price;
     qty += l.qty;
-    cbm += lineCbm(p, l.qty);
+    cbm += l.cbm ?? lineCbm(p, l.qty);
     if (packDone(p)) packsOk++;
   }
-  const deposit = (amount * pf.depositPct) / 100;
+  const deposit = pf.depositAmount ?? (amount * pf.depositPct) / 100;
   return {
     amount,
     qty,
