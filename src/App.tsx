@@ -1,4 +1,7 @@
-import { HashRouter, Route, Routes } from 'react-router-dom';
+import { HashRouter, MemoryRouter, Route, Routes } from 'react-router-dom';
+
+// Dans un Artifact claude.ai, la navigation reste en mémoire (pas d'URL en #/chemin)
+const Router = import.meta.env.VITE_ARTIFACT ? MemoryRouter : HashRouter;
 import { StoreProvider } from './data/store';
 import Layout from './components/Layout';
 import Home from './pages/Home';
@@ -19,7 +22,7 @@ import { PortalContainers, PortalFinance, PortalHome, PortalLoading, PortalPacks
 export default function App() {
   return (
     <StoreProvider>
-      <HashRouter>
+      <Router>
         <Routes>
           <Route element={<Layout />}>
             <Route index element={<Home />} />
@@ -45,7 +48,7 @@ export default function App() {
             <Route path="finance" element={<PortalFinance />} />
           </Route>
         </Routes>
-      </HashRouter>
+      </Router>
     </StoreProvider>
   );
 }
