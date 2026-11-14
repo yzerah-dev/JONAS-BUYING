@@ -247,6 +247,12 @@ function Group({
 
           {/* Téléphone : fiches */}
           <div className="pf-cards">
+            <div className="pf-cards-head">
+              <span>Proforma</span>
+              <span>Pack</span>
+              <span>Chgt</span>
+              <span />
+            </div>
             {items.map((p) => (
               <Card key={p.id} p={p} state={state} showMoney={showMoney} onSign={onSign} onOpen={() => navigate(`/proformas/${p.id}`)} />
             ))}
@@ -366,49 +372,62 @@ function Row({ p, state, showMoney, onSign, onOpen }: RowProps) {
   );
 }
 
+/** Téléphone : ligne fine (identité, état pack, chargement) ; le détail s'ouvre au toucher. */
 function Card({ p, state, showMoney, onSign, onOpen }: RowProps) {
   const { t, sup, title, packsDone } = useRowData(p, state);
+  const [open, setOpen] = useState(false);
   return (
-    <article className="pf-card" onClick={onOpen}>
-      <div className="pf-card-top">
-        <SupplierMark supplier={sup} size={28} />
-        <div className="grow">
+    <article className={`pf-line ${open ? 'open' : ''}`}>
+      <button className="pf-line-main" onClick={() => setOpen(!open)} aria-expanded={open}>
+        <SupplierMark supplier={sup} size={22} />
+        <span className="pf-line-id">
           <b>{p.id}</b>
-          <div className="small">{title}</div>
-          <div className="xs muted">{sup.name}</div>
-        </div>
-        <ChevronRight size={20} className="muted" />
-      </div>
-      <div className="pf-card-grid">
-        <div>
-          <small>Pack</small>
+          <small>{title}</small>
+        </span>
+        <span className="pf-line-pack">
           <PackCell ok={t.packsOk} total={t.packsTotal} done={packsDone} />
+        </span>
+        <span className="pf-line-week">{weekLabel(p.etd)}</span>
+        {open ? <ChevronUp size={18} className="muted" /> : <ChevronDown size={18} className="muted" />}
+      </button>
+      {open && (
+        <div className="pf-line-detail">
+          <div className="xs muted">{sup.name}</div>
+          <div className="pf-card-grid">
+            <div>
+              <small>Validation</small>
+              <CheckCircle2 className="pf-check" size={22} strokeWidth={1.8} />
+            </div>
+            <div>
+              <small>CBM</small>
+              <b>{dec(t.cbm)}</b>
+            </div>
+            <div>
+              <small>40HC</small>
+              <b>≈ {dec(t.eq40)}</b>
+            </div>
+            <div>
+              <small>Chargement</small>
+              <b>{weekLabel(p.etd)}</b>
+            </div>
+            <div>
+              <small>Arrivée</small>
+              <b>{weekLabel(p.eta)}</b>
+            </div>
+            <div>
+              <small>Pack</small>
+              <PackCell ok={t.packsOk} total={t.packsTotal} done={packsDone} />
+            </div>
+          </div>
+          <div className="pf-card-bottom">
+            <StatusCell p={p} onSign={onSign} />
+            {showMoney && <AmountCell p={p} amount={t.amount} deposit={t.deposit} />}
+          </div>
+          <button className="pf-btn pf-line-open" onClick={onOpen}>
+            Ouvrir la proforma <ChevronRight size={18} />
+          </button>
         </div>
-        <div>
-          <small>Validation</small>
-          <CheckCircle2 className="pf-check" size={22} strokeWidth={1.8} />
-        </div>
-        <div>
-          <small>CBM</small>
-          <b>{dec(t.cbm)}</b>
-        </div>
-        <div>
-          <small>Chargement</small>
-          <b>{weekLabel(p.etd)}</b>
-        </div>
-        <div>
-          <small>Arrivée</small>
-          <b>{weekLabel(p.eta)}</b>
-        </div>
-        <div>
-          <small>40HC</small>
-          <b>≈ {dec(t.eq40)}</b>
-        </div>
-      </div>
-      <div className="pf-card-bottom">
-        <StatusCell p={p} onSign={onSign} />
-        {showMoney && <AmountCell p={p} amount={t.amount} deposit={t.deposit} />}
-      </div>
+      )}
     </article>
   );
 }

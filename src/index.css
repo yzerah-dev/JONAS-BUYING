@@ -621,3 +621,28 @@ tr[draggable='true'] { cursor: grab; }
   .pf-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .nav-sep { width: 1px; height: auto; margin: 6px 4px; }
 }
+
+/* --- Téléphone : lignes fines dépliables --- */
+@media (max-width: 820px) {
+  .pf-cards { gap: 0; padding: 4px 0 2px; }
+  .pf-line { border-top: 1px solid var(--line); }
+  .pf-line:first-child { border-top: 0; }
+  .pf-line-main { width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px 4px; border: 0; background: transparent; text-align: left; min-height: 48px; }
+  .pf-line-id { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.2; }
+  .pf-line-id b { font-size: 14px; font-weight: 700; }
+  .pf-line-id small { font-size: 12px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pf-line-pack { width: 46px; display: flex; justify-content: center; }
+  .pf-line-pack .pf-big { font-size: 16px; }
+  .pf-line-pack .pf-ok { font-size: 13px; padding: 2px 8px; }
+  .pf-line-week { width: 40px; text-align: center; font-size: 17px; font-weight: 800; }
+  .pf-line.open { background: var(--green-softer); border-radius: 12px; }
+  .pf-line.open + .pf-line { border-top-color: transparent; }
+  .pf-line-detail { display: grid; gap: 10px; padding: 0 10px 12px; }
+  .pf-line-detail .pf-card-grid { background: #fff; }
+  .pf-line-open { height: 40px; font-size: 15px; width: 100%; }
+  .pf-cards-head { display: flex; align-items: center; gap: 10px; padding: 8px 4px 0; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+  .pf-cards-head span:first-child { flex: 1; padding-left: 32px; }
+  .pf-cards-head span:nth-child(2) { width: 46px; text-align: center; }
+  .pf-cards-head span:nth-child(3) { width: 40px; text-align: center; }
+  .pf-cards-head span:last-child { width: 18px; }
+}
