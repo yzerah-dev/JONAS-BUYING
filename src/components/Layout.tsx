@@ -53,6 +53,7 @@ export default function Layout() {
   const { state } = useStore();
   const user = currentUser(state);
   const [q, setQ] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
   useTableLabels(mainRef);
   const navigate = useNavigate();
@@ -85,35 +86,38 @@ export default function Layout() {
         <NavLink to="/" className="logo">
           <span className="logo-mark">J</span> JONAS BUYING
         </NavLink>
-        <div className="grow" style={{ position: 'relative', maxWidth: 520 }}>
-          <div className="search">
-            <Search size={16} className="muted" />
-            <input placeholder="Rechercher une référence, proforma, fournisseur, conteneur…" value={q} onChange={(e) => setQ(e.target.value)} />
-          </div>
-          {results.length > 0 && (
-            <div className="card" style={{ position: 'absolute', top: 44, left: 0, right: 0, zIndex: 30, padding: 6 }}>
-              {results.map((r) => (
-                <div
-                  key={r.to + r.label}
-                  className="row"
-                  style={{ padding: '8px 10px', borderRadius: 8, cursor: 'pointer' }}
-                  onMouseDown={() => {
-                    navigate(r.to);
-                    setQ('');
-                  }}
-                >
-                  <span className="bold">{r.label}</span>
-                  <span className="grow" />
-                  <span className="muted small">{r.sub}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
         <div className="grow" />
         <div className="top-actions">
+          <div style={{ position: 'relative' }}>
+            <button className="icon-btn" title="Rechercher" onClick={() => setSearchOpen(!searchOpen)}>
+              <Search size={24} />
+            </button>
+            {searchOpen && (
+              <div className="card search-pop">
+                <div className="search">
+                  <Search size={16} className="muted" />
+                  <input autoFocus placeholder="Référence, proforma, fournisseur, conteneur…" value={q} onChange={(e) => setQ(e.target.value)} />
+                </div>
+                {results.map((r) => (
+                  <div
+                    key={r.to + r.label}
+                    className="menu-row"
+                    onMouseDown={() => {
+                      navigate(r.to);
+                      setQ('');
+                      setSearchOpen(false);
+                    }}
+                  >
+                    <span className="bold small grow">{r.label}</span>
+                    <span className="muted xs">{r.sub}</span>
+                  </div>
+                ))}
+                {q.trim().length >= 2 && results.length === 0 && <div className="small muted" style={{ padding: 8 }}>Aucun résultat.</div>}
+              </div>
+            )}
+          </div>
           <button className="icon-btn" title={`${alerts} alertes`} onClick={() => navigate('/')}>
-            <Bell size={22} />
+            <Bell size={26} />
             {alerts > 0 && <span className="dot" />}
           </button>
           <UserSwitcher />

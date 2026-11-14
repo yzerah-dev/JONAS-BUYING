@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Check, LogIn } from 'lucide-react';
+import { Check, ChevronDown, LogIn } from 'lucide-react';
 import { currentUser, useStore } from '../data/store';
 import { ROLE_DEFS } from '../data/permissions';
 import { initials } from '../lib/format';
@@ -47,14 +47,15 @@ export default function UserSwitcher() {
   };
 
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
-      <button className="user-btn" onClick={() => setOpen(!open)} title="Changer d’utilisateur">
-        <div className="col" style={{ alignItems: 'flex-end', gap: 0 }}>
-          <span className="bold small">{me.name}</span>
-          <span className="xs muted">{ROLE_DEFS[me.role].label}</span>
-        </div>
-        <div className="avatar">{initials(me.name === 'Yzerah' ? 'Y Z' : me.name)}</div>
-      </button>
+    <div ref={ref} className="user-switch">
+      <div className="user-btns">
+        <button className="role-btn" onClick={() => setOpen(!open)} title={`${me.name} · changer d’utilisateur`}>
+          {ROLE_DEFS[me.role].label} <ChevronDown size={18} />
+        </button>
+        <button className="avatar avatar-lg" onClick={() => setOpen(!open)} title={me.name}>
+          {initials(me.name === 'Yzerah' ? 'Y Z' : me.name)}
+        </button>
+      </div>
       {open && (
         <div className="card menu">
           <div className="menu-title">

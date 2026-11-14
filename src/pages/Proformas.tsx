@@ -1,9 +1,24 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Building2, Calendar, Check, ChevronDown, ChevronRight, ChevronUp, Container as Ctn, List, PenLine, Search } from 'lucide-react';
+import {
+  Box,
+  Calendar,
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  ChevronUp,
+  Container as Ctn,
+  Landmark,
+  Layers,
+  List,
+  PenLine,
+  Search,
+  SlidersHorizontal,
+} from 'lucide-react';
 import { byId, proformaTotals, useAuth, useStore, PROFORMA_STATUS_LABEL, type State } from '../data/store';
 import { PROFORMA_STATUSES, type Proforma, type ProformaStatus } from '../data/types';
-import { Pill, ProformaStatusPill, Seg, SupplierLogo, toast } from '../components/ui';
+import { PROFORMA_ICON, ProformaStatusPill, SupplierMark, toast } from '../components/ui';
 import { TODAY, dec, eur, weekKey, weekLabel, weekRange } from '../lib/format';
 
 type View = 'liste' | 'semaine' | 'fournisseur';
@@ -18,6 +33,7 @@ export default function Proformas() {
   const [view, setView] = useState<View>('semaine');
   const [q, setQ] = useState('');
   const [supplier, setSupplier] = useState('all');
+  const [showFilter, setShowFilter] = useState(false);
   const [showPast, setShowPast] = useState(false);
 
   const filtered = useMemo(() => {
@@ -38,7 +54,7 @@ export default function Proformas() {
   }, [state, status, supplier, q]);
 
   const groups = useMemo(() => {
-    if (view === 'liste') return [{ key: 'all', title: 'Toutes les proformas', sub: '', items: filtered }];
+    if (view === 'liste') return [{ key: 'all', title: 'Toutes les proformas', sub: `${filtered.length} proformas`, items: filtered, kind: 'liste' as const }];
     const map = new Map<string, Proforma[]>();
     for (const p of filtered) {
       const k = view === 'semaine' ? weekKey(p.etd) : p.supplierId;
@@ -48,8 +64,8 @@ export default function Proformas() {
     const entries = [...map.entries()].filter(([key]) => view !== 'semaine' || showPast || status !== 'all' || key >= current);
     return entries.map(([key, items]) =>
       view === 'semaine'
-        ? { key, title: `Semaine ${weekLabel(items[0].etd).slice(1)}`, sub: weekRange(items[0].etd), items }
-        : { key, title: byId(state.suppliers, key).name, sub: `${byId(state.suppliers, key).city} · ${byId(state.suppliers, key).flag}`, items },
+        ? { key, title: `Semaine ${weekLabel(items[0].etd).slice(1)}`, sub: weekRange(items[0].etd), items, kind: 'semaine' as const }
+        : { key, title: byId(state.suppliers, key).name, sub: `${byId(state.suppliers, key).flag} ${byId(state.suppliers, key).city}`, items, kind: 'fournisseur' as const },
     );
   }, [filtered, view, state.suppliers, showPast, status]);
   const pastWeeks = view === 'semaine' && status === 'all' ? new Set(filtered.filter((p) => weekKey(p.etd) < weekKey(TODAY)).map((p) => weekKey(p.etd))).size : 0;
@@ -60,72 +76,114 @@ export default function Proformas() {
     else params.set('statut', s);
     setParams(params);
   };
+  const sign = (id: string) => {
+    dispatch({ type: 'signProforma', id });
+    toast(`${id} signée`);
+  };
 
   return (
-    <>
-      <div className="page-head">
-        <h1>Proformas</h1>
-      </div>
-      <div className="row wrap mb">
-        <div className="search grow">
-          <Search size={17} className="muted" />
+    <div className="pf-page">
+      <h1 className="pf-title">Proformas</h1>
+
+      <div className="pf-toolbar">
+        <label className="pf-search">
+          <Search size={20} />
           <input placeholder="Rechercher une proforma, un fournisseur, une référence…" value={q} onChange={(e) => setQ(e.target.value)} />
+        </label>
+        <div style={{ position: 'relative' }}>
+          <button className={`pf-btn ${supplier !== 'all' ? 'on' : ''}`} onClick={() => setShowFilter(!showFilter)}>
+            <SlidersHorizontal size={19} /> Filtrer
+          </button>
+          {showFilter && (
+            <div className="card pf-popover">
+              <label className="xs muted" htmlFor="pf-sup">
+                Fournisseur
+              </label>
+              <select id="pf-sup" className="input" value={supplier} onChange={(e) => setSupplier(e.target.value)}>
+                <option value="all">Tous les fournisseurs</option>
+                {state.suppliers.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+              {pastWeeks > 0 && (
+                <label className="row small" style={{ gap: 6 }}>
+                  <input type="checkbox" checked={showPast} onChange={(e) => setShowPast(e.target.checked)} /> Afficher les semaines passées ({pastWeeks})
+                </label>
+              )}
+            </div>
+          )}
         </div>
-        <select className="input" value={supplier} onChange={(e) => setSupplier(e.target.value)}>
-          <option value="all">Tous les fournisseurs</option>
-          {state.suppliers.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
         {canSign && (
-          <button className="btn primary lg" onClick={() => setStatus('a_signer')}>
-            <PenLine size={18} /> Signer ({toSign.length})
+          <button className="pf-btn primary" onClick={() => setStatus('a_signer')}>
+            <PenLine size={21} /> Signer ({toSign.length})
           </button>
         )}
       </div>
 
-      <div className="chips mb">
-        <button className={`chip ${status === 'all' ? 'active' : ''}`} onClick={() => setStatus('all')}>
-          Toutes <span className="count">{state.proformas.length}</span>
+      <div className="pf-chips">
+        <button className={`pf-chip ${status === 'all' ? 'active' : ''}`} onClick={() => setStatus('all')}>
+          <Layers size={19} /> Toutes <b>{state.proformas.length}</b>
         </button>
-        {PROFORMA_STATUSES.map((s) => (
-          <button key={s} className={`chip ${status === s ? 'active' : ''}`} onClick={() => setStatus(s)}>
-            {PROFORMA_STATUS_LABEL[s]} <span className="count">{state.proformas.filter((p) => p.status === s).length}</span>
+        {PROFORMA_STATUSES.map((s) => {
+          const Icon = PROFORMA_ICON[s].icon;
+          return (
+            <button key={s} className={`pf-chip ${status === s ? 'active' : ''}`} onClick={() => setStatus(s)}>
+              <Icon size={19} style={{ color: status === s ? undefined : PROFORMA_ICON[s].color }} /> {PROFORMA_STATUS_LABEL[s]} <b>{state.proformas.filter((p) => p.status === s).length}</b>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="pf-views">
+        {(
+          [
+            ['liste', 'Vue liste', List],
+            ['semaine', 'Par semaine d’expédition', Calendar],
+            ['fournisseur', 'Par fournisseur', Landmark],
+          ] as const
+        ).map(([id, label, Icon]) => (
+          <button key={id} className={view === id ? 'active' : ''} onClick={() => setView(id)}>
+            <Icon size={19} /> {label}
           </button>
         ))}
       </div>
 
-      <div className="mb">
-        <Seg<View>
-          value={view}
-          onChange={setView}
-          options={[
-            { id: 'liste', label: 'Vue liste', icon: <List size={16} /> },
-            { id: 'semaine', label: 'Par semaine d’expédition', icon: <Calendar size={16} /> },
-            { id: 'fournisseur', label: 'Par fournisseur', icon: <Building2 size={16} /> },
-          ]}
-        />
-      </div>
-
-      {pastWeeks > 0 && (
-        <button className="btn sm mb" onClick={() => setShowPast(!showPast)}>
-          {showPast ? 'Masquer' : 'Afficher'} les semaines passées ({pastWeeks})
-        </button>
-      )}
       {groups.length === 0 && <div className="card empty">Aucune proforma ne correspond à ces filtres.</div>}
       {groups.map((g, i) => (
-        <Group key={g.key + view + status} title={g.title} sub={g.sub} items={g.items} state={state} showMoney={showMoney} defaultOpen={i === 0 || view === 'liste' || status !== 'all'} onSign={!canSign ? undefined : (id) => {
-          dispatch({ type: 'signProforma', id });
-          toast(`${id} signée`);
-        }} />
+        <Group
+          key={g.key + view + status}
+          title={g.title}
+          sub={g.sub}
+          items={g.items}
+          state={state}
+          showMoney={showMoney}
+          defaultOpen={i === 0 || view === 'liste'}
+          onSign={canSign ? sign : undefined}
+        />
       ))}
-    </>
+    </div>
   );
 }
 
-function Group({ title, sub, items, state, defaultOpen, onSign, showMoney }: { title: string; sub: string; items: Proforma[]; state: State; defaultOpen: boolean; onSign?: (id: string) => void; showMoney: boolean }) {
+function Group({
+  title,
+  sub,
+  items,
+  state,
+  defaultOpen,
+  onSign,
+  showMoney,
+}: {
+  title: string;
+  sub: string;
+  items: Proforma[];
+  state: State;
+  defaultOpen: boolean;
+  onSign?: (id: string) => void;
+  showMoney: boolean;
+}) {
   const [open, setOpen] = useState(defaultOpen);
   const navigate = useNavigate();
   const totals = items.map((p) => proformaTotals(state, p));
@@ -136,132 +194,235 @@ function Group({ title, sub, items, state, defaultOpen, onSign, showMoney }: { t
   const depositTodo = items.reduce((s, p, i) => s + (p.depositPaid ? 0 : totals[i].deposit), 0);
 
   return (
-    <div className="card week">
-      <div className={`week-head ${open ? 'open' : ''}`} onClick={() => setOpen(!open)}>
-        <div className="cal-icon">
-          <Calendar size={24} />
+    <section className={`pf-week ${open ? 'open' : ''}`}>
+      <header className="pf-week-head" onClick={() => setOpen(!open)}>
+        <Calendar className="pf-week-cal" size={38} strokeWidth={1.8} />
+        <div className="pf-week-title">
+          <h2>{title}</h2>
+          <span>{sub}</span>
         </div>
-        <div style={{ minWidth: 190 }}>
-          <div style={{ fontSize: 22, fontWeight: 800 }}>{title}</div>
-          <div className="muted">{sub}</div>
-        </div>
-        <Pill color="green">{items.length} proforma{items.length > 1 ? 's' : ''}</Pill>
-        <div className="grow" />
-        <div className="metric">
-          <div className="l">Packs OK</div>
-          <div className="v">
-            {packsOk}/{packsTotal}
-          </div>
-        </div>
-        <div className="metric">
-          <div className="l">CBM</div>
-          <div className="v">{dec(cbm)}</div>
-        </div>
-        <div className="metric">
-          <div className="l">
-            <Ctn size={12} /> 40HC
-          </div>
-          <div className="v">≈ {dec(cbm / 69)}</div>
-        </div>
-        {showMoney && (
-          <>
-            <div className="metric">
-              <div className="l">Montant</div>
-              <div className="v">{eur(amount)}</div>
+        <span className="pf-count">
+          {items.length} proforma{items.length > 1 ? 's' : ''}
+        </span>
+        <div className="pf-metrics">
+          <div className="pf-pack">
+            <Box size={22} strokeWidth={1.8} />
+            <div>
+              <small>État pack</small>
+              <b>
+                {packsOk}/{packsTotal}
+              </b>
             </div>
-            <div className="metric">
-              <div className="l">Acompte à faire</div>
-              <div className={`v ${depositTodo > 0 ? 'red' : 'green'}`} style={{ fontSize: 16 }}>
-                {depositTodo > 0 ? eur(depositTodo) : '—'}
+          </div>
+          <div className="pf-metric">
+            <small>CBM</small>
+            <b>{dec(cbm)}</b>
+          </div>
+          <div className="pf-metric">
+            <small>
+              <Ctn size={15} />
+            </small>
+            <b>≈ {dec(cbm / 69)}</b>
+          </div>
+          {showMoney && (
+            <>
+              <div className="pf-metric">
+                <small>Montant</small>
+                <b>{eur(amount)}</b>
               </div>
-            </div>
-          </>
-        )}
-        {open ? <ChevronUp /> : <ChevronDown />}
-      </div>
+              <div className={`pf-deposit ${depositTodo > 0 ? '' : 'none'}`}>
+                <small>Acompte à faire</small>
+                <b>{depositTodo > 0 ? eur(depositTodo) : '—'}</b>
+              </div>
+            </>
+          )}
+        </div>
+        <span className="pf-chevron">{open ? <ChevronUp size={24} /> : <ChevronDown size={24} />}</span>
+      </header>
+
       {open && (
-        <div className="tbl-wrap">
-          <table className="tbl">
+        <div className="pf-body">
+          <table className="pf-table">
             <thead>
               <tr>
                 <th>Référence</th>
-                <th>Produits</th>
+                <th>Produit</th>
                 <th>Fournisseur</th>
-                <th className="center">Pack</th>
-                <th className="num">CBM</th>
-                <th>Statut</th>
-                <th className="center">Chargement</th>
-                <th className="center">Arrivée</th>
-                {showMoney && <th className="num">Montant</th>}
+                <th className="c">Pack</th>
+                <th className="c">Validation</th>
+                <th className="c">CBM</th>
+                <th className="c">Statut</th>
+                <th className="c">Chargement</th>
+                <th className="c">Arrivée</th>
+                {showMoney && <th className="c">Montant</th>}
                 <th />
               </tr>
             </thead>
             <tbody>
-              {items.map((p) => {
-                const t = proformaTotals(state, p);
-                const sup = byId(state.suppliers, p.supplierId);
-                const names = p.lines.map((l) => byId(state.products, l.productId).name);
-                return (
-                  <tr key={p.id} className="clickable" onClick={() => navigate(`/proformas/${p.id}`)}>
-                    <td>
-                      <div className="row">
-                        <SupplierLogo supplier={sup} size={32} />
-                        <span className="bold nowrap">{p.id}</span>
-                      </div>
-                    </td>
-                    <td style={{ maxWidth: 220 }}>
-                      <div className="bold">{names[0]}</div>
-                      {names.length > 1 && <div className="muted small">+ {names.length - 1} autre{names.length > 2 ? 's' : ''} référence{names.length > 2 ? 's' : ''}</div>}
-                    </td>
-                    <td>{sup.name}</td>
-                    <td className="center">
-                      <Pill color={t.packsOk === t.packsTotal ? 'green' : t.packsOk === 0 ? 'red' : 'orange'}>
-                        {t.packsOk === t.packsTotal ? 'OK' : `${t.packsOk}/${t.packsTotal}`}
-                      </Pill>
-                    </td>
-                    <td className="num">
-                      <div className="bold">{dec(t.cbm)}</div>
-                      <div className="muted small">{dec(t.eq40)} × 40HC</div>
-                    </td>
-                    <td>
-                      <div className="col" style={{ alignItems: 'flex-start' }}>
-                        <ProformaStatusPill status={p.status} />
-                        {p.status === 'a_signer' && onSign && (
-                          <button
-                            className="btn primary sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onSign(p.id);
-                            }}
-                          >
-                            <PenLine size={12} /> Signer maintenant
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                    <td className="center bold">{weekLabel(p.etd)}</td>
-                    <td className="center bold">{weekLabel(p.eta)}</td>
-                    {showMoney && <td className="num">
-                      <div className="bold">{eur(t.amount)}</div>
-                      <div className="muted xs">
-                        Acompte {p.depositPct} % : {eur(t.deposit)}
-                      </div>
-                      {p.depositPaid ? (
-                        <Check size={16} className="green" />
-                      ) : (
-                        <Pill color="red">À faire</Pill>
-                      )}
-                    </td>}
-                    <td>
-                      <ChevronRight size={18} className="muted" />
-                    </td>
-                  </tr>
-                );
-              })}
+              {items.map((p) => (
+                <Row key={p.id} p={p} state={state} showMoney={showMoney} onSign={onSign} onOpen={() => navigate(`/proformas/${p.id}`)} />
+              ))}
             </tbody>
           </table>
+
+          {/* Téléphone : fiches */}
+          <div className="pf-cards">
+            {items.map((p) => (
+              <Card key={p.id} p={p} state={state} showMoney={showMoney} onSign={onSign} onOpen={() => navigate(`/proformas/${p.id}`)} />
+            ))}
+          </div>
         </div>
       )}
+    </section>
+  );
+}
+
+interface RowProps {
+  p: Proforma;
+  state: State;
+  showMoney: boolean;
+  onSign?: (id: string) => void;
+  onOpen: () => void;
+}
+
+function useRowData(p: Proforma, state: State) {
+  const t = proformaTotals(state, p);
+  const sup = byId(state.suppliers, p.supplierId);
+  const names = p.lines.map((l) => byId(state.products, l.productId).name);
+  const validated = ['en_production', 'booke', 'en_transit', 'arrive'].includes(p.status);
+  return { t, sup, names, validated };
+}
+
+function StatusCell({ p, onSign }: { p: Proforma; onSign?: (id: string) => void }) {
+  if (p.status === 'a_signer')
+    return (
+      <div className="pf-sign">
+        <span>
+          <PenLine size={16} /> À signer
+        </span>
+        {onSign && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onSign(p.id);
+            }}
+          >
+            <PenLine size={11} /> Signer maintenant
+          </button>
+        )}
+      </div>
+    );
+  return <ProformaStatusPill status={p.status} big />;
+}
+
+function AmountCell({ p, amount, deposit }: { p: Proforma; amount: number; deposit: number }) {
+  return (
+    <div className="pf-amount">
+      <b>{eur(amount)}</b>
+      <small>Acompte : {eur(deposit)}</small>
+      {p.depositPaid ? (
+        <span className="ok">
+          <Check size={15} strokeWidth={3} />
+        </span>
+      ) : (
+        <span className="todo">À faire</span>
+      )}
     </div>
+  );
+}
+
+function Row({ p, state, showMoney, onSign, onOpen }: RowProps) {
+  const { t, sup, names, validated } = useRowData(p, state);
+  return (
+    <tr onClick={onOpen}>
+      <td>
+        <div className="pf-ref">
+          <SupplierMark supplier={sup} size={30} />
+          <b>{p.id}</b>
+        </div>
+      </td>
+      <td className="pf-prod">
+        <b>{names[0]}</b>
+        {names.length > 1 && <small>+ {names.length - 1} réf.</small>}
+      </td>
+      <td className="pf-sup">{sup.name}</td>
+      <td className="c pf-big">
+        {t.packsOk}/{t.packsTotal}
+      </td>
+      <td className="c">{validated ? <span className="pf-ok">OK</span> : <CheckCircle2 className="pf-check" size={26} strokeWidth={1.8} />}</td>
+      <td className="c">
+        <div className="pf-cbm">
+          <b>{dec(t.cbm)}</b>
+          <small>
+            {dec(t.eq40)} <Ctn size={15} />
+          </small>
+        </div>
+      </td>
+      <td className="c">
+        <StatusCell p={p} onSign={onSign} />
+      </td>
+      <td className="c pf-week-no">{weekLabel(p.etd)}</td>
+      <td className="c pf-week-no">{weekLabel(p.eta)}</td>
+      {showMoney && (
+        <td className="c">
+          <AmountCell p={p} amount={t.amount} deposit={t.deposit} />
+        </td>
+      )}
+      <td className="pf-go">
+        <ChevronRight size={22} />
+      </td>
+    </tr>
+  );
+}
+
+function Card({ p, state, showMoney, onSign, onOpen }: RowProps) {
+  const { t, sup, names, validated } = useRowData(p, state);
+  return (
+    <article className="pf-card" onClick={onOpen}>
+      <div className="pf-card-top">
+        <SupplierMark supplier={sup} size={28} />
+        <div className="grow">
+          <b>{p.id}</b>
+          <div className="small">
+            {names[0]}
+            {names.length > 1 ? ` + ${names.length - 1}` : ''}
+          </div>
+          <div className="xs muted">{sup.name}</div>
+        </div>
+        <ChevronRight size={20} className="muted" />
+      </div>
+      <div className="pf-card-grid">
+        <div>
+          <small>Pack</small>
+          <b>
+            {t.packsOk}/{t.packsTotal}
+          </b>
+        </div>
+        <div>
+          <small>Validation</small>
+          {validated ? <span className="pf-ok">OK</span> : <CheckCircle2 className="pf-check" size={22} strokeWidth={1.8} />}
+        </div>
+        <div>
+          <small>CBM</small>
+          <b>{dec(t.cbm)}</b>
+        </div>
+        <div>
+          <small>Chargement</small>
+          <b>{weekLabel(p.etd)}</b>
+        </div>
+        <div>
+          <small>Arrivée</small>
+          <b>{weekLabel(p.eta)}</b>
+        </div>
+        <div>
+          <small>40HC</small>
+          <b>≈ {dec(t.eq40)}</b>
+        </div>
+      </div>
+      <div className="pf-card-bottom">
+        <StatusCell p={p} onSign={onSign} />
+        {showMoney && <AmountCell p={p} amount={t.amount} deposit={t.deposit} />}
+      </div>
+    </article>
   );
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Check, Circle, Clock } from 'lucide-react';
+import { Box, Check, CheckCircle2, Circle, Clock, Code2, PenLine, Settings, Truck, type LucideIcon } from 'lucide-react';
 import type { Brand, ContainerStatus, Product, ProformaStatus, Supplier, ValidationStep } from '../data/types';
 import { VALIDATION_LABELS, VALIDATION_STEPS } from '../data/types';
 import { CONTAINER_STATUS_LABEL, PROFORMA_STATUS_LABEL, packLate, packState, type PackState } from '../data/store';
@@ -22,8 +22,37 @@ export const PROFORMA_COLOR: Record<ProformaStatus, string> = {
   en_transit: 'yellow',
   arrive: 'green',
 };
-export function ProformaStatusPill({ status }: { status: ProformaStatus }) {
-  return <Pill color={PROFORMA_COLOR[status]}>{PROFORMA_STATUS_LABEL[status]}</Pill>;
+/** Icône et couleur de chaque statut (maquette JONAS) */
+export const PROFORMA_ICON: Record<ProformaStatus, { icon: LucideIcon; color: string }> = {
+  a_signer: { icon: PenLine, color: 'var(--red)' },
+  en_dev: { icon: Code2, color: 'var(--violet)' },
+  en_production: { icon: Settings, color: 'var(--orange)' },
+  booke: { icon: Box, color: 'var(--blue)' },
+  en_transit: { icon: Truck, color: 'var(--yellow)' },
+  arrive: { icon: CheckCircle2, color: 'var(--ink-2)' },
+};
+
+export function ProformaStatusPill({ status, big }: { status: ProformaStatus; big?: boolean }) {
+  const Icon = PROFORMA_ICON[status].icon;
+  return (
+    <span className={`pill ${PROFORMA_COLOR[status]} ${big ? 'pill-big' : ''}`}>
+      <Icon size={big ? 17 : 13} />
+      {PROFORMA_STATUS_LABEL[status]}
+    </span>
+  );
+}
+
+/** Monogramme fournisseur façon logo (lettre en dégradé), utilisé dans les listes */
+export function SupplierMark({ supplier, size = 30 }: { supplier: Supplier; size?: number }) {
+  return (
+    <span
+      className="supplier-mark"
+      title={supplier.name}
+      style={{ fontSize: size, backgroundImage: `linear-gradient(135deg, ${supplier.color}, ${supplier.color}88 55%, ${supplier.color})` }}
+    >
+      {supplier.shortName[0]}
+    </span>
+  );
 }
 
 export const CONTAINER_COLOR: Record<ContainerStatus, string> = {
