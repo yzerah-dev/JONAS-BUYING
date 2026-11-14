@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   Bell,
   Boxes,
@@ -14,42 +14,67 @@ import {
   Settings,
   Truck,
 } from 'lucide-react';
-import { ROLES, packLate, useStore, type Role } from '../data/store';
+import { currentUser, packLate, useStore } from '../data/store';
+import { canSee, isSupplier, type Module } from '../data/permissions';
 import { Toaster } from './ui';
-import { initials } from '../lib/format';
+import UserSwitcher from './UserSwitcher';
+import { Forbidden } from './Guard';
 
-const NAV = [
-  { to: '/', label: 'Mon espace', icon: Home, end: true },
-  { to: '/proformas', label: 'Proformas', icon: FileText },
-  { to: '/produits', label: 'Total – Produits', icon: Boxes },
-  { to: '/developpement', label: 'Développement', icon: FlaskConical },
-  { to: '/design', label: 'Design', icon: Palette },
-  { to: '/conteneurs', label: 'Conteneurs', icon: ContainerIcon },
-  { to: '/fournisseurs', label: 'Fournisseurs', icon: Truck },
-  { to: '/finance', label: 'Factures & Finance', icon: Euro },
+const NAV: { to: string; label: string; icon: typeof Home; module: Module; end?: boolean }[] = [
+  { to: '/', label: 'Mon espace', icon: Home, module: 'home', end: true },
+  { to: '/proformas', label: 'Proformas', icon: FileText, module: 'proformas' },
+  { to: '/produits', label: 'Total – Produits', icon: Boxes, module: 'produits' },
+  { to: '/developpement', label: 'Développement', icon: FlaskConical, module: 'developpement' },
+  { to: '/design', label: 'Design', icon: Palette, module: 'design' },
+  { to: '/conteneurs', label: 'Conteneurs', icon: ContainerIcon, module: 'conteneurs' },
+  { to: '/fournisseurs', label: 'Fournisseurs', icon: Truck, module: 'fournisseurs' },
+  { to: '/finance', label: 'Factures & Finance', icon: Euro, module: 'finance' },
 ];
 
+/** Module correspondant à une URL interne */
+function moduleOf(path: string): Module {
+  const seg = path.split('/')[1] ?? '';
+  const map: Record<string, Module> = {
+    '': 'home',
+    proformas: 'proformas',
+    produits: 'produits',
+    developpement: 'developpement',
+    design: 'design',
+    conteneurs: 'conteneurs',
+    fournisseurs: 'fournisseurs',
+    finance: 'finance',
+    parametres: 'parametres',
+  };
+  return map[seg] ?? 'home';
+}
+
 export default function Layout() {
-  const { state, dispatch } = useStore();
+  const { state } = useStore();
+  const user = currentUser(state);
   const [q, setQ] = useState('');
   const navigate = useNavigate();
+  const location = useLocation();
   const alerts = state.products.filter(packLate).length + state.proformas.filter((p) => p.status === 'a_signer').length;
 
   const results = useMemo(() => {
     const s = q.trim().toLowerCase();
     if (s.length < 2) return [];
-    const out: { label: string; sub: string; to: string }[] = [];
+    const out: { label: string; sub: string; to: string; module: Module }[] = [];
     for (const p of state.products)
-      if (`${p.ref} ${p.name} ${p.ean}`.toLowerCase().includes(s)) out.push({ label: `${p.ref} – ${p.name}`, sub: 'Produit', to: `/produits/${p.id}` });
+      if (`${p.ref} ${p.name} ${p.ean}`.toLowerCase().includes(s)) out.push({ label: `${p.ref} – ${p.name}`, sub: 'Produit', to: `/produits/${p.id}`, module: 'produits' });
     for (const p of state.proformas)
-      if (`${p.id} ${p.poNumber}`.toLowerCase().includes(s)) out.push({ label: p.id, sub: `Proforma · ${p.poNumber}`, to: `/proformas/${p.id}` });
+      if (`${p.id} ${p.poNumber}`.toLowerCase().includes(s)) out.push({ label: p.id, sub: `Proforma · ${p.poNumber}`, to: `/proformas/${p.id}`, module: 'proformas' });
     for (const sup of state.suppliers)
-      if (sup.name.toLowerCase().includes(s)) out.push({ label: sup.name, sub: 'Fournisseur', to: `/fournisseurs/${sup.id}` });
+      if (sup.name.toLowerCase().includes(s)) out.push({ label: sup.name, sub: 'Fournisseur', to: `/fournisseurs/${sup.id}`, module: 'fournisseurs' });
     for (const c of state.containers)
       if (`${c.id} ${c.number ?? ''} ${c.bookingNo ?? ''}`.toLowerCase().includes(s))
-        out.push({ label: c.number ?? c.id, sub: `Conteneur · ${c.bookingNo ?? c.id}`, to: `/conteneurs?c=${c.id}` });
-    return out.slice(0, 8);
-  }, [q, state]);
+        out.push({ label: c.number ?? c.id, sub: `Conteneur · ${c.bookingNo ?? c.id}`, to: `/conteneurs?c=${c.id}`, module: 'conteneurs' });
+    return out.filter((r) => canSee(user, r.module)).slice(0, 8);
+  }, [q, state, user]);
+
+  // Les comptes fournisseurs n'accèdent qu'au portail
+  if (isSupplier(user)) return <Navigate to="/portail" replace />;
+  const allowedHere = canSee(user, moduleOf(location.pathname));
 
   return (
     <div className="app">
@@ -84,20 +109,15 @@ export default function Layout() {
         </div>
         <div className="grow" />
         <div className="top-actions">
-          <select className="role-select" value={state.role} onChange={(e) => dispatch({ type: 'setRole', role: e.target.value as Role })} title="Rôle">
-            {ROLES.map((r) => (
-              <option key={r}>{r}</option>
-            ))}
-          </select>
           <button className="icon-btn" title={`${alerts} alertes`} onClick={() => navigate('/')}>
             <Bell size={22} />
             {alerts > 0 && <span className="dot" />}
           </button>
-          <div className="avatar">{initials(state.user === 'Yzerah' ? 'Y Z' : state.user)}</div>
+          <UserSwitcher />
         </div>
       </header>
       <nav className="sidebar">
-        {NAV.map((n) => (
+        {NAV.filter((n) => canSee(user, n.module)).map((n) => (
           <NavLink key={n.to} to={n.to} end={n.end}>
             <n.icon size={19} /> {n.label}
           </NavLink>
@@ -111,7 +131,7 @@ export default function Layout() {
         </div>
       </nav>
       <main className="main">
-        <Outlet />
+        {allowedHere ? <Outlet /> : <Forbidden />}
       </main>
       <Toaster />
     </div>

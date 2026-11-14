@@ -153,6 +153,10 @@ export interface Container {
   receivedOn?: ISODate;
   warehouse: string;
   planValidated: boolean;
+  /** JONAS a demandé un plan de chargement au fournisseur */
+  planRequested?: boolean;
+  /** Le fournisseur a proposé son plan, en attente de validation JONAS */
+  planProposed?: boolean;
   allocations: Allocation[];
   documents: string[];
   dateHistory: HistoryEntry[];
@@ -163,3 +167,22 @@ export const CONTAINER_CAPACITY: Record<Container['type'], number> = {
   '40': 59,
   '20': 28,
 };
+
+// ---- Utilisateurs & rôles ----------------------------------------------------
+
+export type Role = 'pilote' | 'acheteur' | 'designer' | 'validateur' | 'direction' | 'finance' | 'logistique' | 'fournisseur';
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: Role;
+  title: string;
+  /** Étape du circuit de validation pack que cet utilisateur signe */
+  validationStep?: ValidationStep;
+  /** Nom du designer (rattachement des packs) */
+  designerName?: string;
+  /** Pour les comptes du portail fournisseur */
+  supplierId?: string;
+  active: boolean;
+}

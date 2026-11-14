@@ -27,6 +27,26 @@ npm run build    # build de production dans dist/
 | Fournisseurs | `/fournisseurs`, `/fournisseurs/:id` | Galerie puis espace dédié : tableau de bord, produits, proformas, bookings, conteneurs, factures & finance |
 | Factures & Finance | `/finance` | Acomptes et soldes dérivés des proformas, échéances, retards |
 
+## Rôles et portail fournisseur
+
+Menu utilisateur en haut à droite : « Se connecter en tant que » (démo, en attendant une vraie authentification).
+
+| Rôle | Accès |
+|---|---|
+| Pilote | Tout, gestion des utilisateurs, arbitrage sur toutes les étapes de validation |
+| Direction | Tous les modules en lecture, signature des proformas, validation Direction |
+| Acheteur | Proformas, développement, consolidation des conteneurs (David : étape de validation « David ») |
+| Designer | Ses packs (artwork, die cut, envoi au fournisseur) |
+| Validation pack | Valide ou refuse les packs à son étape (Moinard) |
+| Finance | Proformas, fournisseurs, finance : enregistrement des paiements |
+| Logistique | Plans de chargement, bookings, départ, réception, révision d’ETA (sans montants) |
+| Fournisseur | **Portail** `/portail` : uniquement ses données |
+
+- La matrice (`src/data/permissions.ts`) sert à la fois à l’affichage et au **contrôle de chaque action dans le store** : une action non autorisée est refusée même si l’interface l’envoie.
+- Circuit pack : chaque étape (David → Direction → Moinard → Fournisseur) ne peut être validée que par la personne attribuée (configurable dans Paramètres) ; l’étape Fournisseur uniquement par le fournisseur du produit, après envoi du pack.
+- Portail fournisseur : tableau de bord des actions attendues, produits (développés / à développer), proformas, packs à valider, die cuts demandés, **plan de chargement proposé par le fournisseur** puis validé par JONAS, dépôt BL / Invoice / Packing List, paiements.
+- Paramètres → Utilisateurs & rôles : changement de rôle, d’étape de validation, activation (Pilote uniquement) et matrice des droits.
+
 ## Règles métier implémentées
 
 - **Source unique** (`src/data/store.tsx`) : toute action (signature, validation pack, affectation conteneur, booking, départ, réception, paiement) met à jour un seul état, répercuté dans toutes les vues.
@@ -52,7 +72,7 @@ src/
 ## Prochaines étapes
 
 - Backend & persistance (ex. Supabase/Postgres) avec le modèle de `types.ts`.
-- Rôles et permissions (équipes, portail fournisseur).
+- Authentification réelle (comptes, invitations fournisseurs).
 - Upload réel de documents (artwork, die cut, BL, Invoice, Packing List).
 - Notifications et relances.
 - Connexion ERP TCI (stock, réceptions).

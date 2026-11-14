@@ -19,6 +19,7 @@ import {
   PenLine,
   Phone,
   Plus,
+  Send,
   Share2,
   Ship,
   Trash2,
@@ -33,6 +34,7 @@ import {
   containerQty,
   lineCbm,
   proformaTotals,
+  useAuth,
   useStore,
   type State,
 } from '../data/store';
@@ -45,6 +47,7 @@ type Tab = 'produits' | 'details' | 'documents' | 'logistique' | 'historique';
 export default function ProformaDetail() {
   const { id } = useParams();
   const { state, dispatch } = useStore();
+  const auth = useAuth();
   const navigate = useNavigate();
   const pf = state.proformas.find((p) => p.id === id);
   const [tab, setTab] = useState<Tab>('produits');
@@ -52,6 +55,7 @@ export default function ProformaDetail() {
   if (!pf) return <div className="card empty">Proforma introuvable.</div>;
   const sup = byId(state.suppliers, pf.supplierId);
   const t = proformaTotals(state, pf);
+  const showMoney = auth.can('finance.view');
 
   return (
     <>
@@ -68,15 +72,17 @@ export default function ProformaDetail() {
         <button className="btn" onClick={() => toast('Lien de partage copié (démo)')}>
           <Share2 size={16} /> Partager
         </button>
-        <button
-          className="btn primary"
-          onClick={() => {
-            dispatch({ type: 'signProforma', id: pf.id });
-            toast(`${pf.id} signée`);
-          }}
-        >
-          <PenLine size={16} /> {pf.status === 'a_signer' ? 'Signer' : 'Signer à nouveau'}
-        </button>
+        {auth.can('proforma.sign') && (
+          <button
+            className="btn primary"
+            onClick={() => {
+              dispatch({ type: 'signProforma', id: pf.id });
+              toast(`${pf.id} signée`);
+            }}
+          >
+            <PenLine size={16} /> {pf.status === 'a_signer' ? 'Signer' : 'Signer à nouveau'}
+          </button>
+        )}
       </div>
 
       <div className="row wrap gap-lg" style={{ alignItems: 'stretch' }}>
@@ -110,7 +116,7 @@ export default function ProformaDetail() {
             <Info icon={<Ship size={18} />} label="ETA" value={weekLabel(pf.eta)} sub={`du ${fdate(pf.eta)}`} />
             <Info icon={<Ctn size={18} />} label="Conteneurs" value={dec(t.eq40)} sub="(40HC)" />
             <Info icon={<Boxes size={18} />} label="CBM total" value={m3(t.cbm)} />
-            <Info icon={<Euro size={18} />} label="Montant total" value={eur2(t.amount)} />
+            {showMoney && <Info icon={<Euro size={18} />} label="Montant total" value={eur2(t.amount)} />}
           </div>
         </div>
       </div>
@@ -165,7 +171,7 @@ export default function ProformaDetail() {
         <Metric l="Qté totale" v={`${num(t.qty)} pcs`} />
         <Metric l="CBM total" v={m3(t.cbm)} />
         <Metric l="Conteneurs" v={`${dec(t.eq40)} (40HC)`} />
-        <Metric l="Montant total" v={eur2(t.amount)} />
+        {showMoney && <Metric l="Montant total" v={eur2(t.amount)} />}
         <Metric l="Packs validés" v={`${t.packsOk}/${t.packsTotal}`} />
         <div className="grow" />
         <Pill color="green">
@@ -311,6 +317,7 @@ function ProductsTab({ pf, state, mode }: { pf: Proforma; state: State; mode: 'g
 
 function DetailsTab({ pf, state }: { pf: Proforma; state: State }) {
   const { dispatch } = useStore();
+  const auth = useAuth();
   const t = proformaTotals(state, pf);
   return (
     <div className="grid2">
@@ -338,7 +345,7 @@ function DetailsTab({ pf, state }: { pf: Proforma; state: State }) {
         </dl>
         <div className="mt">
           <div className="muted small mb">Changer le statut</div>
-          <select className="input" value={pf.status} onChange={(e) => dispatch({ type: 'setProformaStatus', id: pf.id, status: e.target.value as ProformaStatus })}>
+          <select className="input" disabled={!auth.can('proforma.edit')} value={pf.status} onChange={(e) => dispatch({ type: 'setProformaStatus', id: pf.id, status: e.target.value as ProformaStatus })}>
             <option value="a_signer">À signer</option>
             <option value="en_dev">En dev</option>
             <option value="en_production">En production</option>
@@ -348,7 +355,7 @@ function DetailsTab({ pf, state }: { pf: Proforma; state: State }) {
           </select>
         </div>
       </div>
-      <div className="card pad">
+      {auth.can('finance.view') && <div className="card pad">
         <div className="card-title">Finance</div>
         <dl className="kv">
           <dt>Montant total</dt>
@@ -363,18 +370,18 @@ function DetailsTab({ pf, state }: { pf: Proforma; state: State }) {
           </dd>
         </dl>
         <div className="row mt">
-          {!pf.depositPaid && (
+          {!pf.depositPaid && auth.can('finance.pay') && (
             <button className="btn primary" onClick={() => dispatch({ type: 'payDeposit', id: pf.id })}>
               <Check size={16} /> Marquer l’acompte payé
             </button>
           )}
-          {pf.depositPaid && !pf.balancePaid && (
+          {pf.depositPaid && !pf.balancePaid && auth.can('finance.pay') && (
             <button className="btn primary" onClick={() => dispatch({ type: 'payBalance', id: pf.id })}>
               <Check size={16} /> Marquer le solde payé
             </button>
           )}
         </div>
-      </div>
+      </div>}
     </div>
   );
 }
@@ -410,8 +417,9 @@ const TRACK_STEPS: { label: string; reached: (pf: Proforma) => boolean; date: (p
   { label: 'Réception', reached: (p) => p.status === 'arrive', date: (p) => weekLabel(addDays(p.eta, 3)) },
 ];
 
-function LogisticsTab({ pf }: { pf: Proforma }) {
+export function LogisticsTab({ pf, portal }: { pf: Proforma; portal?: boolean }) {
   const { state, dispatch } = useStore();
+  const auth = useAuth();
   const [scope, setScope] = useState<'pf' | 'others' | 'all'>('pf');
   const [selected, setSelected] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState<string | null>(null);
@@ -444,6 +452,7 @@ function LogisticsTab({ pf }: { pf: Proforma }) {
     const p = byId(state.products, productId);
     const remaining = line.qty - allocatedQty(state, proformaId, productId);
     if (remaining <= 0) return toast('Cette ligne est déjà entièrement affectée');
+    if (!auth.allowed({ type: 'allocate', containerId: c.id, proformaId, productId, qty: 1 })) return toast('Ce conteneur n’est pas modifiable (droits ou plan déjà validé)');
     if (['en_transit', 'arrive'].includes(c.status)) return toast('Conteneur déjà parti : affectation impossible');
     const free = containerCapacity(c) - containerCbm(state, c);
     const maxCartons = Math.floor(free / p.cbmCarton);
@@ -582,7 +591,7 @@ function LogisticsTab({ pf }: { pf: Proforma }) {
                 </div>
               );
             })}
-            <div
+            {auth.can('logistics.plan') && <div
               className="ccard center"
               style={{ justifyContent: 'center', alignItems: 'center', borderStyle: 'dashed', minHeight: 150 }}
               onClick={() => {
@@ -592,13 +601,13 @@ function LogisticsTab({ pf }: { pf: Proforma }) {
             >
               <Plus className="green" />
               <span className="bold small">Nouveau conteneur</span>
-            </div>
+            </div>}
           </div>
         </div>
 
         <div className="card pad">
           {sel ? (
-            <ContainerPanel c={sel} index={containers.indexOf(sel) + 1} />
+            <ContainerPanel c={sel} index={containers.indexOf(sel) + 1} portal={portal} />
           ) : (
             <div className="empty">Aucun conteneur. Créez-en un pour commencer la consolidation.</div>
           )}
@@ -627,11 +636,12 @@ function LogisticsTab({ pf }: { pf: Proforma }) {
   );
 }
 
-function ContainerPanel({ c, index }: { c: Container; index: number }) {
+function ContainerPanel({ c, index, portal }: { c: Container; index: number; portal?: boolean }) {
   const { state, dispatch } = useStore();
+  const auth = useAuth();
   const cbm = containerCbm(state, c);
   const ratio = cbm / containerCapacity(c);
-  const editable = ['a_booker', 'booking_demande'].includes(c.status);
+  const editable = auth.allowed({ type: 'deallocate', containerId: c.id, proformaId: '', productId: '' }) && ['a_booker', 'booking_demande'].includes(c.status);
   return (
     <>
       <div className="card-title">
@@ -648,6 +658,11 @@ function ContainerPanel({ c, index }: { c: Container; index: number }) {
         <span className="bold">{num(containerQty(c))} pcs</span>
       </div>
       {ratio > 1 && <div className="pill red mb">Dépassement de capacité</div>}
+      <div className="row wrap mb">
+        {c.planRequested && <Pill color="orange">Plan demandé au fournisseur</Pill>}
+        {c.planProposed && <Pill color="violet">Plan proposé par le fournisseur – à valider</Pill>}
+        {c.planValidated && <Pill color="green" icon={<Check size={12} />}>Plan validé par JONAS</Pill>}
+      </div>
       <table className="tbl">
         <thead>
           <tr>
@@ -695,12 +710,35 @@ function ContainerPanel({ c, index }: { c: Container; index: number }) {
         </tbody>
       </table>
       <div className="col mt" style={{ gap: 8 }}>
-        {c.status === 'a_booker' && !c.planValidated && (
-          <button className="btn" disabled={!c.allocations.length} onClick={() => dispatch({ type: 'validatePlan', containerId: c.id })}>
-            <Check size={16} /> Valider le plan de chargement
+        {c.status === 'a_booker' && !c.planValidated && !c.planRequested && !c.planProposed && auth.can('logistics.plan') && (
+          <button
+            className="btn"
+            onClick={() => {
+              dispatch({ type: 'requestPlan', containerId: c.id });
+              toast('Plan de chargement demandé au fournisseur');
+            }}
+          >
+            <Send size={16} /> Demander le plan au fournisseur
           </button>
         )}
-        {c.status === 'a_booker' && (
+        {c.status === 'a_booker' && !c.planValidated && auth.can('logistics.plan') && (
+          <button className="btn" disabled={!c.allocations.length} onClick={() => dispatch({ type: 'validatePlan', containerId: c.id })}>
+            <Check size={16} /> {c.planProposed ? 'Valider le plan proposé' : 'Valider le plan de chargement'}
+          </button>
+        )}
+        {auth.allowed({ type: 'proposePlan', containerId: c.id }) && (
+          <button
+            className="btn primary"
+            disabled={!c.allocations.length || ratio > 1 || c.planProposed}
+            onClick={() => {
+              dispatch({ type: 'proposePlan', containerId: c.id });
+              toast('Plan envoyé à JONAS pour validation');
+            }}
+          >
+            <Send size={16} /> {c.planProposed ? 'Plan envoyé – en attente JONAS' : 'Proposer ce plan à JONAS'}
+          </button>
+        )}
+        {c.status === 'a_booker' && auth.can('logistics.booking') && (
           <button
             className="btn primary"
             disabled={!c.allocations.length || ratio > 1}
@@ -712,14 +750,16 @@ function ContainerPanel({ c, index }: { c: Container; index: number }) {
             <Calendar size={16} /> Demande de booking
           </button>
         )}
-        {c.status === 'booking_demande' && (
+        {c.status === 'booking_demande' && auth.can('logistics.booking') && (
           <button className="btn primary" onClick={() => dispatch({ type: 'confirmBooking', containerId: c.id })}>
             <Check size={16} /> Confirmer le booking {c.bookingNo}
           </button>
         )}
-        <Link to={`/conteneurs?c=${c.id}`} className="btn ghost sm">
-          Voir dans Conteneurs →
-        </Link>
+        {!portal && auth.canSee('conteneurs') && (
+          <Link to={`/conteneurs?c=${c.id}`} className="btn ghost sm">
+            Voir dans Conteneurs →
+          </Link>
+        )}
       </div>
     </>
   );

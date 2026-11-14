@@ -13,6 +13,8 @@ import Suppliers from './pages/Suppliers';
 import SupplierDetail from './pages/SupplierDetail';
 import Finance from './pages/Finance';
 import Settings from './pages/Settings';
+import PortalLayout from './portal/PortalLayout';
+import { PortalContainers, PortalFinance, PortalHome, PortalLoading, PortalPacks, PortalProducts, PortalProformas } from './portal/PortalPages';
 
 export default function App() {
   return (
@@ -32,6 +34,15 @@ export default function App() {
             <Route path="fournisseurs/:id" element={<SupplierDetail />} />
             <Route path="finance" element={<Finance />} />
             <Route path="parametres" element={<Settings />} />
+          </Route>
+          <Route path="portail" element={<PortalLayout />}>
+            <Route index element={<PortalHome />} />
+            <Route path="produits" element={<PortalProducts />} />
+            <Route path="proformas" element={<PortalProformas />} />
+            <Route path="packs" element={<PortalPacks />} />
+            <Route path="chargement" element={<PortalLoading />} />
+            <Route path="conteneurs" element={<PortalContainers />} />
+            <Route path="finance" element={<PortalFinance />} />
           </Route>
         </Routes>
       </HashRouter>

@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, Calendar, Check } from 'lucide-react';
-import { byId, useStore } from '../data/store';
+import { byId, useAuth, useStore } from '../data/store';
 import { DEV_STAGES } from '../data/types';
 import { Pill, ProductThumb, Ring, Seg, toast } from '../components/ui';
 import { TODAY, eur2, fdate, num } from '../lib/format';
 
 export default function Development() {
   const { state, dispatch } = useStore();
+  const auth = useAuth();
   const navigate = useNavigate();
   const [view, setView] = useState<'todo' | 'done'>('todo');
   const [supplier, setSupplier] = useState('all');
@@ -91,7 +92,7 @@ export default function Development() {
                       <span className={p.devDeadline < TODAY ? 'red bold' : ''}>{fdate(p.devDeadline)}</span>
                     </div>
                     <Pill color="violet">→ {p.nextAction}</Pill>
-                    <button
+                    {auth.can('dev.advance') && <button
                       className="btn sm soft"
                       onClick={(e) => {
                         e.stopPropagation();
@@ -100,7 +101,7 @@ export default function Development() {
                       }}
                     >
                       Étape suivante <ArrowRight size={13} />
-                    </button>
+                    </button>}
                   </div>
                 ))}
                 {items.length === 0 && <div className="card empty small">—</div>}

@@ -9,9 +9,12 @@ import type {
   Product,
   Proforma,
   ProformaStatus,
+  Role,
   Supplier,
+  User,
   ValidationStep,
 } from './types';
+import { can, canSee, canValidateStep, isSupplier, type Module, type Perm } from './permissions';
 import { CONTAINER_CAPACITY, DEV_STAGES, VALIDATION_LABELS, VALIDATION_STEPS } from './types';
 import { TODAY, addDays } from '../lib/format';
 
@@ -21,14 +24,13 @@ export interface State {
   products: Product[];
   proformas: Proforma[];
   containers: Container[];
-  user: string;
-  role: Role;
+  users: User[];
+  currentUserId: string;
 }
 
-export type Role = 'Pilote' | 'Acheteur' | 'Designer' | 'Direction' | 'Finance' | 'Logistique';
-export const ROLES: Role[] = ['Pilote', 'Acheteur', 'Designer', 'Direction', 'Finance', 'Logistique'];
+const STORAGE_KEY = 'jonas-buying-state-v2';
 
-const STORAGE_KEY = 'jonas-buying-state-v1';
+export const currentUser = (s: State): User => s.users.find((u) => u.id === s.currentUserId) ?? s.users[0];
 
 function initialState(): State {
   return structuredClone({
@@ -37,8 +39,8 @@ function initialState(): State {
     products: seed.products,
     proformas: seed.proformas,
     containers: seed.containers,
-    user: 'Yzerah',
-    role: 'Pilote' as Role,
+    users: seed.users,
+    currentUserId: 'yzerah',
   });
 }
 
@@ -54,7 +56,12 @@ function load(): State {
 
 export type Action =
   | { type: 'reset' }
-  | { type: 'setRole'; role: Role }
+  | { type: 'login'; userId: string }
+  | { type: 'setUserRole'; userId: string; role: Role; validationStep?: ValidationStep | null }
+  | { type: 'toggleUser'; userId: string }
+  | { type: 'requestPlan'; containerId: string }
+  | { type: 'proposePlan'; containerId: string }
+  | { type: 'addContainerDoc'; containerId: string; doc: string }
   | { type: 'signProforma'; id: string }
   | { type: 'setProformaStatus'; id: string; status: ProformaStatus }
   | { type: 'payDeposit'; id: string }
@@ -112,24 +119,132 @@ function syncProformaStatuses(s: State): State {
   };
 }
 
-function reducer(s: State, a: Action): State {
+// ---------------------------------------------------------------------------
+// Contrôle des droits : chaque action est vérifiée ici, quelle que soit l'interface.
+
+const ACTION_PERM: Partial<Record<Action['type'], Perm>> = {
+  signProforma: 'proforma.sign',
+  setProformaStatus: 'proforma.edit',
+  payDeposit: 'finance.pay',
+  payBalance: 'finance.pay',
+  requestDieCut: 'pack.design',
+  uploadArtwork: 'pack.design',
+  forwardPack: 'pack.design',
+  createContainer: 'logistics.plan',
+  validatePlan: 'logistics.plan',
+  requestPlan: 'logistics.plan',
+  requestBooking: 'logistics.booking',
+  confirmBooking: 'logistics.booking',
+  ship: 'logistics.booking',
+  receive: 'logistics.booking',
+  reviseEta: 'logistics.booking',
+  advanceDev: 'dev.advance',
+  setUserRole: 'users.manage',
+  toggleUser: 'users.manage',
+};
+
+/** Conteneur modifiable par un fournisseur : le sien, pas encore booké, plan non validé */
+function supplierOwnsOpenContainer(s: State, u: User, containerId: string) {
+  const c = s.containers.find((x) => x.id === containerId);
+  return !!c && c.supplierId === u.supplierId && c.status === 'a_booker' && !c.planValidated;
+}
+
+export function isAllowed(s: State, a: Action): boolean {
+  const u = currentUser(s);
   switch (a.type) {
     case 'reset':
-      return initialState();
-    case 'setRole':
-      return { ...s, role: a.role };
+    case 'login':
+      return true;
+    case 'validatePack': {
+      const p = s.products.find((x) => x.id === a.productId);
+      if (!p) return false;
+      const step = VALIDATION_STEPS.find((st) => p.pack.validations[st].state !== 'done');
+      if (!step || !canValidateStep(u, step)) return false;
+      return step !== 'fournisseur' || u.role === 'pilote' || (p.supplierId === u.supplierId && p.pack.sentToSupplier);
+    }
+    case 'rejectPack': {
+      const p = s.products.find((x) => x.id === a.productId);
+      if (!p) return false;
+      if (isSupplier(u)) return p.supplierId === u.supplierId && p.pack.validations.fournisseur.state === 'pending' && p.pack.sentToSupplier;
+      return can(u, 'pack.reject');
+    }
+    case 'receiveDieCut': {
+      const p = s.products.find((x) => x.id === a.productId);
+      if (isSupplier(u)) return !!p && p.supplierId === u.supplierId;
+      return can(u, 'pack.design');
+    }
+    case 'allocate':
+    case 'deallocate':
+      if (isSupplier(u)) return supplierOwnsOpenContainer(s, u, a.containerId);
+      return can(u, 'logistics.plan');
+    case 'proposePlan':
+      return isSupplier(u) ? supplierOwnsOpenContainer(s, u, a.containerId) : false;
+    case 'addContainerDoc': {
+      const c = s.containers.find((x) => x.id === a.containerId);
+      if (isSupplier(u)) return !!c && c.supplierId === u.supplierId;
+      return can(u, 'logistics.booking');
+    }
+    default: {
+      const perm = ACTION_PERM[a.type];
+      return perm ? can(u, perm) : false;
+    }
+  }
+}
+
+function reducer(s: State, a: Action): State {
+  if (!isAllowed(s, a)) {
+    console.warn(`Action refusée pour ${currentUser(s).name} : ${a.type}`);
+    return s;
+  }
+  const me = currentUser(s).name;
+  switch (a.type) {
+    case 'reset':
+      return { ...initialState(), currentUserId: s.currentUserId };
+    case 'login':
+      return { ...s, currentUserId: a.userId };
+    case 'setUserRole':
+      return {
+        ...s,
+        users: s.users.map((u) =>
+          u.id === a.userId
+            ? { ...u, role: a.role, validationStep: a.validationStep === null ? undefined : a.validationStep ?? u.validationStep }
+            : u,
+        ),
+      };
+    case 'toggleUser':
+      if (a.userId === s.currentUserId) return s;
+      return { ...s, users: s.users.map((u) => (u.id === a.userId ? { ...u, active: !u.active } : u)) };
+    case 'requestPlan':
+      return mapC(s, a.containerId, (c) => ({
+        ...c,
+        planRequested: true,
+        dateHistory: [...c.dateHistory, hist(me, 'Plan de chargement demandé au fournisseur')],
+      }));
+    case 'proposePlan':
+      return mapC(s, a.containerId, (c) => ({
+        ...c,
+        planProposed: true,
+        planRequested: false,
+        dateHistory: [...c.dateHistory, hist(me, 'Plan de chargement proposé par le fournisseur')],
+      }));
+    case 'addContainerDoc':
+      return mapC(s, a.containerId, (c) => ({
+        ...c,
+        documents: c.documents.includes(a.doc) ? c.documents : [...c.documents, a.doc],
+        dateHistory: [...c.dateHistory, hist(me, `Document déposé : ${a.doc}`)],
+      }));
     case 'signProforma':
       return mapPF(s, a.id, (pf) => ({
         ...pf,
         status: pf.status === 'a_signer' ? 'en_dev' : pf.status,
         documents: pf.documents.includes('Proforma signée.pdf') ? pf.documents : [...pf.documents, 'Proforma signée.pdf'],
-        history: [...pf.history, hist(s.user, 'Proforma signée')],
+        history: [...pf.history, hist(me, 'Proforma signée')],
       }));
     case 'setProformaStatus':
       return mapPF(s, a.id, (pf) => ({
         ...pf,
         status: a.status,
-        history: [...pf.history, hist(s.user, `Statut → ${PROFORMA_STATUS_LABEL[a.status]}`)],
+        history: [...pf.history, hist(me, `Statut → ${PROFORMA_STATUS_LABEL[a.status]}`)],
       }));
     case 'payDeposit':
       return mapPF(s, a.id, (pf) => ({ ...pf, depositPaid: true, history: [...pf.history, hist('Finance', `Acompte ${pf.depositPct} % versé`)] }));
@@ -194,12 +309,12 @@ function reducer(s: State, a: Action): State {
         planValidated: false,
         allocations: [],
         documents: [],
-        dateHistory: [hist(s.user, 'Conteneur créé')],
+        dateHistory: [hist(me, 'Conteneur créé')],
       };
       return { ...s, containers: [...s.containers, c] };
     }
     case 'validatePlan':
-      return mapC(s, a.containerId, (c) => ({ ...c, planValidated: true, dateHistory: [...c.dateHistory, hist(s.user, 'Plan de chargement validé')] }));
+      return mapC(s, a.containerId, (c) => ({ ...c, planValidated: true, planProposed: false, planRequested: false, dateHistory: [...c.dateHistory, hist(me, 'Plan de chargement validé')] }));
     case 'requestBooking':
       return mapC(s, a.containerId, (c) => ({
         ...c,
@@ -207,7 +322,7 @@ function reducer(s: State, a: Action): State {
         planValidated: true,
         bookingNo: c.bookingNo ?? `BK-${1040 + s.containers.indexOf(c)}`,
         carrier: c.carrier ?? 'MSC',
-        dateHistory: [...c.dateHistory, hist(s.user, 'Demande de booking envoyée')],
+        dateHistory: [...c.dateHistory, hist(me, 'Demande de booking envoyée')],
       }));
     case 'confirmBooking':
       return syncProformaStatuses(
@@ -259,7 +374,7 @@ function reducer(s: State, a: Action): State {
       return mapC(s, a.containerId, (c) => ({
         ...c,
         etaRevised: a.eta,
-        dateHistory: [...c.dateHistory, hist(s.user, `ETA révisée : ${containerEta(c)} → ${a.eta}`)],
+        dateHistory: [...c.dateHistory, hist(me, `ETA révisée : ${containerEta(c)} → ${a.eta}`)],
       }));
   }
 }
@@ -454,4 +569,20 @@ export function payments(s: State): Payment[] {
     out.push({ proformaId: pf.id, supplierId: pf.supplierId, kind: 'Solde', amount: t.balance, due: pf.balanceDue, paid: pf.balancePaid });
   }
   return out.sort((a, b) => a.due.localeCompare(b.due));
+}
+
+// ---------------------------------------------------------------------------
+// Session : utilisateur courant et droits
+
+export function useAuth() {
+  const { state } = useStore();
+  const user = currentUser(state);
+  return {
+    user,
+    can: (p: Perm) => can(user, p),
+    canSee: (m: Module) => canSee(user, m),
+    canStep: (st: ValidationStep) => canValidateStep(user, st),
+    /** L'action serait-elle acceptée par le store ? (sert à afficher / masquer les boutons) */
+    allowed: (a: Action) => isAllowed(state, a),
+  };
 }

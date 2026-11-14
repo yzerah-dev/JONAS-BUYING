@@ -12,6 +12,7 @@ import {
   containerQty,
   containerValue,
   lineCbm,
+  useAuth,
   useStore,
 } from '../data/store';
 import { CONTAINER_STATUSES, type Container, type ContainerStatus } from '../data/types';
@@ -28,6 +29,8 @@ const GROUP_COLOR: Record<ContainerStatus, string> = {
 
 export default function Containers() {
   const { state, dispatch } = useStore();
+  const auth = useAuth();
+  const canBook = auth.can('logistics.booking');
   const [params, setParams] = useSearchParams();
   const selId = params.get('c');
   const [period, setPeriod] = useState<'mois' | 'semaine'>('mois');
@@ -233,6 +236,8 @@ export default function Containers() {
                                 <span className="bold">{s === 'a_booker' ? c.id : s === 'booking_demande' ? c.bookingNo : c.number}</span>
                               </div>
                               {s !== 'a_booker' && s !== 'booking_demande' && <div className="xs muted">{c.bookingNo}</div>}
+                              {c.planRequested && <Pill color="orange">Plan demandé</Pill>}
+                              {c.planProposed && <Pill color="violet">Plan fournisseur à valider</Pill>}
                             </td>
                             <td>
                               <div className="row" style={{ gap: 6 }}>
@@ -255,7 +260,7 @@ export default function Containers() {
                               {c.etaRevised && !c.etaReal && <div className="xs">révisée (prévue {fshort(c.etaPlanned)})</div>}
                             </td>
                             <td onClick={(e) => e.stopPropagation()}>
-                              {s === 'a_booker' && (
+                              {s === 'a_booker' && canBook && (
                                 <button
                                   className="btn primary sm"
                                   disabled={!c.allocations.length}
@@ -267,7 +272,7 @@ export default function Containers() {
                                   <Check size={12} /> Booker
                                 </button>
                               )}
-                              {s === 'booking_demande' && (
+                              {s === 'booking_demande' && canBook && (
                                 <div className="row" style={{ gap: 4 }}>
                                   <button className="btn sm" onClick={() => toast(`Relance envoyée à ${c.carrier}`)}>
                                     Relancer
@@ -277,7 +282,7 @@ export default function Containers() {
                                   </button>
                                 </div>
                               )}
-                              {s === 'booke' && (
+                              {s === 'booke' && canBook && (
                                 <button className="btn sm" onClick={() => dispatch({ type: 'ship', containerId: c.id })}>
                                   <Ship size={12} /> Parti
                                 </button>
@@ -285,9 +290,9 @@ export default function Containers() {
                               {s === 'en_transit' && (
                                 <div className="row" style={{ gap: 4 }}>
                                   <Pill color={left < 0 ? 'red' : left < 10 ? 'orange' : 'grey'}>{left < 0 ? `+${-left} j` : `J-${left}`}</Pill>
-                                  <button className="btn sm" onClick={() => dispatch({ type: 'receive', containerId: c.id })}>
+                                  {canBook && <button className="btn sm" onClick={() => dispatch({ type: 'receive', containerId: c.id })}>
                                     Réceptionner
-                                  </button>
+                                  </button>}
                                 </div>
                               )}
                               {s === 'arrive' && <Pill color="green">Réceptionné {fshort(c.receivedOn)}</Pill>}
@@ -310,6 +315,7 @@ export default function Containers() {
 
 function ContainerDetail({ c, onClose }: { c: Container; onClose: () => void }) {
   const { state, dispatch } = useStore();
+  const auth = useAuth();
   const [tab, setTab] = useState<'produits' | 'documents' | 'historique'>('produits');
   const [eta, setEta] = useState(containerEta(c));
   const sup = byId(state.suppliers, c.supplierId);
@@ -475,7 +481,7 @@ function ContainerDetail({ c, onClose }: { c: Container; onClose: () => void }) 
           <dt>Valeur</dt>
           <dd>{eur(containerValue(state, c))}</dd>
         </dl>
-        {c.status !== 'arrive' && (
+        {c.status !== 'arrive' && auth.can('logistics.booking') && (
           <div className="row mt">
             <input className="input" type="date" value={eta} onChange={(e) => setEta(e.target.value)} />
             <button

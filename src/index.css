@@ -269,3 +269,17 @@ tr[draggable='true'] { cursor: grab; }
 .split > *, .split3 > *, .grid2 > *, .grid3 > * { min-width: 0; }
 .sticky-panel .card { overflow: hidden; }
 .split { grid-template-columns: minmax(0, 1fr) 400px; }
+
+/* ---------- Utilisateur / menu ---------- */
+.user-btn { display: flex; align-items: center; gap: 10px; border: 1px solid var(--line); background: #fff; border-radius: 12px; padding: 4px 4px 4px 12px; }
+.user-btn:hover { background: var(--grey-soft); }
+.avatar.sm { width: 30px; height: 30px; font-size: 12px; flex-shrink: 0; }
+.menu { position: absolute; right: 0; top: 50px; width: 320px; max-height: 70vh; overflow-y: auto; z-index: 50; padding: 6px; }
+.menu-title { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); padding: 6px 8px; }
+.menu-group { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.6px; color: var(--green-dark); padding: 10px 8px 4px; }
+.menu-row { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 9px; cursor: pointer; }
+.menu-row:hover { background: var(--green-softer); }
+.portal .topbar { border-bottom: 3px solid var(--green); }
+.portal-badge { background: var(--ink); color: #fff; font-size: 11px; font-weight: 800; letter-spacing: 1px; padding: 3px 8px; border-radius: 6px; }
+.matrix td, .matrix th { text-align: center; }
+.matrix td:first-child, .matrix th:first-child { text-align: left; }

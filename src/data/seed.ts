@@ -1,5 +1,6 @@
 // Données de démonstration — chiffres et fournisseurs illustratifs.
 import type {
+  User,
   Brand,
   Container,
   ContainerStatus,
@@ -330,3 +331,32 @@ for (const c of containers.filter((x) => x.status === 'arrive')) {
   }
 }
 products.find((p) => p.id === 'AB-M026')!.stock.Meaux = 1800;
+
+// ---- Utilisateurs (démo) ------------------------------------------------------
+// Équipe JONAS + un compte portail par fournisseur.
+export const users: User[] = [
+  { id: 'yzerah', name: 'Yzerah', email: 'yzerah@jonas.example', role: 'pilote', title: 'Pilote achats', active: true },
+  { id: 'david', name: 'David', email: 'david@jonas.example', role: 'acheteur', title: 'Chef de produit', validationStep: 'david', active: true },
+  { id: 'direction', name: 'Direction', email: 'direction@jonas.example', role: 'direction', title: 'Direction générale', validationStep: 'direction', active: true },
+  { id: 'moinard', name: 'Moinard', email: 'moinard@jonas.example', role: 'validateur', title: 'Validation pack', validationStep: 'moinard', active: true },
+  { id: 'lea', name: 'Léa', email: 'lea@jonas.example', role: 'designer', title: 'Designer packaging', designerName: 'Léa', active: true },
+  { id: 'sarah', name: 'Sarah', email: 'sarah@jonas.example', role: 'designer', title: 'Designer packaging', designerName: 'Sarah', active: true },
+  { id: 'hugo', name: 'Hugo', email: 'hugo@jonas.example', role: 'designer', title: 'Designer packaging', designerName: 'Hugo', active: true },
+  { id: 'finance', name: 'Finance', email: 'finance@jonas.example', role: 'finance', title: 'Comptabilité fournisseurs', active: true },
+  { id: 'logistique', name: 'Logistique', email: 'logistique@jonas.example', role: 'logistique', title: 'Transport & réception', active: true },
+  ...suppliers.map<User>((s) => ({
+    id: `sup-${s.id}`,
+    name: s.contact.name,
+    email: s.contact.email,
+    role: 'fournisseur',
+    title: `${s.contact.role} · ${s.shortName}`,
+    supplierId: s.id,
+    active: true,
+  })),
+];
+
+// Un plan de chargement demandé au fournisseur pour la démo du portail
+{
+  const c = containers.find((x) => x.status === 'a_booker' && x.supplierId === 'tide');
+  if (c) c.planRequested = true;
+}

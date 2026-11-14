@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, Box, Calendar, Check, Download, FileText, History, LayoutGrid, Layers, List, Scissors, Send, Tag, Truck, Upload, X } from 'lucide-react';
-import { byId, packDone, packLate, useStore, type State } from '../data/store';
+import { byId, packDone, packLate, useAuth, useStore, type State } from '../data/store';
 import type { Product } from '../data/types';
 import { VALIDATION_LABELS, VALIDATION_STEPS } from '../data/types';
 import { BrandLogo, Kpi, Pill, ProductThumb, Progress, Seg, Tabs, ValidationCircuit, ValidationDot, toast } from '../components/ui';
@@ -24,8 +24,10 @@ function proformaOf(s: State, p: Product) {
 
 export default function Design() {
   const { state } = useStore();
+  const { user } = useAuth();
   const designers = [...new Set(state.products.map((p) => p.pack.designer))];
-  const [designer, setDesigner] = useState('all');
+  // Un designer voit d'abord ses propres packs
+  const [designer, setDesigner] = useState(user.designerName ?? 'all');
   const mine = state.products.filter((p) => designer === 'all' || p.pack.designer === designer);
 
   const weeks = useMemo(() => {
@@ -235,6 +237,7 @@ function PackList({ items, mode, state, selected, onSelect }: { items: Product[]
 
 function PackPanel({ p }: { p: Product }) {
   const { state, dispatch } = useStore();
+  const auth = useAuth();
   const [sub, setSub] = useState<'pack' | 'diecut' | 'brief' | 'fichiers'>('pack');
   const sup = byId(state.suppliers, p.supplierId);
   const pf = proformaOf(state, p);
@@ -304,7 +307,7 @@ function PackPanel({ p }: { p: Product }) {
             État :{' '}
             {p.pack.dieCut === 'received' ? <Pill color="green">Reçu</Pill> : p.pack.dieCut === 'requested' ? <Pill color="orange">Demandé au fournisseur</Pill> : <Pill color="grey">Non demandé</Pill>}
           </div>
-          {p.pack.dieCut === 'requested' && (
+          {p.pack.dieCut === 'requested' && auth.allowed({ type: 'receiveDieCut', productId: p.id }) && (
             <button className="btn sm" onClick={() => dispatch({ type: 'receiveDieCut', productId: p.id })}>
               <Check size={13} /> Marquer comme reçu
             </button>
@@ -330,7 +333,7 @@ function PackPanel({ p }: { p: Product }) {
       <ValidationCircuit product={p} />
 
       <div className="grid2 mt">
-        <button
+        {auth.can('pack.design') && <button
           className="btn"
           disabled={p.pack.dieCut !== 'none'}
           onClick={() => {
@@ -339,8 +342,8 @@ function PackPanel({ p }: { p: Product }) {
           }}
         >
           <Scissors size={15} /> Demander le die cut
-        </button>
-        <button
+        </button>}
+        {auth.can('pack.design') && <button
           className="btn"
           onClick={() => {
             dispatch({ type: 'uploadArtwork', productId: p.id });
@@ -348,8 +351,8 @@ function PackPanel({ p }: { p: Product }) {
           }}
         >
           <Upload size={15} /> Déposer une version
-        </button>
-        {!done && pendingStep && (
+        </button>}
+        {!done && pendingStep && auth.allowed({ type: 'validatePack', productId: p.id }) && (
           <button
             className="btn primary"
             onClick={() => {
@@ -360,12 +363,12 @@ function PackPanel({ p }: { p: Product }) {
             <Check size={15} /> Valider ({VALIDATION_LABELS[pendingStep]})
           </button>
         )}
-        {!done && (
+        {!done && auth.allowed({ type: 'rejectPack', productId: p.id }) && (
           <button className="btn danger" onClick={() => dispatch({ type: 'rejectPack', productId: p.id })}>
             <X size={15} /> Refuser
           </button>
         )}
-        <button
+        {auth.can('pack.design') && <button
           className="btn primary"
           disabled={p.pack.validations.moinard.state !== 'done' || p.pack.sentToSupplier}
           onClick={() => {
@@ -374,8 +377,14 @@ function PackPanel({ p }: { p: Product }) {
           }}
         >
           <Send size={15} /> Forwarder le pack
-        </button>
+        </button>}
       </div>
+      {!done && pendingStep && !auth.allowed({ type: 'validatePack', productId: p.id }) && (
+        <div className="small muted mt">
+          En attente de la validation <b>{VALIDATION_LABELS[pendingStep]}</b>
+          {pendingStep === 'fournisseur' && !p.pack.sentToSupplier ? ' (pack pas encore transmis au fournisseur)' : ''}.
+        </div>
+      )}
       <div className="xs muted mt row" style={{ gap: 6 }}>
         <History size={12} /> Un pack n’est compté terminé qu’après les quatre validations.
       </div>

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Building2, Calendar, Check, ChevronDown, ChevronRight, ChevronUp, Container as Ctn, List, PenLine, Search } from 'lucide-react';
-import { byId, proformaTotals, useStore, PROFORMA_STATUS_LABEL, type State } from '../data/store';
+import { byId, proformaTotals, useAuth, useStore, PROFORMA_STATUS_LABEL, type State } from '../data/store';
 import { PROFORMA_STATUSES, type Proforma, type ProformaStatus } from '../data/types';
 import { Pill, ProformaStatusPill, Seg, SupplierLogo, toast } from '../components/ui';
 import { TODAY, dec, eur, weekKey, weekLabel, weekRange } from '../lib/format';
@@ -10,6 +10,9 @@ type View = 'liste' | 'semaine' | 'fournisseur';
 
 export default function Proformas() {
   const { state, dispatch } = useStore();
+  const auth = useAuth();
+  const canSign = auth.can('proforma.sign');
+  const showMoney = auth.can('finance.view');
   const [params, setParams] = useSearchParams();
   const status = (params.get('statut') as ProformaStatus | null) ?? 'all';
   const [view, setView] = useState<View>('semaine');
@@ -76,9 +79,11 @@ export default function Proformas() {
             </option>
           ))}
         </select>
-        <button className="btn primary lg" onClick={() => setStatus('a_signer')}>
-          <PenLine size={18} /> Signer ({toSign.length})
-        </button>
+        {canSign && (
+          <button className="btn primary lg" onClick={() => setStatus('a_signer')}>
+            <PenLine size={18} /> Signer ({toSign.length})
+          </button>
+        )}
       </div>
 
       <div className="chips mb">
@@ -111,7 +116,7 @@ export default function Proformas() {
       )}
       {groups.length === 0 && <div className="card empty">Aucune proforma ne correspond à ces filtres.</div>}
       {groups.map((g, i) => (
-        <Group key={g.key + view + status} title={g.title} sub={g.sub} items={g.items} state={state} defaultOpen={i === 0 || view === 'liste' || status !== 'all'} onSign={(id) => {
+        <Group key={g.key + view + status} title={g.title} sub={g.sub} items={g.items} state={state} showMoney={showMoney} defaultOpen={i === 0 || view === 'liste' || status !== 'all'} onSign={!canSign ? undefined : (id) => {
           dispatch({ type: 'signProforma', id });
           toast(`${id} signée`);
         }} />
@@ -120,7 +125,7 @@ export default function Proformas() {
   );
 }
 
-function Group({ title, sub, items, state, defaultOpen, onSign }: { title: string; sub: string; items: Proforma[]; state: State; defaultOpen: boolean; onSign: (id: string) => void }) {
+function Group({ title, sub, items, state, defaultOpen, onSign, showMoney }: { title: string; sub: string; items: Proforma[]; state: State; defaultOpen: boolean; onSign?: (id: string) => void; showMoney: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
   const navigate = useNavigate();
   const totals = items.map((p) => proformaTotals(state, p));
@@ -158,16 +163,20 @@ function Group({ title, sub, items, state, defaultOpen, onSign }: { title: strin
           </div>
           <div className="v">≈ {dec(cbm / 69)}</div>
         </div>
-        <div className="metric">
-          <div className="l">Montant</div>
-          <div className="v">{eur(amount)}</div>
-        </div>
-        <div className="metric">
-          <div className="l">Acompte à faire</div>
-          <div className={`v ${depositTodo > 0 ? 'red' : 'green'}`} style={{ fontSize: 16 }}>
-            {depositTodo > 0 ? eur(depositTodo) : '—'}
-          </div>
-        </div>
+        {showMoney && (
+          <>
+            <div className="metric">
+              <div className="l">Montant</div>
+              <div className="v">{eur(amount)}</div>
+            </div>
+            <div className="metric">
+              <div className="l">Acompte à faire</div>
+              <div className={`v ${depositTodo > 0 ? 'red' : 'green'}`} style={{ fontSize: 16 }}>
+                {depositTodo > 0 ? eur(depositTodo) : '—'}
+              </div>
+            </div>
+          </>
+        )}
         {open ? <ChevronUp /> : <ChevronDown />}
       </div>
       {open && (
@@ -183,7 +192,7 @@ function Group({ title, sub, items, state, defaultOpen, onSign }: { title: strin
                 <th>Statut</th>
                 <th className="center">Chargement</th>
                 <th className="center">Arrivée</th>
-                <th className="num">Montant</th>
+                {showMoney && <th className="num">Montant</th>}
                 <th />
               </tr>
             </thead>
@@ -217,7 +226,7 @@ function Group({ title, sub, items, state, defaultOpen, onSign }: { title: strin
                     <td>
                       <div className="col" style={{ alignItems: 'flex-start' }}>
                         <ProformaStatusPill status={p.status} />
-                        {p.status === 'a_signer' && (
+                        {p.status === 'a_signer' && onSign && (
                           <button
                             className="btn primary sm"
                             onClick={(e) => {
@@ -232,7 +241,7 @@ function Group({ title, sub, items, state, defaultOpen, onSign }: { title: strin
                     </td>
                     <td className="center bold">{weekLabel(p.etd)}</td>
                     <td className="center bold">{weekLabel(p.eta)}</td>
-                    <td className="num">
+                    {showMoney && <td className="num">
                       <div className="bold">{eur(t.amount)}</div>
                       <div className="muted xs">
                         Acompte {p.depositPct} % : {eur(t.deposit)}
@@ -242,7 +251,7 @@ function Group({ title, sub, items, state, defaultOpen, onSign }: { title: strin
                       ) : (
                         <Pill color="red">À faire</Pill>
                       )}
-                    </td>
+                    </td>}
                     <td>
                       <ChevronRight size={18} className="muted" />
                     </td>

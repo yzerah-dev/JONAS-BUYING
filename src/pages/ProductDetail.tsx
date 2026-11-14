@@ -26,6 +26,7 @@ import {
   containerEtd,
   packDone,
   productQuantities,
+  useAuth,
   useStore,
   type State,
 } from '../data/store';
@@ -232,6 +233,7 @@ function PriceCard({ p, q }: { p: Product; q: number }) {
 
 function DesignCard({ p, full }: { p: Product; full?: boolean }) {
   const { dispatch } = useStore();
+  const auth = useAuth();
   const steps = ['Brief', 'Design', 'Pack'];
   return (
     <Card title="Flux de design & validations" icon={<Palette size={18} className="green" />} action={<PackPill product={p} />}>
@@ -266,7 +268,7 @@ function DesignCard({ p, full }: { p: Product; full?: boolean }) {
         <button className="btn sm" onClick={() => toast('Téléchargement Rendus (JPG) – démo')}>
           <Download size={13} /> Rendus (JPG)
         </button>
-        {full && !packDone(p) && (
+        {full && !packDone(p) && auth.allowed({ type: 'validatePack', productId: p.id }) && (
           <button className="btn primary sm" onClick={() => dispatch({ type: 'validatePack', productId: p.id })}>
             <Check size={13} /> Valider l’étape en cours
           </button>

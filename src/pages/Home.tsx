@@ -9,15 +9,28 @@ import {
   packLate,
   payments,
   proformaTotals,
+  currentValidator,
+  useAuth,
   useStore,
+  currentUser,
 } from '../data/store';
 import { PROFORMA_STATUSES } from '../data/types';
 import { Kpi, Pill, ProductThumb, PROFORMA_COLOR } from '../components/ui';
+import type { Module } from '../data/permissions';
 import { PROFORMA_STATUS_LABEL } from '../data/store';
 import { TODAY, addDays, diffDays, eur, fdate, fshort, num, weekLabel } from '../lib/format';
 
 export default function Home() {
   const { state } = useStore();
+  const auth = useAuth();
+  const me = auth.user;
+  const money = auth.can('finance.view');
+  // Packs qui attendent MA validation, et packs du designer connecté
+  const myValidations = state.products.filter((p) => {
+    const st = currentValidator(p);
+    return st && st !== 'fournisseur' && me.validationStep === st;
+  });
+  const myPacks = me.designerName ? state.products.filter((p) => p.pack.designer === me.designerName && !packDone(p)) : [];
   const toSign = state.proformas.filter((p) => p.status === 'a_signer');
   const latePacks = state.products.filter(packLate);
   const pays = payments(state);
@@ -41,16 +54,42 @@ export default function Home() {
     <>
       <div className="page-head">
         <div>
-          <h1>Bonjour {state.user} 👋</h1>
+          <h1>Bonjour {currentUser(state).name} 👋</h1>
           <div className="page-sub">
             Cockpit achats internationaux · {fdate(TODAY)} · semaine {weekLabel(TODAY)}
           </div>
         </div>
       </div>
 
+      {(myValidations.length > 0 || myPacks.length > 0) && (
+        <div className="card pad mb" style={{ borderColor: 'var(--green)' }}>
+          <div className="card-title">
+            <Box size={18} className="green" /> Mes actions
+          </div>
+          {myValidations.map((p) => (
+            <Link key={p.id} to="/design" className="alert-line">
+              <ProductThumb product={p} size={30} />
+              <span className="bold small">{p.ref}</span>
+              <span className="small">{p.name}</span>
+              <span className="grow" />
+              <Pill color="orange">Validation {me.name} attendue</Pill>
+            </Link>
+          ))}
+          {myPacks.map((p) => (
+            <Link key={p.id} to="/design" className="alert-line">
+              <ProductThumb product={p} size={30} />
+              <span className="bold small">{p.ref}</span>
+              <span className="small">{p.name}</span>
+              <span className="grow" />
+              <span className={`small ${packLate(p) ? 'red bold' : 'muted'}`}>limite {fshort(p.pack.artworkDeadline)}</span>
+            </Link>
+          ))}
+        </div>
+      )}
+
       <div className="kpis mb">
-        <Kpi icon={<Euro size={18} />} value={eur(engaged)} label="Achats engagés (non arrivés)" />
-        <Kpi icon={<Truck size={18} />} value={transit.length} label={`Conteneurs en transit · ${eur(transit.reduce((s, c) => s + containerValue(state, c), 0))}`} color="blue" />
+        {money && <Kpi icon={<Euro size={18} />} value={eur(engaged)} label="Achats engagés (non arrivés)" />}
+        <Kpi icon={<Truck size={18} />} value={transit.length} label={money ? `Conteneurs en transit · ${eur(transit.reduce((s, c) => s + containerValue(state, c), 0))}` : 'Conteneurs en transit'} color="blue" />
         <Kpi icon={<Box size={18} />} value={`${packsOk}/${state.products.length}`} label="Packs validés (4/4)" />
         <Kpi icon={<Ctn size={18} />} value={`${num(state.containers.reduce((s, c) => s + containerCbm(state, c), 0))} m³`} label="Volume planifié" />
       </div>
@@ -60,19 +99,20 @@ export default function Home() {
           <div className="card-title">
             <AlertTriangle size={18} className="red" /> Alertes & actions
           </div>
-          <Alert to="/proformas?statut=a_signer" icon={<PenLine size={16} className="red" />} n={toSign.length} text="proforma(s) à signer" />
-          <Alert to="/design" icon={<Box size={16} className="red" />} n={latePacks.length} text="pack(s) en retard sur la date limite artwork" />
-          <Alert to="/conteneurs" icon={<Calendar size={16} className="orange" />} n={urgentBooking.length} text="conteneur(s) à booker avec départ < 3 semaines" />
-          <Alert to="/conteneurs" icon={<Ship size={16} className="orange" />} n={delayed.length} text="conteneur(s) avec ETA révisée (retard)" />
-          <Alert to="/finance" icon={<Euro size={16} className="red" />} n={latePays.length} text={`échéance(s) en retard · ${eur(latePays.reduce((s, p) => s + p.amount, 0))}`} />
+          <Alert m="proformas" to="/proformas?statut=a_signer" icon={<PenLine size={16} className="red" />} n={toSign.length} text="proforma(s) à signer" />
+          <Alert m="design" to="/design" icon={<Box size={16} className="red" />} n={latePacks.length} text="pack(s) en retard sur la date limite artwork" />
+          <Alert m="conteneurs" to="/conteneurs" icon={<Calendar size={16} className="orange" />} n={urgentBooking.length} text="conteneur(s) à booker avec départ < 3 semaines" />
+          <Alert m="conteneurs" to="/conteneurs" icon={<Ship size={16} className="orange" />} n={delayed.length} text="conteneur(s) avec ETA révisée (retard)" />
+          <Alert m="finance" to="/finance" icon={<Euro size={16} className="red" />} n={latePays.length} text={`échéance(s) en retard · ${eur(latePays.reduce((s, p) => s + p.amount, 0))}`} />
           <Alert
-            to="/proformas"
+            m="finance"
+            to="/finance"
             icon={<FileText size={16} className="orange" />}
             n={state.proformas.filter((p) => !p.depositPaid).length}
             text="acompte(s) à faire"
           />
         </div>
-        <div className="card pad">
+        {auth.canSee('proformas') && <div className="card pad">
           <div className="card-title">
             <FileText size={18} className="green" /> Proformas par statut
           </div>
@@ -88,15 +128,15 @@ export default function Home() {
                 <div style={{ width: `${(amount / maxAmount) * 100}%` }} />
               </div>
               <span className="small bold right" style={{ width: 100 }}>
-                {eur(amount)}
+                {money ? eur(amount) : ''}
               </span>
             </Link>
           ))}
-        </div>
+        </div>}
       </div>
 
       <div className="grid2">
-        <div className="card pad">
+        {auth.canSee('conteneurs') && <div className="card pad">
           <div className="card-title">
             <Ship size={18} className="green" /> Arrivages des 6 prochaines semaines
           </div>
@@ -112,7 +152,7 @@ export default function Home() {
               <Pill color={c.status === 'en_transit' ? 'blue' : c.status === 'booke' ? 'green' : 'orange'}>{c.status === 'en_transit' ? 'En transit' : c.status === 'booke' ? 'Booké' : 'Non booké'}</Pill>
             </Link>
           ))}
-        </div>
+        </div>}
         <div className="card pad">
           <div className="card-title">
             <Box size={18} className="red" /> Packs en retard
@@ -133,7 +173,9 @@ export default function Home() {
   );
 }
 
-function Alert({ to, icon, n, text }: { to: string; icon: React.ReactNode; n: number; text: string }) {
+function Alert({ to, icon, n, text, m }: { to: string; icon: React.ReactNode; n: number; text: string; m: Module }) {
+  const { canSee } = useAuth();
+  if (!canSee(m)) return null;
   return (
     <Link to={to} className="alert-line" style={{ opacity: n ? 1 : 0.5 }}>
       {icon}

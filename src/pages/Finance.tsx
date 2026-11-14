@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, Calendar, Check, Euro, Wallet } from 'lucide-react';
-import { byId, payments, useStore } from '../data/store';
+import { byId, payments, useAuth, useStore } from '../data/store';
 import { Kpi, Pill, Seg, SupplierLogo, toast } from '../components/ui';
 import { TODAY, addDays, eur, fdate, weekLabel } from '../lib/format';
 
 export default function Finance() {
   const { state, dispatch } = useStore();
+  const auth = useAuth();
   const [f, setF] = useState<'open' | 'late' | 'paid' | 'all'>('open');
   const all = payments(state);
   const open = all.filter((p) => !p.paid);
@@ -78,7 +79,7 @@ export default function Finance() {
                   <td className="num bold">{eur(p.amount)}</td>
                   <td>{p.paid ? <Pill color="green">Payé</Pill> : isLate ? <Pill color="red">En retard</Pill> : <Pill color="orange">À payer</Pill>}</td>
                   <td>
-                    {!p.paid && (
+                    {!p.paid && auth.can('finance.pay') && (
                       <button
                         className="btn sm primary"
                         disabled={blocked}
