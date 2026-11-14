@@ -277,7 +277,7 @@ GEN_WEEKS.forEach((weekMonday, wi) => {
         brandId,
         supplierId: pick(fam.suppliers),
         rayon: fam.rayon,
-        collection: 'Été 2027',
+        collection: pick(['Été 2027', 'Été 2027', 'Printemps 2027', 'Noël 2026', 'Permanent']),
         gender: 'Mixte',
         material: 'Divers',
         emoji,

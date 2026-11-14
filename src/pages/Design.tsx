@@ -50,7 +50,20 @@ const ORDER: StatusKey[] = ['a_traiter', 'a_valider', 'en_validation', 'a_envoye
 const sortPacks = (a: Product, b: Product) =>
   Number(packLate(b)) - Number(packLate(a)) || ORDER.indexOf(statusKey(a)) - ORDER.indexOf(statusKey(b)) || a.pack.artworkDeadline.localeCompare(b.pack.artworkDeadline);
 
-type GroupBy = 'none' | 'fournisseur' | 'statut' | 'jour';
+type GroupBy = 'none' | 'marque' | 'collection' | 'type' | 'fournisseur' | 'statut' | 'jour';
+type SortBy = 'priorite' | 'marque' | 'collection' | 'type' | 'echeance';
+const SORT_LABELS: Record<SortBy, string> = { priorite: 'Priorité', marque: 'Marque', collection: 'Collection', type: 'Type de pack', echeance: 'Échéance' };
+const GROUP_LABELS: Record<GroupBy, string> = {
+  none: 'Aucun',
+  marque: 'Par marque',
+  collection: 'Par collection',
+  type: 'Par type de pack',
+  fournisseur: 'Par fournisseur',
+  statut: 'Par statut',
+  jour: 'Par jour',
+};
+/** Données glissées : liste d'identifiants de produits */
+const DRAG_MIME = 'text/plain';
 
 /** Repart de zéro à chaque changement d'utilisateur (filtre designer par défaut). */
 export default function Design() {
@@ -79,6 +92,19 @@ function DesignPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [selId, setSelId] = useState<string | null>(null);
   const [limit, setLimit] = useState(50);
+  const [sortBy, setSortBy] = useState<SortBy>('priorite');
+  const [dropKey, setDropKey] = useState<string | null>(null);
+  const [moveTo, setMoveTo] = useState<{ designer: string; week: string }>({ designer: '', week: '' });
+  const canAssign = auth.can('pack.assign');
+  const canPush = auth.can('dev.advance');
+  const brandName = (p: Product) => byId(state.brands, p.brandId).name;
+  const sorters: Record<SortBy, (a: Product, b: Product) => number> = {
+    priorite: sortPacks,
+    marque: (a, b) => brandName(a).localeCompare(brandName(b)) || sortPacks(a, b),
+    collection: (a, b) => a.collection.localeCompare(b.collection) || sortPacks(a, b),
+    type: (a, b) => a.pack.type.localeCompare(b.pack.type) || sortPacks(a, b),
+    echeance: (a, b) => a.pack.artworkDeadline.localeCompare(b.pack.artworkDeadline) || sortPacks(a, b),
+  };
 
   const cell = (d: string | 'all', wk: string) =>
     state.products.filter((p) => (d === 'all' || p.pack.designer === d) && weekKey(p.pack.artworkDeadline) === wk);
@@ -87,8 +113,8 @@ function DesignPage() {
   const s = q.trim().toLowerCase();
   const list = scope
     .filter((p) => matches(p, status))
-    .filter((p) => !s || `${p.ref} ${p.name} ${byId(state.suppliers, p.supplierId).name} ${byId(state.brands, p.brandId).name}`.toLowerCase().includes(s))
-    .sort(sortPacks);
+    .filter((p) => !s || `${p.ref} ${p.name} ${byId(state.suppliers, p.supplierId).name} ${byId(state.brands, p.brandId).name} ${p.collection} ${p.pack.type}`.toLowerCase().includes(s))
+    .sort(sorters[sortBy]);
   const sel = list.find((p) => p.id === selId) ?? scope.find((p) => p.id === selId);
   const done = scope.filter(packDone).length;
   const late = scope.filter(packLate).length;
@@ -100,12 +126,55 @@ function DesignPage() {
     const map = new Map<string, Product[]>();
     for (const p of shown) {
       const k =
-        groupBy === 'fournisseur' ? byId(state.suppliers, p.supplierId).name : groupBy === 'statut' ? (packLate(p) ? 'En retard' : packStatus(p)[0]) : fdate(p.pack.artworkDeadline);
+        groupBy === 'fournisseur'
+          ? byId(state.suppliers, p.supplierId).name
+          : groupBy === 'marque'
+            ? brandName(p)
+            : groupBy === 'collection'
+              ? p.collection
+              : groupBy === 'type'
+                ? p.pack.type
+                : groupBy === 'statut'
+                  ? packLate(p)
+                    ? 'En retard'
+                    : packStatus(p)[0]
+                  : fdate(p.pack.artworkDeadline);
       map.set(k, [...(map.get(k) ?? []), p]);
     }
-    return [...map.entries()];
+    const entries = [...map.entries()];
+    return groupBy === 'jour' || groupBy === 'statut' ? entries : entries.sort(([a], [b]) => a.localeCompare(b));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [list, limit, groupBy, state.suppliers]);
+  }, [list, limit, groupBy, state.suppliers, state.brands]);
+
+  // Réaffectation (administrateur) : glisser-déposer ou « Déplacer vers »
+  const move = (ids: string[], toDesigner?: string, toWeekOf?: string) => {
+    const moved = ids.filter((id) => auth.allowed({ type: 'reassignPack', productId: id, designer: toDesigner, weekOf: toWeekOf }));
+    moved.forEach((id) => dispatch({ type: 'reassignPack', productId: id, designer: toDesigner, weekOf: toWeekOf }));
+    const where = [toDesigner, toWeekOf ? `semaine ${weekLabel(toWeekOf)}` : ''].filter(Boolean).join(' · ');
+    toast(`${moved.length} pack${moved.length > 1 ? 's' : ''} déplacé${moved.length > 1 ? 's' : ''} → ${where}`);
+    setSelected(new Set());
+  };
+  const dropZone = (key: string, toDesigner?: string, toWeekOf?: string) =>
+    canAssign
+      ? {
+          onDragOver: (e: React.DragEvent) => {
+            e.preventDefault();
+            if (dropKey !== key) setDropKey(key);
+          },
+          onDragLeave: () => setDropKey(null),
+          onDrop: (e: React.DragEvent) => {
+            e.preventDefault();
+            setDropKey(null);
+            try {
+              const ids = JSON.parse(e.dataTransfer.getData(DRAG_MIME)) as string[];
+              if (Array.isArray(ids) && ids.length) move(ids, toDesigner, toWeekOf);
+            } catch {
+              /* contenu glissé étranger */
+            }
+          },
+        }
+      : {};
+  const dragIds = (id: string) => (selected.has(id) ? [...selected] : [id]);
 
   const pick = (d: string | 'all', wk: string) => {
     setDesigner(d);
@@ -159,7 +228,7 @@ function DesignPage() {
           <tbody>
             {[...designers, 'all'].map((d) => (
               <tr key={d} className={d === 'all' ? 'total' : ''}>
-                <th>
+                <th {...(d === 'all' ? {} : dropZone(`who-${d}`, d))} className={dropKey === `who-${d}` ? 'pk-drop' : ''}>
                   <button className="pk-who" onClick={() => pick(d, week)}>
                     {d === 'all' ? (
                       <b>Équipe</b>
@@ -181,8 +250,11 @@ function DesignPage() {
                   const over = items.length > cap;
                   const active = designer === d && week === w.key;
                   return (
-                    <td key={w.key}>
-                      <button className={`pk-cell ${active ? 'active' : ''} ${over ? 'over' : ''}`} onClick={() => pick(d, w.key)} disabled={!items.length}>
+                    <td key={w.key} {...dropZone(`${d}|${w.key}`, d === 'all' ? undefined : d, w.sample)}>
+                      <button
+                        className={`pk-cell ${active ? 'active' : ''} ${over ? 'over' : ''} ${!items.length ? 'empty' : ''} ${dropKey === `${d}|${w.key}` ? 'drop' : ''}`}
+                        onClick={() => pick(d, w.key)}
+                      >
                         <span className="pk-cell-n">
                           <b>{ok}</b>/{items.length}
                         </span>
@@ -202,6 +274,8 @@ function DesignPage() {
           </tbody>
         </table>
       </div>
+
+      {canAssign && <div className="pk-hint">Administrateur : glissez un pack (ou votre sélection) sur une case du planning pour changer de designer et/ou de semaine, ou sur un nom de designer pour ne changer que le designer.</div>}
 
       <div className="split">
         <div className="col" style={{ gap: 12 }}>
@@ -254,13 +328,24 @@ function DesignPage() {
               <Search size={18} />
               <input placeholder="Réf., produit, fournisseur, marque…" value={q} onChange={(e) => setQ(e.target.value)} />
             </label>
-            <label className="pk-group">
+            <label className="pk-group" htmlFor="pk-sort">
+              <span className="xs muted">Trier</span>
+              <select id="pk-sort" className="input" value={sortBy} onChange={(e) => setSortBy(e.target.value as SortBy)}>
+                {(Object.keys(SORT_LABELS) as SortBy[]).map((k) => (
+                  <option key={k} value={k}>
+                    {SORT_LABELS[k]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="pk-group" htmlFor="pk-group">
               <span className="xs muted">Grouper</span>
-              <select className="input" value={groupBy} onChange={(e) => setGroupBy(e.target.value as GroupBy)}>
-                <option value="none">Aucun</option>
-                <option value="jour">Par jour</option>
-                <option value="fournisseur">Par fournisseur</option>
-                <option value="statut">Par statut</option>
+              <select id="pk-group" className="input" value={groupBy} onChange={(e) => setGroupBy(e.target.value as GroupBy)}>
+                {(Object.keys(GROUP_LABELS) as GroupBy[]).map((k) => (
+                  <option key={k} value={k}>
+                    {GROUP_LABELS[k]}
+                  </option>
+                ))}
               </select>
             </label>
           </div>
@@ -283,7 +368,47 @@ function DesignPage() {
                   <Send size={14} /> Forwarder ({canForward.length})
                 </button>
               )}
-              {canValidate.length + canDieCut.length + canForward.length === 0 && <span className="small muted">Aucune action possible pour votre rôle sur cette sélection.</span>}
+              {canPush && (
+                <button
+                  className="btn sm danger"
+                  onClick={() => {
+                    const toPush = chosen.filter((p) => !p.urgent);
+                    toPush.forEach((p) => dispatch({ type: 'toggleUrgent', productId: p.id }));
+                    toast(`${toPush.length} pack(s) poussé(s) en urgent`);
+                    setSelected(new Set());
+                  }}
+                >
+                  <Flame size={14} /> Push urgent
+                </button>
+              )}
+              {canAssign && (
+                <span className="pk-move">
+                  <select className="input" value={moveTo.designer} onChange={(e) => setMoveTo({ ...moveTo, designer: e.target.value })} aria-label="Designer cible">
+                    <option value="">Même designer</option>
+                    {designers.map((d) => (
+                      <option key={d}>{d}</option>
+                    ))}
+                  </select>
+                  <select className="input" value={moveTo.week} onChange={(e) => setMoveTo({ ...moveTo, week: e.target.value })} aria-label="Semaine cible">
+                    <option value="">Même semaine</option>
+                    {weeks.map((w) => (
+                      <option key={w.key} value={w.sample}>
+                        {weekLabel(w.sample)}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    className="btn sm"
+                    disabled={!moveTo.designer && !moveTo.week}
+                    onClick={() => move([...selected], moveTo.designer || undefined, moveTo.week || undefined)}
+                  >
+                    Déplacer
+                  </button>
+                </span>
+              )}
+              {canValidate.length + canDieCut.length + canForward.length === 0 && !canPush && !canAssign && (
+                <span className="small muted">Aucune action possible pour votre rôle sur cette sélection.</span>
+              )}
               <button className="btn sm ghost" onClick={() => setSelected(new Set())}>
                 <X size={14} /> Désélectionner
               </button>
@@ -318,6 +443,19 @@ function DesignPage() {
                     active={sel?.id === p.id}
                     showDesigner={designer === 'all'}
                     color={colorOf(p.pack.designer)}
+                    draggable={canAssign}
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData(DRAG_MIME, JSON.stringify(dragIds(p.id)));
+                      e.dataTransfer.effectAllowed = 'move';
+                    }}
+                    onUrgent={
+                      canPush
+                        ? () => {
+                            dispatch({ type: 'toggleUrgent', productId: p.id });
+                            toast(p.urgent ? `${p.ref} retiré de PUSH URGENT` : `${p.ref} poussé en urgent`);
+                          }
+                        : undefined
+                    }
                     onCheck={() => toggle(p.id)}
                     onOpen={() => {
                       setSelId(p.id);
@@ -347,6 +485,9 @@ function PackRow({
   active,
   showDesigner,
   color,
+  draggable,
+  onDragStart,
+  onUrgent,
   onCheck,
   onOpen,
 }: {
@@ -356,27 +497,43 @@ function PackRow({
   active: boolean;
   showDesigner: boolean;
   color: string;
+  draggable: boolean;
+  onDragStart: (e: React.DragEvent) => void;
+  onUrgent?: () => void;
   onCheck: () => void;
   onOpen: () => void;
 }) {
   const [label, tone] = packStatus(p);
   const late = packLate(p);
   return (
-    <div className={`pk-row ${active ? 'active' : ''} ${late ? 'late' : ''}`} onClick={onOpen}>
+    <div className={`pk-row ${active ? 'active' : ''} ${late ? 'late' : ''} ${draggable ? 'draggable' : ''}`} onClick={onOpen} draggable={draggable} onDragStart={onDragStart}>
       <input type="checkbox" checked={checked} onClick={(e) => e.stopPropagation()} onChange={onCheck} aria-label={`Sélectionner ${p.ref}`} />
       <span className="pk-c-prod">
         <ProductThumb product={p} size={32} />
         <span className="pk-id">
-          <b>
-            {p.ref}
-            {p.urgent && <Flame size={12} className="red" />}
-          </b>
-          <small>{p.name}</small>
+          <b>{p.ref}</b>
+          <small>
+            {p.name} · {p.collection}
+          </small>
         </span>
         {showDesigner && (
           <span className="dev-avatar" style={{ background: color }} title={p.pack.designer}>
             {initials(p.pack.designer)}
           </span>
+        )}
+        {onUrgent ? (
+          <button
+            className={`pk-urgent ${p.urgent ? 'on' : ''}`}
+            title={p.urgent ? 'Retirer de PUSH URGENT' : 'Pousser en urgent'}
+            onClick={(e) => {
+              e.stopPropagation();
+              onUrgent();
+            }}
+          >
+            <Flame size={15} />
+          </button>
+        ) : (
+          p.urgent && <Flame size={15} className="red" />
         )}
       </span>
       <span className="pk-c-brand">
@@ -431,6 +588,43 @@ function PackPanel({ p }: { p: Product }) {
       <div className="row mt small">
         Type de pack <Pill color="violet">{p.pack.type}</Pill>
       </div>
+      <div className="row mt small wrap">
+        Collection <Pill color="grey">{p.collection}</Pill>
+        {p.urgent && (
+          <Pill color="red-solid" icon={<Flame size={12} />}>
+            URGENT
+          </Pill>
+        )}
+      </div>
+      {auth.can('pack.assign') && (
+        <div className="pk-assign mt">
+          <span className="xs muted">Affectation</span>
+          <select
+            className="input"
+            value={p.pack.designer}
+            onChange={(e) => {
+              dispatch({ type: 'reassignPack', productId: p.id, designer: e.target.value });
+              toast(`${p.ref} → ${e.target.value}`);
+            }}
+            aria-label="Designer"
+          >
+            {[...new Set(state.products.map((x) => x.pack.designer))].sort().map((d) => (
+              <option key={d}>{d}</option>
+            ))}
+          </select>
+          <input
+            className="input"
+            type="date"
+            value={p.pack.artworkDeadline}
+            onChange={(e) => {
+              if (!e.target.value) return;
+              dispatch({ type: 'reassignPack', productId: p.id, weekOf: e.target.value });
+              toast(`${p.ref} → semaine ${weekLabel(e.target.value)}`);
+            }}
+            aria-label="Semaine"
+          />
+        </div>
+      )}
       {packLate(p) && (
         <div className="pill red mt">
           <AlertTriangle size={13} /> Date limite artwork dépassée ({fdate(p.pack.artworkDeadline)})
@@ -540,6 +734,17 @@ function PackPanel({ p }: { p: Product }) {
         >
           <Send size={15} /> Forwarder le pack
         </button>}
+        {auth.can('dev.advance') && (
+          <button
+            className={`btn ${p.urgent ? 'danger' : ''}`}
+            onClick={() => {
+              dispatch({ type: 'toggleUrgent', productId: p.id });
+              toast(p.urgent ? `${p.ref} retiré de PUSH URGENT` : `${p.ref} poussé en urgent`);
+            }}
+          >
+            <Flame size={15} /> {p.urgent ? 'Retirer de l’urgent' : 'Push urgent'}
+          </button>
+        )}
       </div>
       {!done && pendingStep && !auth.allowed({ type: 'validatePack', productId: p.id }) && (
         <div className="small muted mt">

@@ -23,6 +23,39 @@ function DevelopmentPage() {
   const auth = useAuth();
   const navigate = useNavigate();
   const canAct = auth.can('dev.advance');
+  const canAssign = auth.can('pack.assign');
+  const [sortBy, setSortBy] = useState<'echeance' | 'marque' | 'collection' | 'type'>('echeance');
+  const [dropKey, setDropKey] = useState<string | null>(null);
+  const brandName = (p: Product) => byId(state.brands, p.brandId).name;
+  const sortFn = (a: Product, b: Product) =>
+    (sortBy === 'marque'
+      ? brandName(a).localeCompare(brandName(b))
+      : sortBy === 'collection'
+        ? a.collection.localeCompare(b.collection)
+        : sortBy === 'type'
+          ? a.pack.type.localeCompare(b.pack.type)
+          : 0) || a.devDeadline.localeCompare(b.devDeadline);
+  /** Zone de dépôt (administrateur) : change designer et/ou semaine */
+  const dropZone = (key: string, toDesigner?: string, toWeekOf?: string) =>
+    canAssign
+      ? {
+          className: dropKey === key ? 'dev-drop' : undefined,
+          onDragOver: (e: React.DragEvent) => {
+            e.preventDefault();
+            if (dropKey !== key) setDropKey(key);
+          },
+          onDragLeave: () => setDropKey(null),
+          onDrop: (e: React.DragEvent) => {
+            e.preventDefault();
+            setDropKey(null);
+            const id = e.dataTransfer.getData('text/plain');
+            const prod = state.products.find((x) => x.id === id);
+            if (!prod) return;
+            dispatch({ type: 'reassignPack', productId: id, designer: toDesigner, weekOf: toWeekOf });
+            toast(`${prod.ref} → ${[toDesigner, toWeekOf ? `semaine ${weekLabel(toWeekOf)}` : ''].filter(Boolean).join(' · ')}`);
+          },
+        }
+      : {};
 
   const designers = useMemo(() => {
     const names = new Set<string>();
@@ -43,7 +76,7 @@ function DevelopmentPage() {
     .filter((p) => !p.developed)
     .filter((p) => designer === 'all' || p.pack.designer === designer)
     .filter((p) => !qs || `${p.ref} ${p.name} ${byId(state.suppliers, p.supplierId).name}`.toLowerCase().includes(qs))
-    .sort((a, b) => a.devDeadline.localeCompare(b.devDeadline));
+    .sort(sortFn);
   const done = state.products.filter((p) => p.developed && (designer === 'all' || p.pack.designer === designer));
   const pushed = todo.filter(isPushed).sort((a, b) => Number(isLate(b)) - Number(isLate(a)) || a.devDeadline.localeCompare(b.devDeadline));
   const late = todo.filter(isLate);
@@ -64,6 +97,7 @@ function DevelopmentPage() {
       toast(`${p.ref} développé`);
     },
     onRemind: (p: Product) => toast(`Relance envoyée à ${p.pack.designer} pour ${p.ref}`),
+    draggable: canAssign,
   };
 
   return (
@@ -106,7 +140,12 @@ function DevelopmentPage() {
             Tous
           </button>
           {designers.map((d) => (
-            <button key={d} className={`pf-chip ${designer === d ? 'active' : ''}`} onClick={() => setDesigner(d)}>
+            <button
+              key={d}
+              {...dropZone(`chip-${d}`, d)}
+              className={`pf-chip ${designer === d ? 'active' : ''} ${dropKey === `chip-${d}` ? 'dev-drop' : ''}`}
+              onClick={() => setDesigner(d)}
+            >
               <span className="dev-avatar" style={{ background: colorOf(d) }}>
                 {initials(d)}
               </span>
@@ -116,10 +155,22 @@ function DevelopmentPage() {
         </div>
       </div>
 
-      <label className="pf-search dev-search">
-        <Search size={18} />
-        <input placeholder="Rechercher une référence, un produit, un fournisseur…" value={q} onChange={(e) => setQ(e.target.value)} />
-      </label>
+      <div className="dev-tools">
+        <label className="pf-search dev-search">
+          <Search size={18} />
+          <input placeholder="Rechercher une référence, un produit, un fournisseur…" value={q} onChange={(e) => setQ(e.target.value)} />
+        </label>
+        <label className="pk-group" htmlFor="dev-sort">
+          <span className="xs muted">Trier</span>
+          <select id="dev-sort" className="input" value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)}>
+            <option value="echeance">Échéance</option>
+            <option value="marque">Marque</option>
+            <option value="collection">Collection</option>
+            <option value="type">Type de pack</option>
+          </select>
+        </label>
+        {canAssign && <span className="pk-hint">Administrateur : glissez un produit sur un designer ou une semaine pour le réaffecter.</span>}
+      </div>
 
       {todo.length === 0 && <div className="card empty">Aucun produit à développer{designer !== 'all' ? ` pour ${designer}` : ''}.</div>}
 
@@ -130,6 +181,7 @@ function DevelopmentPage() {
           .map(({ d, items }) => (
             <Group
               key={d}
+              drop={dropZone(`grp-${d}`, d)}
               head={
                 <>
                   <span className="dev-avatar lg" style={{ background: colorOf(d) }}>
@@ -147,7 +199,7 @@ function DevelopmentPage() {
               }
             >
               {weeksOf(items).map(([wk, ps]) => (
-                <WeekSub key={wk} wk={wk} items={ps}>
+                <WeekSub key={wk} wk={wk} items={ps} drop={dropZone(`${d}|${wk}`, d, ps[0].devDeadline)}>
                   {ps.map((p) => (
                     <Line key={p.id} p={p} showDesigner={false} {...lineProps} />
                   ))}
@@ -160,6 +212,7 @@ function DevelopmentPage() {
         weeksOf(todo).map(([wk, items]) => (
           <Group
             key={wk}
+            drop={dropZone(`wk-${wk}`, undefined, items[0].devDeadline)}
             defaultOpen={wk <= weekKey(TODAY)}
             head={
               <>
@@ -284,11 +337,14 @@ function GroupStats({ items }: { items: Product[] }) {
   );
 }
 
-function Group({ head, children, defaultOpen = true }: { head: React.ReactNode; children: React.ReactNode; defaultOpen?: boolean }) {
+type Drop = { className?: string; onDragOver?: (e: React.DragEvent) => void; onDragLeave?: () => void; onDrop?: (e: React.DragEvent) => void };
+
+function Group({ head, children, defaultOpen = true, drop = {} }: { head: React.ReactNode; children: React.ReactNode; defaultOpen?: boolean; drop?: Drop }) {
   const [open, setOpen] = useState(defaultOpen);
+  const { className: dropClass, ...dropHandlers } = drop;
   return (
     <section className={`pf-week ${open ? 'open' : ''}`}>
-      <header className="pf-week-head" onClick={() => setOpen(!open)}>
+      <header className={`pf-week-head ${dropClass ?? ''}`} onClick={() => setOpen(!open)} {...dropHandlers}>
         {head}
         <span className="pf-chevron">{open ? <ChevronUp size={24} /> : <ChevronDown size={24} />}</span>
       </header>
@@ -307,17 +363,28 @@ interface LineProps {
   onUrgent: (p: Product) => void;
   onDone: (p: Product) => void;
   onRemind: (p: Product) => void;
+  draggable: boolean;
 }
 
-function Line({ p, state, showDesigner, canAct, colorOf, onOpen, onUrgent, onDone, onRemind }: LineProps) {
+function Line({ p, state, showDesigner, canAct, colorOf, onOpen, onUrgent, onDone, onRemind, draggable }: LineProps) {
   const late = isLate(p);
   const days = diffDays(p.devDeadline, TODAY);
   return (
-    <div className={`dev-line ${p.urgent ? 'is-urgent' : ''}`} onClick={() => onOpen(p)}>
+    <div
+      className={`dev-line ${p.urgent ? 'is-urgent' : ''} ${draggable ? 'draggable' : ''}`}
+      onClick={() => onOpen(p)}
+      draggable={draggable}
+      onDragStart={(e) => {
+        e.dataTransfer.setData('text/plain', p.id);
+        e.dataTransfer.effectAllowed = 'move';
+      }}
+    >
       <ProductThumb product={p} size={44} />
       <div className="dev-id">
         <b>{p.ref}</b>
-        <small>{p.name}</small>
+        <small>
+          {p.name} · {p.collection} · {p.pack.type}
+        </small>
       </div>
       <span className="dev-brand">
         <BrandLogo brand={byId(state.brands, p.brandId)} size={10} />
@@ -369,12 +436,13 @@ function Line({ p, state, showDesigner, canAct, colorOf, onOpen, onUrgent, onDon
 const CAPACITY = 40;
 
 /** Sous-groupe semaine repliable : semaines passées et en cours ouvertes par défaut */
-function WeekSub({ wk, items, children }: { wk: string; items: Product[]; children: React.ReactNode }) {
+function WeekSub({ wk, items, children, drop = {} }: { wk: string; items: Product[]; children: React.ReactNode; drop?: Drop }) {
+  const { className: dropClass, ...dropHandlers } = drop;
   const [open, setOpen] = useState(wk <= weekKey(TODAY));
   const late = items.filter(isLate).length;
   return (
     <div className="dev-sub">
-      <div className="dev-sub-head" onClick={() => setOpen(!open)}>
+      <div className={`dev-sub-head ${dropClass ?? ''}`} onClick={() => setOpen(!open)} {...dropHandlers}>
         {open ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
         Semaine {weekLabel(items[0].devDeadline).slice(1)} <span>{weekRange(items[0].devDeadline)}</span>
         {late > 0 && <span className="pill red">{late} en retard</span>}

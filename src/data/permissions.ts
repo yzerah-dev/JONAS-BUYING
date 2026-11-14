@@ -23,7 +23,8 @@ export type Perm =
   | 'dev.advance' // faire avancer un développement produit
   | 'logistics.plan' // consolider, créer conteneurs, valider plan de chargement
   | 'logistics.booking' // booking, départ, réception, révision ETA
-  | 'users.manage'; // gérer utilisateurs et rôles
+  | 'users.manage' // gérer utilisateurs et rôles
+  | 'pack.assign'; // réaffecter un pack à un autre designer / une autre semaine
 
 export interface RoleDef {
   label: string;
@@ -45,6 +46,7 @@ const ALL_PERMS: Perm[] = [
   'logistics.plan',
   'logistics.booking',
   'users.manage',
+  'pack.assign',
 ];
 
 export const ROLE_DEFS: Record<Role, RoleDef> = {
@@ -124,6 +126,7 @@ export const PERM_LABELS: Record<Perm, string> = {
   'logistics.plan': 'Consolidation & plan de chargement',
   'logistics.booking': 'Bookings, départ, réception, ETA',
   'users.manage': 'Gérer les utilisateurs',
+  'pack.assign': 'Réaffecter les packs (designer, semaine)',
 };
 
 export const MODULE_LABELS: Record<Module, string> = {

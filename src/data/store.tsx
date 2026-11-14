@@ -16,7 +16,7 @@ import type {
 } from './types';
 import { can, canSee, canValidateStep, isSupplier, type Module, type Perm } from './permissions';
 import { CONTAINER_CAPACITY, DEV_STAGES, VALIDATION_LABELS, VALIDATION_STEPS } from './types';
-import { TODAY, addDays } from '../lib/format';
+import { TODAY, addDays, parse, weekStart } from '../lib/format';
 
 export interface State {
   suppliers: Supplier[];
@@ -28,7 +28,7 @@ export interface State {
   currentUserId: string;
 }
 
-const STORAGE_KEY = 'jonas-buying-state-v5';
+const STORAGE_KEY = 'jonas-buying-state-v6';
 
 export const currentUser = (s: State): User => s.users.find((u) => u.id === s.currentUserId) ?? s.users[0];
 
@@ -83,7 +83,8 @@ export type Action =
   | { type: 'reviseEta'; containerId: string; eta: ISODate }
   | { type: 'advanceDev'; productId: string }
   | { type: 'toggleUrgent'; productId: string }
-  | { type: 'markDeveloped'; productId: string };
+  | { type: 'markDeveloped'; productId: string }
+  | { type: 'reassignPack'; productId: string; designer?: string; weekOf?: ISODate };
 
 const hist = (user: string, text: string): HistoryEntry => ({ date: TODAY, user, text });
 
@@ -143,6 +144,7 @@ const ACTION_PERM: Partial<Record<Action['type'], Perm>> = {
   advanceDev: 'dev.advance',
   toggleUrgent: 'dev.advance',
   markDeveloped: 'dev.advance',
+  reassignPack: 'pack.assign',
   setUserRole: 'users.manage',
   toggleUser: 'users.manage',
 };
@@ -363,6 +365,20 @@ function reducer(s: State, a: Action): State {
       }
       return syncProformaStatuses(next);
     }
+    case 'reassignPack':
+      return mapP(s, a.productId, (p) => {
+        let deadline = p.pack.artworkDeadline;
+        if (a.weekOf) {
+          // Même jour ouvré dans la semaine cible
+          const day = Math.min(4, (parse(deadline).getUTCDay() + 6) % 7);
+          deadline = addDays(weekStart(a.weekOf), day);
+        }
+        return {
+          ...p,
+          devDeadline: a.weekOf ? deadline : p.devDeadline,
+          pack: { ...p.pack, designer: a.designer ?? p.pack.designer, artworkDeadline: deadline },
+        };
+      });
     case 'toggleUrgent':
       return mapP(s, a.productId, (p) => ({ ...p, urgent: !p.urgent }));
     case 'markDeveloped':
