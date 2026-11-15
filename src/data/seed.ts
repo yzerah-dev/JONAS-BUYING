@@ -576,6 +576,9 @@ export const users: User[] = [
     supplierId: s.id,
     active: true,
   })),
+  // Portail transitaire : un compte par commissionnaire
+  { id: 'fwd-logfret', name: 'Julien Morel', email: 'j.morel@logfret.example', role: 'transitaire', title: 'Agent maritime · Logfret', forwarder: 'Logfret', active: true },
+  { id: 'fwd-kn', name: 'Anna Weber', email: 'a.weber@kuehne-nagel.example', role: 'transitaire', title: 'Ocean Freight · Kuehne + Nagel', forwarder: 'Kuehne + Nagel', active: true },
 ];
 
 // Booking par proforma : JONAS demande (nb de containers, date souhaitée), le fournisseur répond
@@ -614,4 +617,15 @@ export const users: User[] = [
   const seoul = proformas.find((p) => p.id === 'PF-2026-0143')!;
   seoul.booking = { requestedAt: '2026-11-12T15:40', requestedBy: 'Logistique', containers: 1, dateWanted: addDays(seoul.etd, -5), note: 'Merci de grouper avec les coffrets restants si possible', reminders: [] };
   for (const c of containers.filter((x) => x.allocations.some((a) => a.proformaId === seoul.id))) c.status = 'booking_demande';
+}
+
+// Suivi transitaire : bookings confirmés, dédouanement et livraisons des conteneurs déjà partis
+{
+  for (const c of containers) {
+    if (c.status === 'en_transit' || c.status === 'arrive') c.fwdConfirmedAt = `${addDays(c.etdPlanned, -15)}T10:00`;
+    if (c.status === 'arrive') {
+      c.customs = 'dedouane';
+      c.deliveryDate = c.receivedOn;
+    }
+  }
 }

@@ -31,6 +31,8 @@ const PortalProformas = portal('PortalProformas');
 const PortalPacks = portal('PortalPacks');
 const PortalLoading = portal('PortalLoading');
 const PortalBooking = portal('PortalBooking');
+const ForwarderLayout = lazy(() => import('./forwarder/ForwarderLayout'));
+const ForwarderHome = lazy(() => import('./forwarder/ForwarderHome'));
 const PortalContainers = portal('PortalContainers');
 const PortalFinance = portal('PortalFinance');
 
@@ -67,6 +69,9 @@ export default function App() {
             <Route path="chargement" element={page(<PortalLoading />)} />
             <Route path="conteneurs" element={page(<PortalContainers />)} />
             <Route path="finance" element={page(<PortalFinance />)} />
+          </Route>
+          <Route path="transitaire" element={page(<ForwarderLayout />)}>
+            <Route index element={page(<ForwarderHome />)} />
           </Route>
         </Routes>
       </Router>

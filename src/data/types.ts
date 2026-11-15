@@ -222,6 +222,12 @@ export interface Container {
   planProposed?: boolean;
   /** Qui a validé le plan : le fournisseur tel quel, ou JONAS (après modifications) */
   planValidatedBy?: 'fournisseur' | 'jonas';
+  /** Transitaire : booking confirmé (n° de conteneur, navire, cut-off) */
+  fwdConfirmedAt?: string;
+  /** Dédouanement à l'arrivée, géré par le transitaire */
+  customs?: CustomsStatus;
+  /** Rendez-vous de livraison à l'entrepôt */
+  deliveryDate?: ISODate;
   /** Le fournisseur a touché au plan (il ne peut plus le valider « tel quel ») */
   planEdited?: boolean;
   allocations: Allocation[];
@@ -253,7 +259,7 @@ export const CONTAINER_CAPACITY: Record<Container['type'], number> = {
 
 // ---- Utilisateurs & rôles ----------------------------------------------------
 
-export type Role = 'pilote' | 'acheteur' | 'designer' | 'validateur' | 'direction' | 'finance' | 'logistique' | 'fournisseur';
+export type Role = 'pilote' | 'acheteur' | 'designer' | 'validateur' | 'direction' | 'finance' | 'logistique' | 'fournisseur' | 'transitaire';
 
 export interface User {
   id: string;
@@ -267,6 +273,8 @@ export interface User {
   designerName?: string;
   /** Pour les comptes du portail fournisseur */
   supplierId?: string;
+  /** Pour les comptes du portail transitaire */
+  forwarder?: Forwarder;
   active: boolean;
 }
 
@@ -317,3 +325,6 @@ export interface LoadingDate {
   initialDate?: ISODate;
   validatedAt?: string;
 }
+
+export type CustomsStatus = 'en_cours' | 'dedouane';
+export const CUSTOMS_LABEL: Record<CustomsStatus, string> = { en_cours: 'Dédouanement en cours', dedouane: 'Dédouané' };

@@ -101,6 +101,13 @@ export const ROLE_DEFS: Record<Role, RoleDef> = {
     perms: [],
     portal: true,
   },
+  transitaire: {
+    label: 'Transitaire',
+    description: 'Portail transitaire : ses conteneurs bookés (confirmation, départ, ETA, documents, douane, livraison).',
+    modules: [],
+    perms: [],
+    portal: true,
+  },
 };
 
 export const ROLES = Object.keys(ROLE_DEFS) as Role[];
@@ -108,6 +115,9 @@ export const ROLES = Object.keys(ROLE_DEFS) as Role[];
 export const can = (u: User, p: Perm) => u.active && ROLE_DEFS[u.role].perms.includes(p);
 export const canSee = (u: User, m: Module) => u.active && ROLE_DEFS[u.role].modules.includes(m);
 export const isSupplier = (u: User) => u.role === 'fournisseur';
+export const isForwarder = (u: User) => u.role === 'transitaire' && !!u.forwarder;
+/** Page d'accueil selon le rôle : portail fournisseur, portail transitaire ou application JONAS */
+export const homeOf = (u: User) => (isSupplier(u) ? '/portail' : u.role === 'transitaire' ? '/transitaire' : '/');
 
 /** Qui peut signer une étape du circuit David → Direction → Moinard → Fournisseur */
 export function canValidateStep(u: User, step: ValidationStep): boolean {

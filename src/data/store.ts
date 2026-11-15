@@ -6,6 +6,7 @@ import type {
   ContainerStatus,
   HistoryEntry,
   ISODate,
+  CustomsStatus,
   Product,
   Proforma,
   Forwarder,
@@ -19,7 +20,7 @@ import type {
   User,
   ValidationStep,
 } from './types';
-import { can, canSee, canValidateStep, isSupplier, type Module, type Perm } from './permissions';
+import { can, canSee, canValidateStep, isForwarder, isSupplier, type Module, type Perm } from './permissions';
 import { CONTAINER_CAPACITY, DEV_STAGES, VALIDATION_LABELS, VALIDATION_STEPS } from './types';
 import { TODAY, addDays, parse, weekStart } from '../lib/format';
 
@@ -41,7 +42,7 @@ export const DEFAULT_SETTINGS: Settings = {
   fx: { EUR: 1, USD: 0.93, CNY: 0.128 },
 };
 
-export const STORAGE_KEY = 'jonas-buying-state-v9';
+export const STORAGE_KEY = 'jonas-buying-state-v10';
 
 export const currentUser = (s: State): User => s.users.find((u) => u.id === s.currentUserId) ?? s.users[0];
 
@@ -119,6 +120,9 @@ export type Action =
   | { type: 'ship'; containerId: string }
   | { type: 'receive'; containerId: string; lines?: ReceptionLine[]; note?: string }
   | { type: 'reviseEta'; containerId: string; eta: ISODate }
+  | { type: 'fwdConfirm'; containerId: string; number: string; seal?: string; vessel: string; cutoff?: ISODate; etd: ISODate }
+  | { type: 'setCustoms'; containerId: string; status: CustomsStatus }
+  | { type: 'planDelivery'; containerId: string; date: ISODate }
   | { type: 'advanceDev'; productId: string }
   | { type: 'toggleUrgent'; productId: string }
   | { type: 'markDeveloped'; productId: string }
@@ -296,6 +300,22 @@ export function isAllowed(s: State, a: Action): boolean {
     case 'addContainerDoc': {
       const c = s.containers.find((x) => x.id === a.containerId);
       if (isSupplier(u)) return !!c && c.supplierId === u.supplierId;
+      if (isForwarder(u)) return !!c && forwarderOwns(u, c);
+      return can(u, 'logistics.booking');
+    }
+    case 'fwdConfirm':
+    case 'ship': {
+      const c = s.containers.find((x) => x.id === a.containerId);
+      if (!c || c.status !== 'booke') return false;
+      if (isForwarder(u)) return forwarderOwns(u, c) && (a.type === 'fwdConfirm' || !!c.fwdConfirmedAt);
+      return can(u, 'logistics.booking');
+    }
+    case 'reviseEta':
+    case 'setCustoms':
+    case 'planDelivery': {
+      const c = s.containers.find((x) => x.id === a.containerId);
+      if (!c || !['booke', 'en_transit', 'arrive'].includes(c.status)) return false;
+      if (isForwarder(u)) return forwarderOwns(u, c);
       return can(u, 'logistics.booking');
     }
     default: {
@@ -304,6 +324,9 @@ export function isAllowed(s: State, a: Action): boolean {
     }
   }
 }
+
+/** Conteneur suivi par ce transitaire : le sien, une fois booké par le fournisseur */
+export const forwarderOwns = (u: User, c: Container) => isForwarder(u) && c.forwarder === u.forwarder && ['booke', 'en_transit', 'arrive'].includes(c.status);
 
 /** Demande de booking envoyée, pas encore répondue par le fournisseur */
 export const bookingOpen = (pf: Proforma) => !!pf.booking && !pf.booking.answeredAt;
@@ -645,7 +668,7 @@ function applyAction(s: State, a: Action): State {
           status: 'en_transit',
           etdReal: TODAY,
           documents: [...new Set([...c.documents, 'BL.pdf', 'Invoice.pdf', 'Packing List.xlsx'])],
-          dateHistory: [...c.dateHistory, hist('Logistique', `Départ réel ${TODAY}`)],
+          dateHistory: [...c.dateHistory, hist(me, `Départ réel ${TODAY}`)],
         })),
       );
     case 'receive': {
@@ -760,6 +783,28 @@ function applyAction(s: State, a: Action): State {
         etaRevised: a.eta,
         dateHistory: [...c.dateHistory, hist(me, `ETA révisée : ${containerEta(c)} → ${a.eta}`)],
       }));
+    case 'fwdConfirm':
+      return mapC(s, a.containerId, (c) => ({
+        ...c,
+        number: a.number,
+        seal: a.seal || c.seal,
+        etdPlanned: a.etd,
+        fwdConfirmedAt: nowStamp(),
+        booking: { reminders: [], ...(c.booking ?? {}), vessel: a.vessel, cutoff: a.cutoff ?? c.booking?.cutoff },
+        dateHistory: [...c.dateHistory, hist(me, `Booking confirmé par ${c.forwarder ?? 'le transitaire'} : ${a.number} · ${a.vessel} · ETD ${a.etd}`)],
+      }));
+    case 'setCustoms':
+      return mapC(s, a.containerId, (c) => ({
+        ...c,
+        customs: a.status,
+        dateHistory: [...c.dateHistory, hist(me, a.status === 'dedouane' ? 'Marchandise dédouanée' : 'Dédouanement lancé')],
+      }));
+    case 'planDelivery':
+      return mapC(s, a.containerId, (c) => ({
+        ...c,
+        deliveryDate: a.date,
+        dateHistory: [...c.dateHistory, hist(me, `Livraison planifiée à ${c.warehouse} le ${a.date}`)],
+      }));
   }
 }
 
@@ -847,6 +892,12 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
     }
     case 'reviseEta':
       return { target: ctn(a.containerId), text: `ETA révisée au ${a.eta}` };
+    case 'fwdConfirm':
+      return { target: ctn(a.containerId), text: `Booking confirmé par le transitaire (${a.vessel})` };
+    case 'setCustoms':
+      return { target: ctn(a.containerId), text: a.status === 'dedouane' ? 'Dédouané' : 'Dédouanement lancé' };
+    case 'planDelivery':
+      return { target: ctn(a.containerId), text: `Livraison planifiée le ${a.date}` };
     case 'advanceDev':
       return { target: ref(a.productId), text: 'Développement : étape suivante' };
     case 'toggleUrgent': {

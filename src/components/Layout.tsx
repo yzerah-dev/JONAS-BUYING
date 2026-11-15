@@ -66,6 +66,7 @@ export default function Layout() {
 
   // Les comptes fournisseurs n'accèdent qu'au portail
   if (isSupplier(user)) return <Navigate to="/portail" replace />;
+  if (user.role === 'transitaire') return <Navigate to="/transitaire" replace />;
   const allowedHere = canSee(user, moduleOf(location.pathname));
 
   return (

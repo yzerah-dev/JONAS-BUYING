@@ -192,6 +192,13 @@ function BookedRow({ s, pf, canShip }: { s: State; pf: Proforma; canShip?: boole
           Répondu le {fstamp(b.answeredAt)} par {b.answeredBy}
           {b.supplierNote ? ` · « ${b.supplierNote} »` : ''}
         </span>
+        {toShip.length > 0 && (
+          <span className={toShip.every((c) => c.fwdConfirmedAt) ? 'green bold' : 'orange bold'}>
+            {toShip.every((c) => c.fwdConfirmedAt)
+              ? `Confirmé par ${toShip[0].forwarder ?? 'le transitaire'} · ${toShip[0].booking?.vessel ?? ''}`
+              : `En attente de confirmation ${toShip[0].forwarder ?? 'transitaire'}`}
+          </span>
+        )}
       </div>
       <div className="bk-actions">
         {canShip && toShip.length > 0 && (

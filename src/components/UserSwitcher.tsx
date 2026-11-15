@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Check, ChevronDown, LogIn } from 'lucide-react';
 import { currentUser, useStore } from '../data/store';
+import { homeOf, ROLE_DEFS } from '../data/permissions';
 import { initials } from '../lib/format';
 import { useT } from '../i18n/context';
 
@@ -20,14 +21,15 @@ export default function UserSwitcher() {
     return () => document.removeEventListener('mousedown', close);
   }, []);
 
-  const team = state.users.filter((u) => u.role !== 'fournisseur' && u.active);
+  const team = state.users.filter((u) => !ROLE_DEFS[u.role].portal && u.active);
   const suppliers = state.users.filter((u) => u.role === 'fournisseur' && u.active);
+  const forwarders = state.users.filter((u) => u.role === 'transitaire' && u.active);
 
   const login = (id: string) => {
     const u = state.users.find((x) => x.id === id)!;
     dispatch({ type: 'login', userId: id });
     setOpen(false);
-    navigate(u.role === 'fournisseur' ? '/portail' : '/');
+    navigate(homeOf(u));
   };
 
   const Row = ({ id }: { id: string }) => {
@@ -40,7 +42,7 @@ export default function UserSwitcher() {
         </div>
         <div className="grow">
           <div className="bold small">{u.name}</div>
-          <div className="xs muted">{sup ? sup.name : `${t(`role.${u.role}`)} · ${u.title}`}</div>
+          <div className="xs muted">{sup ? sup.name : u.forwarder ? u.title : `${t(`role.${u.role}`)} · ${u.title}`}</div>
         </div>
         {u.id === me.id && <Check size={15} className="green" />}
       </div>
@@ -68,6 +70,10 @@ export default function UserSwitcher() {
           ))}
           <div className="menu-group">{t('us.portal')}</div>
           {suppliers.map((u) => (
+            <Row key={u.id} id={u.id} />
+          ))}
+          <div className="menu-group">{t('us.forwarders')}</div>
+          {forwarders.map((u) => (
             <Row key={u.id} id={u.id} />
           ))}
         </div>

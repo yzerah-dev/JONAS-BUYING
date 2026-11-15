@@ -166,6 +166,8 @@ export const fr = {
   'role.finance': ROLE_DEFS.finance.label,
   'role.logistique': ROLE_DEFS.logistique.label,
   'role.fournisseur': ROLE_DEFS.fournisseur.label,
+  'role.transitaire': ROLE_DEFS.transitaire.label,
+  'us.forwarders': 'Portail transitaires',
 
   // --- Logistique (pages/ProformaDetail.tsx : LogisticsTab / ContainerPanel)
   'track.0': 'Proforma validée',
@@ -415,6 +417,8 @@ export const en: Record<Key, string> = {
   'role.finance': 'Finance',
   'role.logistique': 'Logistics',
   'role.fournisseur': 'Supplier',
+  'role.transitaire': 'Freight forwarder',
+  'us.forwarders': 'Forwarder portal',
 
   'track.0': 'Proforma approved',
   'track.1': 'Product development',
