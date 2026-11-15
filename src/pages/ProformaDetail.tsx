@@ -41,6 +41,7 @@ import {
 import type { Container, Proforma, ProformaStatus } from '../data/types';
 import { BrandLogo, ContainerStatusPill, PackPill, Pill, ProductThumb, ProformaStatusPill, Progress, Ring, Seg, SupplierLogo, Tabs } from '../components/ui';
 import { toast } from '../components/ui-shared';
+import { BookingDialog, ProformaBooking } from '../components/BookingDialog';
 import { addDays, dec, eur, eur2, fdate, m3, num, weekLabel } from '../lib/format';
 import { useT, type I18n } from '../i18n/context';
 import type { Key } from '../i18n/dict';
@@ -55,10 +56,14 @@ export default function ProformaDetail() {
   const pf = state.proformas.find((p) => p.id === id);
   const [tab, setTab] = useState<Tab>('produits');
   const [mode, setMode] = useState<'galerie' | 'liste'>('galerie');
+  const [booking, setBooking] = useState<string | null>(null);
   if (!pf) return <div className="card empty">Proforma introuvable.</div>;
   const sup = byId(state.suppliers, pf.supplierId);
   const t = proformaTotals(state, pf);
   const showMoney = auth.can('finance.view');
+  const pfContainers = state.containers.filter((c) => c.allocations.some((a) => a.proformaId === pf.id));
+  const canBookPf = auth.can('logistics.booking') && !['a_signer', 'en_transit', 'arrive'].includes(pf.status);
+  const toBook = pfContainers.filter((c) => c.status === 'a_booker').length;
 
   return (
     <>
@@ -75,6 +80,12 @@ export default function ProformaDetail() {
         <button className="btn" onClick={() => toast('Lien de partage copié (démo)')}>
           <Share2 size={16} /> Partager
         </button>
+        {canBookPf && (
+          <button className="btn primary pf-book-btn" onClick={() => setBooking(pf.id)}>
+            <Ship size={16} /> Demander le booking
+            {toBook > 0 && <span className="pf-book-n">{toBook}</span>}
+          </button>
+        )}
         {auth.can('proforma.sign') && (
           <button
             className="btn primary"
@@ -153,6 +164,7 @@ export default function ProformaDetail() {
       {tab === 'details' && <DetailsTab pf={pf} state={state} />}
       {tab === 'documents' && <DocumentsTab pf={pf} />}
       {tab === 'logistique' && <LogisticsTab pf={pf} />}
+      {booking === pf.id && <ProformaBooking pf={pf} containers={pfContainers} onClose={() => setBooking(null)} />}
       {tab === 'historique' && (
         <div className="card pad">
           {[...pf.history].reverse().map((h, i) => (
@@ -686,6 +698,7 @@ export function LogisticsTab({ pf, portal }: { pf: Proforma; portal?: boolean })
 
 function ContainerPanel({ c, index, portal }: { c: Container; index: number; portal?: boolean }) {
   const { state, dispatch } = useStore();
+  const [dialog, setDialog] = useState<'date' | 'request' | null>(null);
   const auth = useAuth();
   const cbm = containerCbm(state, c);
   const ratio = cbm / containerCapacity(c);
@@ -804,19 +817,22 @@ function ContainerPanel({ c, index, portal }: { c: Container; index: number; por
             <Send size={16} /> {c.planProposed ? t('cp.proposed') : t('cp.propose')}
           </button>
         )}
+        {!portal && c.status === 'a_booker' && auth.can('logistics.booking') && c.loading?.status !== 'validated' && (
+          <button className="btn" title={t('cp.needDate')} onClick={() => setDialog('date')}>
+            <Calendar size={16} /> {c.loading ? 'Modifier la date de chargement' : 'Proposer une date de chargement'}
+          </button>
+        )}
         {c.status === 'a_booker' && auth.can('logistics.booking') && (
           <button
             className="btn primary"
             title={c.loading?.status === 'validated' ? undefined : t('cp.needDate')}
             disabled={!c.allocations.length || ratio > 1 || !auth.allowed({ type: 'requestBooking', containerId: c.id })}
-            onClick={() => {
-              dispatch({ type: 'requestBooking', containerId: c.id });
-              toast(t('cp.bookingToast'));
-            }}
+            onClick={() => setDialog('request')}
           >
-            <Calendar size={16} /> {t('cp.booking')}
+            <Send size={16} /> {t('cp.booking')}
           </button>
         )}
+        {dialog && <BookingDialog key={dialog} mode={dialog} c={c} onClose={() => setDialog(null)} />}
         {c.status === 'booking_demande' && auth.can('logistics.booking') && (
           <button className="btn primary" onClick={() => dispatch({ type: 'confirmBooking', containerId: c.id })}>
             <Check size={16} /> {t('cp.confirmBooking', { no: c.bookingNo ?? '' })}

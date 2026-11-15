@@ -15,7 +15,8 @@ test.describe('Proformas et logistique', () => {
     await expect(page.locator('.summary-bar').first()).toContainText('Reste à consolider : 0 pcs');
 
     await page.getByRole('button', { name: 'Demander le container' }).first().click();
-    await expect(toast(page)).toHaveText('Demande de container envoyée');
+    await page.getByRole('button', { name: 'Envoyer la demande' }).click();
+    await expect(toast(page)).toContainText('Demande de container envoyée');
     await page.getByRole('button', { name: /Confirmer le booking/ }).click();
     await expect(page.getByRole('button', { name: /Confirmer le booking/ })).toHaveCount(0);
   });
@@ -32,7 +33,32 @@ test.describe('Proformas et logistique', () => {
     await page.getByRole('button', { name: 'Suivi & Logistique' }).click();
     await page.getByRole('button', { name: /Valider les modifications/ }).click();
     await page.getByRole('button', { name: 'Demander le container' }).click();
-    await expect(toast(page)).toHaveText('Demande de container envoyée');
+    await page.getByRole('button', { name: 'Envoyer la demande' }).click();
+    await expect(toast(page)).toContainText('Demande de container envoyée');
+  });
+
+  test('demander le booking depuis la proforma', async ({ page }) => {
+    await loginAs(page, 'Logistique');
+    // Proforma prête (date de chargement validée par le fournisseur)
+    await go(page, 'proformas/PF-2026-0143');
+    await page.getByRole('button', { name: /Demander le booking/ }).click();
+    const dlg = page.getByRole('dialog', { name: 'Booking PF-2026-0143' });
+    await expect(dlg).toContainText('Validée');
+    await dlg.getByRole('button', { name: 'Demander le container' }).click();
+    await page.locator('#bk-fwd').selectOption('Logfret');
+    await page.getByRole('button', { name: 'Envoyer la demande' }).click();
+    await expect(toast(page)).toContainText('Demande de container envoyée à Logfret');
+    await expect(page.locator('.page-head .pf-book-n')).toHaveCount(0);
+
+    // Proforma dont la date n'est pas encore validée : on propose la date depuis la proforma
+    await go(page, 'proformas/PF-2026-0148');
+    await page.getByRole('button', { name: /Demander le booking/ }).click();
+    const dlg2 = page.getByRole('dialog', { name: 'Booking PF-2026-0148' });
+    await expect(dlg2.locator('.pb-ctn')).toHaveCount(2);
+    for (const b of await dlg2.getByRole('button', { name: 'Demander le container' }).all()) await expect(b).toBeDisabled();
+    await dlg2.getByRole('button', { name: 'Proposer une date' }).click();
+    await page.getByRole('button', { name: 'Envoyer au fournisseur' }).click();
+    await expect(toast(page)).toContainText('Date de chargement proposée à Horizon Home');
   });
 
   test('signature des proformas à signer', async ({ page }) => {
