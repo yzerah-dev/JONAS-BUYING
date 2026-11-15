@@ -1,4 +1,4 @@
-import { bookingStage, currentUser, packDone, useStore } from '../data/store';
+import { bookingStage, currentUser, pendingVersion, signedVersion, packDone, useStore } from '../data/store';
 
 /** Données visibles par le fournisseur connecté — et uniquement celles-ci. */
 export function usePortal() {
@@ -20,8 +20,10 @@ export function usePortal() {
   /** Propositions du transitaire en validation (à accepter par le fournisseur et par JONAS) */
   const bookingsInValidation = proformas.filter((p) => bookingStage(p) === 'validation');
   const bookingsToAccept = bookingsInValidation.filter((p) => !p.booking!.proposal!.supplierOk);
+  /** Proformas à déposer : à signer, sans version déposée en attente (dont modification refusée à redéposer) */
+  const proformasToUpload = proformas.filter((p) => p.status === 'a_signer' && !pendingVersion(p) && !signedVersion(p));
   const REQUIRED_DOCS = ['BL.pdf', 'Invoice.pdf', 'Packing List.xlsx'];
   const docsMissing = containers.filter((c) => ['booke', 'en_transit'].includes(c.status) && REQUIRED_DOCS.some((d) => !c.documents.includes(d)));
 
-  return { state, dispatch, user, supplier, products, proformas, containers, packsToValidate, dieCutsRequested, plansRequested, bookingsToDo, bookingsAtForwarder, bookingsInValidation, bookingsToAccept, docsMissing, REQUIRED_DOCS };
+  return { state, dispatch, user, supplier, products, proformas, containers, packsToValidate, dieCutsRequested, plansRequested, bookingsToDo, bookingsAtForwarder, bookingsInValidation, bookingsToAccept, proformasToUpload, docsMissing, REQUIRED_DOCS };
 }

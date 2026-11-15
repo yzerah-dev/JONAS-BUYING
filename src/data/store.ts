@@ -3,6 +3,7 @@ import * as seed from './seed';
 import type {
   Brand,
   BookingProposal,
+  ProformaDoc,
   Container,
   ContainerStatus,
   HistoryEntry,
@@ -21,9 +22,9 @@ import type {
   User,
   ValidationStep,
 } from './types';
-import { can, canSee, canValidateStep, isForwarder, isSupplier, type Module, type Perm } from './permissions';
+import { ROLE_DEFS, can, canSee, canValidateStep, isForwarder, isSupplier, type Module, type Perm } from './permissions';
 import { CONTAINER_CAPACITY, DEV_STAGES, VALIDATION_LABELS, VALIDATION_STEPS } from './types';
-import { TODAY, addDays, parse, weekStart } from '../lib/format';
+import { TODAY, addDays, diffDays, parse, weekStart } from '../lib/format';
 
 export interface State {
   suppliers: Supplier[];
@@ -43,7 +44,7 @@ export const DEFAULT_SETTINGS: Settings = {
   fx: { EUR: 1, USD: 0.93, CNY: 0.128 },
 };
 
-export const STORAGE_KEY = 'jonas-buying-state-v12';
+export const STORAGE_KEY = 'jonas-buying-state-v13';
 
 export const currentUser = (s: State): User => s.users.find((u) => u.id === s.currentUserId) ?? s.users[0];
 
@@ -83,7 +84,9 @@ export type Action =
   | { type: 'requestPlan'; containerId: string }
   | { type: 'proposePlan'; containerId: string }
   | { type: 'addContainerDoc'; containerId: string; doc: string }
-  | { type: 'signProforma'; id: string }
+  | { type: 'signProforma'; id: string; etdWanted: ISODate }
+  | { type: 'uploadProforma'; id: string; fileId: string; name: string; size: number; mime: string; reason?: string }
+  | { type: 'refuseProformaVersion'; id: string; reason: string }
   | { type: 'setProformaStatus'; id: string; status: ProformaStatus }
   | { type: 'payDeposit'; id: string }
   | { type: 'payBalance'; id: string }
@@ -286,6 +289,21 @@ export function isAllowed(s: State, a: Action): boolean {
       if (!(isSupplier(u) ? pf.supplierId === u.supplierId : u.role === 'pilote')) return false;
       return s.containers.some((c) => c.allocations.some((x) => x.proformaId === pf.id) && ['a_booker', 'booking_demande'].includes(c.status));
     }
+    case 'uploadProforma': {
+      // Le fournisseur dépose sa proforma ; une fois signée, une nouvelle version = demande de modification (motif obligatoire)
+      const pf = s.proformas.find((x) => x.id === a.id);
+      if (!pf || !(isSupplier(u) ? pf.supplierId === u.supplierId : u.role === 'pilote')) return false;
+      if (['en_transit', 'arrive'].includes(pf.status)) return false;
+      return !signedVersion(pf) || !!a.reason?.trim();
+    }
+    case 'signProforma':
+    case 'refuseProformaVersion': {
+      // JONAS signe la version déposée ; une modification est signée (ou refusée) par la Direction
+      const pf = s.proformas.find((x) => x.id === a.id);
+      if (!pf || !pendingVersion(pf) || !can(u, 'proforma.sign')) return false;
+      if (a.type === 'refuseProformaVersion') return !!a.reason.trim();
+      return !!a.etdWanted;
+    }
     case 'acceptPfBooking':
     case 'rejectPfBooking': {
       // La proposition du transitaire est acceptée (ou refusée) par le fournisseur et par JONAS
@@ -362,6 +380,13 @@ export function isAllowed(s: State, a: Action): boolean {
 
 /** Conteneur suivi par ce transitaire : le sien, une fois booké par le fournisseur */
 export const forwarderOwns = (u: User, c: Container) => isForwarder(u) && c.forwarder === u.forwarder && ['booke', 'en_transit', 'arrive'].includes(c.status);
+
+/** Version de proforma déposée, en attente de signature */
+export const pendingVersion = (pf: Proforma) => pf.versions?.find((v) => v.status === 'a_signer');
+/** Version signée en vigueur */
+export const signedVersion = (pf: Proforma) => pf.versions?.find((v) => v.status === 'signee');
+/** Demande de modification en attente (nouvelle version d'une proforma déjà signée) */
+export const pendingRevision = (pf: Proforma) => (signedVersion(pf) ? pendingVersion(pf) : undefined);
 
 /** Demande de booking envoyée, booking pas encore effectué */
 export const bookingOpen = (pf: Proforma) => !!pf.booking && !pf.booking.answeredAt;
@@ -450,13 +475,72 @@ function applyAction(s: State, a: Action): State {
         documents: c.documents.includes(a.doc) ? c.documents : [...c.documents, a.doc],
         dateHistory: [...c.dateHistory, hist(me, `Document déposé : ${a.doc}`)],
       }));
-    case 'signProforma':
-      return mapPF(s, a.id, (pf) => ({
-        ...pf,
-        status: pf.status === 'a_signer' ? 'en_dev' : pf.status,
-        documents: pf.documents.includes('Proforma signée.pdf') ? pf.documents : [...pf.documents, 'Proforma signée.pdf'],
-        history: [...pf.history, hist(me, 'Proforma signée')],
-      }));
+    case 'uploadProforma':
+      return mapPF(s, a.id, (pf) => {
+        const versions = pf.versions ?? [];
+        const signed = signedVersion(pf);
+        const n = versions.reduce((m, v) => Math.max(m, v.version), 0) + 1;
+        const doc: ProformaDoc = {
+          version: n,
+          fileId: a.fileId,
+          name: a.name,
+          size: a.size,
+          type: a.mime,
+          uploadedAt: nowStamp(),
+          uploadedBy: me,
+          reason: signed ? a.reason?.trim() : undefined,
+          status: 'a_signer',
+        };
+        return {
+          ...pf,
+          // Une version en attente déposée à nouveau est remplacée
+          versions: [...versions.map((v) => (v.status === 'a_signer' ? { ...v, status: 'remplacee' as const } : v)), doc],
+          history: [
+            ...pf.history,
+            hist(me, signed ? `Demande de modification : proforma v${n} déposée (${doc.reason})` : `Proforma v${n} déposée par le fournisseur (${a.name})`),
+          ],
+        };
+      });
+    case 'signProforma': {
+      const u = currentUser(s);
+      const at = nowStamp();
+      return mapPF(s, a.id, (pf) => {
+        const doc = pendingVersion(pf)!;
+        const prev = signedVersion(pf);
+        const shift = diffDays(a.etdWanted, pf.etd);
+        return {
+          ...pf,
+          status: pf.status === 'a_signer' ? 'en_dev' : pf.status,
+          etd: a.etdWanted,
+          eta: addDays(pf.eta, shift),
+          versions: pf.versions!.map((v) =>
+            v.version === doc.version
+              ? { ...v, status: 'signee', signature: { at, by: me, role: ROLE_DEFS[u.role].label, date: TODAY, etdWanted: a.etdWanted, replaces: prev?.version } }
+              : prev && v.version === prev.version
+                ? { ...v, status: 'annulee', cancelledBy: { version: doc.version, at } }
+                : v,
+          ),
+          history: [
+            ...pf.history,
+            hist(
+              me,
+              prev
+                ? `Proforma v${doc.version} signée et tamponnée · expédition demandée ${a.etdWanted} · annule et remplace la v${prev.version}`
+                : `Proforma v${doc.version} signée et tamponnée · expédition demandée ${a.etdWanted}`,
+            ),
+          ],
+        };
+      });
+    }
+    case 'refuseProformaVersion':
+      return mapPF(s, a.id, (pf) => {
+        const doc = pendingVersion(pf)!;
+        return {
+          ...pf,
+          versions: pf.versions!.map((v) => (v.version === doc.version ? { ...v, status: 'refusee', refused: { at: nowStamp(), by: me, reason: a.reason.trim() } } : v)),
+          history: [...pf.history, hist(me, `Proforma v${doc.version} refusée : ${a.reason.trim()}`)],
+        };
+      });
     case 'setProformaStatus':
       return mapPF(s, a.id, (pf) => ({
         ...pf,
@@ -968,7 +1052,11 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
     case 'reset':
       return null;
     case 'signProforma':
-      return { target: a.id, text: 'Proforma signée' };
+      return { target: a.id, text: `Proforma signée et tamponnée (expédition demandée ${a.etdWanted})` };
+    case 'uploadProforma':
+      return { target: a.id, text: a.reason ? `Demande de modification déposée : ${a.reason}` : `Proforma déposée (${a.name})` };
+    case 'refuseProformaVersion':
+      return { target: a.id, text: `Version de proforma refusée : ${a.reason}` };
     case 'setProformaStatus':
       return { target: a.id, text: `Statut → ${PROFORMA_STATUS_LABEL[a.status]}` };
     case 'payDeposit':

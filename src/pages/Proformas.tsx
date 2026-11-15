@@ -14,18 +14,19 @@ import {
   Search,
   SlidersHorizontal,
 } from 'lucide-react';
-import { byId, proformaTotals, useAuth, useStore, PROFORMA_STATUS_LABEL, type State } from '../data/store';
+import { byId, pendingRevision, pendingVersion, proformaTotals, useAuth, useStore, PROFORMA_STATUS_LABEL, type State } from '../data/store';
 import { PROFORMA_STATUSES, type Proforma, type ProformaStatus } from '../data/types';
 import { ContainerGlyph, ProformaStatusPill, SupplierMark } from '../components/ui';
 import { PROFORMA_ICON, toast } from '../components/ui-shared';
 import { TODAY, dec, eur, weekKey, weekLabel, weekRange } from '../lib/format';
 import { pressable } from '../lib/a11y';
 import { BookingRequestButton } from '../components/BookingDialog';
+import { SignDialog } from '../components/ProformaVersions';
 
 type View = 'liste' | 'semaine' | 'fournisseur';
 
 export default function Proformas() {
-  const { state, dispatch } = useStore();
+  const { state } = useStore();
   const auth = useAuth();
   const canSign = auth.can('proforma.sign');
   const showMoney = auth.can('finance.view');
@@ -77,10 +78,14 @@ export default function Proformas() {
     else params.set('statut', s);
     setParams(params);
   };
+  const [signing, setSigning] = useState<string | null>(null);
   const sign = (id: string) => {
-    dispatch({ type: 'signProforma', id });
-    toast(`${id} signée`);
+    const pf = state.proformas.find((p) => p.id === id)!;
+    if (!pendingVersion(pf)) return toast('En attente de la proforma du fournisseur : il doit la déposer dans son portail');
+    setSigning(id);
   };
+  const signingPf = signing ? state.proformas.find((p) => p.id === signing) : undefined;
+  const signingDoc = signingPf ? pendingVersion(signingPf) : undefined;
 
   return (
     <div className="pf-page">
@@ -164,6 +169,7 @@ export default function Proformas() {
           onSign={canSign ? sign : undefined}
         />
       ))}
+      {signingPf && signingDoc && <SignDialog pf={signingPf} doc={signingDoc} onClose={() => setSigning(null)} />}
     </div>
   );
 }
@@ -283,13 +289,34 @@ function useRowData(p: Proforma, state: State) {
 }
 
 function StatusCell({ p, onSign }: { p: Proforma; onSign?: (id: string) => void }) {
+  const revision = pendingRevision(p);
+  if (revision)
+    return (
+      <BookingStatus p={p}>
+        {onSign ? (
+          <button
+            className="pf-bk-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              onSign(p.id);
+            }}
+          >
+            <PenLine size={11} /> Signer la modification v{revision.version}
+          </button>
+        ) : (
+          <small className="pf-bk-wait">Modification v{revision.version} à signer (Direction)</small>
+        )}
+      </BookingStatus>
+    );
   if (p.status === 'a_signer')
     return (
       <div className="pf-sign">
         <span>
           <PenLine size={16} /> À signer
         </span>
-        {onSign && (
+        {!pendingVersion(p) ? (
+          <small className="pf-bk-wait">Attente de la proforma du fournisseur</small>
+        ) : onSign && (
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -305,9 +332,10 @@ function StatusCell({ p, onSign }: { p: Proforma; onSign?: (id: string) => void 
 }
 
 /** Statut + accès direct à la demande de booking depuis la liste */
-function BookingStatus({ p }: { p: Proforma }) {
+function BookingStatus({ p, children }: { p: Proforma; children?: React.ReactNode }) {
   return (
     <div className="pf-bkcell">
+      {children}
       <ProformaStatusPill status={p.status} big />
       <BookingRequestButton pf={p} variant="chip" />
       {p.booking && !p.booking.answeredAt && <small className="pf-bk-wait">Booking demandé · {p.booking.proposal ? 'proposition à valider' : p.booking.ackAt ? `attente ${p.booking.forwarder}` : 'attente fournisseur'}</small>}

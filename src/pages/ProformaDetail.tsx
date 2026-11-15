@@ -14,6 +14,7 @@ import {
   History,
   LayoutGrid,
   List,
+  Lock,
   Mail,
   MessageCircle,
   PenLine,
@@ -32,6 +33,8 @@ import {
   containerCbm,
   containerQty,
   lineCbm,
+  pendingRevision,
+  pendingVersion,
   proformaTotals,
   useAuth,
   useStore,
@@ -42,6 +45,7 @@ import { BrandLogo, ContainerStatusPill, PackPill, Pill, ProductThumb, ProformaS
 import { toast } from '../components/ui-shared';
 import { BookingRequestButton } from '../components/BookingDialog';
 import BookingReview, { LastRejection } from '../components/BookingReview';
+import ProformaVersions, { SignDialog } from '../components/ProformaVersions';
 import { addDays, dec, eur, eur2, fdate, m3, num, weekLabel } from '../lib/format';
 import { useT, type I18n } from '../i18n/context';
 import type { Key } from '../i18n/dict';
@@ -50,7 +54,7 @@ type Tab = 'produits' | 'details' | 'documents' | 'logistique' | 'historique';
 
 export default function ProformaDetail() {
   const { id } = useParams();
-  const { state, dispatch } = useStore();
+  const { state } = useStore();
   const auth = useAuth();
   const navigate = useNavigate();
   const pf = state.proformas.find((p) => p.id === id);
@@ -78,17 +82,7 @@ export default function ProformaDetail() {
         </button>
         <BookingRequestButton pf={pf} />
         {pf.booking && <BookingState pf={pf} />}
-        {auth.can('proforma.sign') && (
-          <button
-            className="btn primary"
-            onClick={() => {
-              dispatch({ type: 'signProforma', id: pf.id });
-              toast(`${pf.id} signée`);
-            }}
-          >
-            <PenLine size={16} /> {pf.status === 'a_signer' ? 'Signer' : 'Signer à nouveau'}
-          </button>
-        )}
+        <SignButton pf={pf} />
       </div>
 
       <div className="row wrap gap-lg" style={{ alignItems: 'stretch' }}>
@@ -134,7 +128,7 @@ export default function ProformaDetail() {
           tabs={[
             { id: 'produits', label: `Produits (${pf.lines.length})`, icon: <Boxes size={16} /> },
             { id: 'details', label: 'Détails', icon: <ClipboardList size={16} /> },
-            { id: 'documents', label: `Documents (${pf.documents.length})`, icon: <FileText size={16} /> },
+            { id: 'documents', label: `Documents (${pf.documents.length + (pf.versions?.length ?? 0)})`, icon: <FileText size={16} /> },
             { id: 'logistique', label: 'Suivi & Logistique', icon: <Truck size={16} /> },
             { id: 'historique', label: 'Historique', icon: <History size={16} /> },
           ]}
@@ -413,9 +407,36 @@ function DetailsTab({ pf, state }: { pf: Proforma; state: State }) {
   );
 }
 
+/** Signer : la version déposée par le fournisseur (ou la demande de modification), sinon attente du fournisseur */
+function SignButton({ pf }: { pf: Proforma }) {
+  const auth = useAuth();
+  const [open, setOpen] = useState(false);
+  if (!auth.can('proforma.sign')) return null;
+  const pending = pendingVersion(pf);
+  const revision = pendingRevision(pf);
+  if (!pending) {
+    if (pf.status !== 'a_signer') return null;
+    return (
+      <button className="btn locked" onClick={() => toast('En attente de la proforma du fournisseur : il doit la déposer dans son portail')}>
+        <Lock size={16} /> Signer
+      </button>
+    );
+  }
+  return (
+    <>
+      <button className="btn primary" onClick={() => setOpen(true)}>
+        <PenLine size={16} /> {revision ? `Signer la modification v${revision.version}` : 'Signer'}
+      </button>
+      {open && <SignDialog pf={pf} doc={pending} onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
 function DocumentsTab({ pf }: { pf: Proforma }) {
   return (
-    <div className="card pad">
+    <>
+    <ProformaVersions pf={pf} />
+    <div className="card pad mt">
       {pf.documents.map((d) => (
         <div key={d} className="alert-line">
           <FileText size={16} className="green" />
@@ -427,6 +448,7 @@ function DocumentsTab({ pf }: { pf: Proforma }) {
         </div>
       ))}
     </div>
+    </>
   );
 }
 

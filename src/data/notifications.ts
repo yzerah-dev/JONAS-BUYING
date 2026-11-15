@@ -1,6 +1,6 @@
 // Notifications calculées à partir de l'état : chacun ne voit que ce qui le concerne.
 import type { State } from './store';
-import { bookingOpen, canRequestBooking, containerEta, containerEtd, currentUser, packDone, packLate, payments } from './store';
+import { bookingOpen, canRequestBooking, pendingRevision, pendingVersion, containerEta, containerEtd, currentUser, packDone, packLate, payments } from './store';
 import { can, canSee } from './permissions';
 import { VALIDATION_LABELS, VALIDATION_STEPS } from './types';
 import { TODAY, addDays, diffDays, eur, fshort } from '../lib/format';
@@ -50,6 +50,17 @@ export function notificationsFor(s: State): Notice[] {
   if (can(u, 'dev.advance')) {
     const late = s.products.filter(packLate);
     if (late.length) add({ id: `late-all-${late.length}`, level: 'red', title: `${late.length} pack(s) en retard (équipe)`, to: '/design' });
+  }
+
+  // Signature des proformas déposées par les fournisseurs (Direction / Pilote)
+  if (can(u, 'proforma.sign')) {
+    const pend = s.proformas.filter((p) => pendingVersion(p));
+    const revs = pend.filter((p) => pendingRevision(p));
+    const first = pend.filter((p) => !pendingRevision(p));
+    if (revs.length)
+      add({ id: `pfrev-${revs.map((p) => p.id + pendingVersion(p)!.version).join(',')}`, level: 'orange', title: `${revs.length} demande(s) de modification de proforma à signer`, detail: revs.map((p) => `${p.id} v${pendingVersion(p)!.version}`).join(', '), to: `/proformas/${revs[0].id}` });
+    if (first.length)
+      add({ id: `pfsign-${first.map((p) => p.id + pendingVersion(p)!.version).join(',')}`, level: 'orange', title: `${first.length} proforma(s) déposée(s) à signer`, detail: first.map((p) => p.id).join(', '), to: '/proformas?statut=a_signer' });
   }
 
   // Logistique

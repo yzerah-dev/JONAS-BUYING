@@ -1386,3 +1386,35 @@ button.fw-doc.missing:hover { background: var(--red); color: #fff; }
 .pb-alert.green { background: var(--green-soft); color: var(--green); }
 .bk-stage.bk-blue .bk-ico { color: #2563eb; }
 .bk-stage.bk-blue .pf-week-head { background: linear-gradient(90deg, #e6efff, #f3f7ff); }
+
+/* Proforma déposée par le fournisseur : versions, signature et tampon */
+.pv-card .card-title { display: flex; align-items: center; gap: 8px; }
+.pv-alert { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: var(--orange-soft); color: var(--orange); font-weight: 700; font-size: 14px; margin-bottom: 10px; }
+.pv-list { display: grid; gap: 8px; }
+.pv-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; }
+.pv-row.annulee, .pv-row.remplacee, .pv-row.refusee { opacity: 0.75; }
+.pv-row.annulee .pv-info b { text-decoration: line-through; }
+.pv-num { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: var(--grey-soft); font-weight: 800; }
+.pv-row.signee .pv-num { background: var(--green-soft); color: var(--green); }
+.pv-row.a_signer .pv-num { background: var(--orange-soft); color: var(--orange); }
+.pv-info { display: grid; gap: 2px; min-width: 0; }
+.pv-info b { overflow-wrap: anywhere; }
+.pv-info small { font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 4px; }
+.pv-info small.green { color: var(--green); }
+.pv-info small.red { color: var(--red); }
+.pv-reason { color: var(--violet) !important; }
+.pv-form { display: grid; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
+.pv-form label { display: grid; gap: 4px; font-size: 13px; font-weight: 600; }
+.pv-file { position: relative; cursor: pointer; }
+.pv-file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+.pv-stamp-preview { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 18px; align-items: center; padding: 14px; border-radius: 12px; background: #fff; border: 1px solid var(--line); }
+.pv-stamp { display: grid; gap: 1px; padding: 8px 12px; border: 3px double #1d4ed8; color: #1d4ed8; transform: rotate(-3deg); text-align: left; }
+.pv-stamp b { font-size: 13px; letter-spacing: 0.04em; }
+.pv-stamp small { font-size: 11px; }
+.pv-sig { display: grid; gap: 2px; font-size: 12px; }
+.pv-sig i { font-family: 'Brush Script MT', 'Segoe Script', cursive; font-size: 24px; color: #0b1f73; }
+.linkish { background: none; border: 0; padding: 0; color: var(--green); font-weight: 700; text-decoration: underline; cursor: pointer; font: inherit; }
+@media (max-width: 640px) {
+  .pv-row { grid-template-columns: auto minmax(0, 1fr); }
+  .pv-row > .pill, .pv-row > .btn { grid-column: 2; justify-self: start; }
+}

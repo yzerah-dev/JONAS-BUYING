@@ -59,7 +59,7 @@ test.describe('Proformas et logistique', () => {
     await expect(toast(page)).toContainText('Demande de booking envoyée');
   });
 
-  test('signature des proformas à signer', async ({ page }) => {
+  test('signature des proformas à signer : la proforma déposée par le fournisseur', async ({ page }) => {
     await go(page, 'proformas');
     const chips = page.locator('.pf-chips');
     const count = async (label: string) => {
@@ -72,6 +72,9 @@ test.describe('Proformas et logistique', () => {
 
     await page.getByRole('button', { name: /^Signer \(/ }).click();
     await page.getByRole('button', { name: 'Signer maintenant' }).first().click();
+    await page.locator('#sg-etd').fill('2026-12-09');
+    await page.getByRole('button', { name: 'Signer et tamponner' }).click();
+    await expect(toast(page)).toContainText('signée et tamponnée');
     await expect.poll(() => count('À signer')).toBe(toSign - 1);
   });
 

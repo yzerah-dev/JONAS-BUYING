@@ -19,7 +19,7 @@ export default function PortalLayout() {
 }
 
 function PortalShell() {
-  const { user, supplier, packsToValidate, dieCutsRequested, bookingsToDo, bookingsToAccept, docsMissing } = usePortal();
+  const { user, supplier, packsToValidate, dieCutsRequested, bookingsToDo, bookingsToAccept, proformasToUpload, docsMissing } = usePortal();
   const { t, td, lang } = useT();
   const mainRef = useRef<HTMLElement>(null);
   useTableLabels(mainRef);
@@ -33,12 +33,12 @@ function PortalShell() {
     n.remove();
   }, [lang]);
   if (!isSupplier(user) || !supplier) return <Navigate to="/" replace />;
-  const todo = packsToValidate.length + dieCutsRequested.length + bookingsToDo.length + bookingsToAccept.length + docsMissing.length;
+  const todo = packsToValidate.length + dieCutsRequested.length + bookingsToDo.length + bookingsToAccept.length + proformasToUpload.length + docsMissing.length;
 
   const NAV = [
     { to: '/portail', label: t('nav.home'), icon: Home, end: true },
     { to: '/portail/produits', label: t('nav.products'), icon: Boxes },
-    { to: '/portail/proformas', label: t('nav.proformas'), icon: FileText },
+    { to: '/portail/proformas', label: t('nav.proformas'), icon: FileText, badge: proformasToUpload.length },
     { to: '/portail/packs', label: t('nav.packs'), icon: Package, badge: packsToValidate.length + dieCutsRequested.length },
     { to: '/portail/booking', label: t('nav.booking'), icon: CalendarCheck, badge: bookingsToDo.length + bookingsToAccept.length },
     { to: '/portail/chargement', label: t('nav.loading'), icon: Truck },

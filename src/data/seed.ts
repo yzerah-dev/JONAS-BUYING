@@ -1,5 +1,6 @@
 // Données de démonstration — chiffres et fournisseurs illustratifs.
 import type {
+  ProformaDoc,
   User,
   Brand,
   Container,
@@ -362,8 +363,9 @@ const pfDefs: PFDef[] = [
 ];
 
 const docsFor = (st: ProformaStatus) => {
-  const base = ['Proforma signée.pdf', 'Conditions d’achat.pdf'];
-  if (st === 'a_signer') return ['Proforma.pdf'];
+  // La proforma elle-même est déposée par le fournisseur (versions signées) : ici, les autres documents
+  const base = ['Conditions d’achat.pdf'];
+  if (st === 'a_signer') return base;
   if (['booke', 'en_transit', 'arrive'].includes(st)) base.push('Plan de chargement.xlsx', 'Booking confirmation.pdf');
   if (['en_transit', 'arrive'].includes(st)) base.push('BL.pdf', 'Commercial Invoice.pdf', 'Packing List.xlsx');
   return base;
@@ -668,6 +670,48 @@ export const users: User[] = [
     },
   };
   for (const c of containers.filter((x) => x.allocations.some((a) => a.proformaId === seoul.id))) c.status = 'booking_demande';
+}
+
+// Proformas déposées par les fournisseurs : v1 signée par JONAS (tampon + date d'expédition demandée),
+// modifications signées par la Direction (annulent la version précédente)
+{
+  const doc = (pf: (typeof proformas)[number], n: number, day: string, extra: Partial<ProformaDoc> = {}): ProformaDoc => ({
+    version: n,
+    fileId: `demo-${pf.id}-v${n}`,
+    name: n === 1 ? `${pf.id} Proforma Invoice.pdf` : `${pf.id} Proforma Invoice rev${n}.pdf`,
+    size: 46_000 + n * 3_100,
+    type: 'application/pdf',
+    uploadedAt: `${day}T03:20`,
+    uploadedBy: suppliers.find((x) => x.id === pf.supplierId)!.contact.name,
+    status: 'a_signer',
+    ...extra,
+  });
+  const sig = (day: string, etd: string, by = 'Yzerah', role = 'Pilote', replaces?: number) => ({ at: `${day}T10:05`, by, role, date: day, etdWanted: etd, replaces });
+  for (const pf of proformas) {
+    const up = addDays(pf.date, 1);
+    if (pf.status === 'a_signer') {
+      // PF-2026-0150 : le fournisseur n'a pas encore déposé sa proforma
+      if (pf.id !== 'PF-2026-0150') pf.versions = [doc(pf, 1, up)];
+      continue;
+    }
+    const signDay = addDays(pf.date, 2);
+    pf.versions = [doc(pf, 1, up, { status: 'signee', signature: sig(signDay, pf.etd) })];
+  }
+  // Horizon : date de production décalée, modification signée par la Direction (la v1 est annulée)
+  const horizon = proformas.find((p) => p.id === 'PF-2026-0148')!;
+  const h1 = horizon.versions![0];
+  const hDay = addDays(horizon.date, 12);
+  horizon.versions = [
+    { ...h1, status: 'annulee', cancelledBy: { version: 2, at: `${hDay}T11:40` } },
+    doc(horizon, 2, addDays(horizon.date, 11), {
+      reason: 'Production décalée d’une semaine (usine fermée Golden Week)',
+      status: 'signee',
+      signature: sig(hDay, horizon.etd, 'Direction', 'Direction', 1),
+    }),
+  ];
+  // Nova : demande de modification en attente de signature de la Direction
+  const nova = proformas.find((p) => p.id === 'PF-2026-0151')!;
+  nova.versions = [...nova.versions!, doc(nova, 2, '2026-11-13', { reason: 'Quantité CP-B112 portée à 60 000 pcs, prix unitaire ajusté' })];
 }
 
 // Suivi transitaire : bookings confirmés, dédouanement et livraisons des conteneurs déjà partis

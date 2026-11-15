@@ -154,6 +154,12 @@ export interface Proforma {
   balancePaid: boolean;
   balanceDue: ISODate;
   documents: string[];
+  /**
+   * Proforma déposée par le fournisseur, version par version.
+   * v1 : signée par JONAS (signature + tampon + date + date d'expédition demandée).
+   * v2+ : demande de modification du fournisseur, signée par la Direction ; elle annule la version signée précédente.
+   */
+  versions?: ProformaDoc[];
   history: HistoryEntry[];
   /** Demande de booking envoyée au fournisseur, et sa réponse (plan + dates réelles) */
   booking?: BookingRequest;
@@ -198,6 +204,39 @@ export interface BookingRequest {
   vessel?: string;
   cutoff?: ISODate;
   supplierNote?: string;
+}
+
+export type ProformaDocStatus = 'a_signer' | 'signee' | 'annulee' | 'refusee' | 'remplacee';
+
+export interface ProformaDoc {
+  version: number;
+  /** Clé du fichier dans le stockage (absent du stockage pour les données de démo : PDF régénéré) */
+  fileId: string;
+  name: string;
+  size: number;
+  type: string;
+  uploadedAt: string;
+  uploadedBy: string;
+  /** Motif de la demande de modification (v2+) */
+  reason?: string;
+  status: ProformaDocStatus;
+  signature?: ProformaSignature;
+  /** Annulée par la version n (signée le …) */
+  cancelledBy?: { version: number; at: string };
+  /** Refus de la demande de modification */
+  refused?: { at: string; by: string; reason: string };
+}
+
+export interface ProformaSignature {
+  at: string;
+  by: string;
+  /** Fonction du signataire (ex. « Direction ») */
+  role: string;
+  date: ISODate;
+  /** Date d'expédition demandée par JONAS, portée sur le tampon */
+  etdWanted: ISODate;
+  /** Version signée précédente que celle-ci annule et remplace */
+  replaces?: number;
 }
 
 export interface BookingProposal {
