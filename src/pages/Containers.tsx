@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Calendar, CalendarClock, Check, ChevronLeft, ChevronRight, Container as Ctn, FileText, Home, Mail, Phone, Search, Ship, Square, Truck, User, X } from 'lucide-react';
+import { Calendar, CalendarClock, Check, ChevronLeft, ChevronRight, Container as Ctn, FileText, Home, Mail, Phone, Search, Ship, Truck, User, X } from 'lucide-react';
 import {
   CONTAINER_STATUS_LABEL,
   byId,
@@ -19,7 +19,7 @@ import {
 } from '../data/store';
 import { CONTAINER_STATUSES, type Container, type ContainerStatus } from '../data/types';
 import ReceptionDialog from '../components/ReceptionDialog';
-import { pressable } from '../lib/a11y';
+import ContainerCard from '../components/ContainerCard';
 import { ContainerStatusPill, Kpi, Pill, ProductThumb, Progress, Seg, SupplierLogo } from '../components/ui';
 import { toast } from '../components/ui-shared';
 import { TODAY, addDays, dec, diffDays, eur, fshort, m3, monthKey, monthLabel, num, shiftMonth, weekKey, weekLabel, weekRange } from '../lib/format';
@@ -216,57 +216,17 @@ export default function Containers() {
                     <Pill color="red">⚠ {list.filter((c) => diffDays(c.etdPlanned, TODAY) < 21).length} urgent(s)</Pill>
                   )}
                 </div>
-                <div className="tbl-wrap">
-                  <table className="tbl">
-                    <thead>
-                      <tr>
-                        <th>{s === 'a_booker' ? 'N° prévision' : s === 'booking_demande' ? 'N° demande' : 'N° conteneur'}</th>
-                        <th>Fournisseur</th>
-                        <th>Proforma(s)</th>
-                        <th className="num">Qté</th>
-                        <th className="num">CBM</th>
-                        <th>ETD</th>
-                        <th>ETA</th>
-                        <th>{s === 'en_transit' ? 'Jours restants' : s === 'arrive' ? 'Réception' : 'Actions'}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {list.map((c) => {
-                        const sup = byId(state.suppliers, c.supplierId);
-                        const cbm = containerCbm(state, c);
-                        const left = diffDays(containerEta(c), TODAY);
-                        return (
-                          <tr key={c.id} className={`clickable ${sel?.id === c.id ? 'selected' : ''}`} {...pressable(() => select(c.id), `Conteneur ${c.number ?? c.id}`)}>
-                            <td>
-                              <div className="row" style={{ gap: 6 }}>
-                                <Square size={14} className="muted" />
-                                <span className="bold">{s === 'a_booker' ? c.id : s === 'booking_demande' ? c.bookingNo : c.number}</span>
-                              </div>
-                              {s !== 'a_booker' && s !== 'booking_demande' && <div className="xs muted">{c.bookingNo}</div>}
-                              {c.planRequested && <Pill color="orange">Plan demandé</Pill>}
-                              {c.planProposed && <Pill color="violet">Plan fournisseur à valider</Pill>}
-                            </td>
-                            <td>
-                              <div className="row" style={{ gap: 6 }}>
-                                <SupplierLogo supplier={sup} size={24} />
-                                <span className="small">{sup.shortName}</span>
-                              </div>
-                            </td>
-                            <td className="small">{containerProformas(c).join(', ') || '—'}</td>
-                            <td className="num">{num(containerQty(c))}</td>
-                            <td className="num">
-                              {dec(cbm, 1)}
-                              <div className="xs muted">{Math.round((cbm / containerCapacity(c)) * 100)} %</div>
-                            </td>
-                            <td className="small nowrap">
-                              {weekLabel(containerEtd(c))} – {fshort(containerEtd(c))}
-                              {c.etdReal && <div className="xs green">réel</div>}
-                            </td>
-                            <td className={`small nowrap ${c.etaRevised ? 'red bold' : ''}`}>
-                              {weekLabel(containerEta(c))} – {fshort(containerEta(c))}
-                              {c.etaRevised && !c.etaReal && <div className="xs">révisée (prévue {fshort(c.etaPlanned)})</div>}
-                            </td>
-                            <td onClick={(e) => e.stopPropagation()}>
+                <div className="ct-list">
+                  {list.map((c) => {
+                    return (
+                      <ContainerCard
+                        key={c.id}
+                        s={state}
+                        c={c}
+                        selected={sel?.id === c.id}
+                        onOpen={() => select(c.id)}
+                        actions={
+                          <>
                               {s === 'a_booker' && canBook && (
                                 <button
                                   className="btn primary sm"
@@ -296,19 +256,17 @@ export default function Containers() {
                               )}
                               {s === 'en_transit' && (
                                 <div className="row" style={{ gap: 4 }}>
-                                  <Pill color={left < 0 ? 'red' : left < 10 ? 'orange' : 'grey'}>{left < 0 ? `+${-left} j` : `J-${left}`}</Pill>
                                   {canBook && <button className="btn sm" onClick={() => setReceiving(c.id)}>
                                     Réceptionner
                                   </button>}
                                 </div>
                               )}
                               {s === 'arrive' && <Pill color="green">Réceptionné {fshort(c.receivedOn)}</Pill>}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                          </>
+                        }
+                      />
+                    );
+                  })}
                 </div>
               </div>
             );

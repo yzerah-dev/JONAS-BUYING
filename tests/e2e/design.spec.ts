@@ -102,6 +102,7 @@ test.describe('Espace Designer – réaffectation (administrateur)', () => {
   test('le designer peut trier mais ni glisser ni pousser en urgent', async ({ page }) => {
     await loginAs(page, 'Léa');
     await go(page, 'design');
+    await expect(page.locator('.pk-plan')).toBeVisible({ timeout: 15000 });
     await expect(page.locator('#pk-sort option')).toContainText(['Priorité', 'Marque', 'Collection', 'Type de pack', 'Échéance']);
     await expect(page.locator('.pk-row').first()).toBeVisible();
     await expect(page.locator('.pk-row.draggable')).toHaveCount(0);
