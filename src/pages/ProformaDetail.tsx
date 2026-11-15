@@ -709,6 +709,11 @@ function ContainerPanel({ c, index, portal }: { c: Container; index: number; por
       </div>
       {ratio > 1 && <div className="pill red mb">{t('cp.over')}</div>}
       <div className="row wrap mb">
+        {c.loading && (
+          <Pill color={c.loading.status === 'validated' ? 'green' : 'orange'}>
+            {t(c.loading.status === 'validated' ? 'cp.loadingOk' : 'cp.loadingWait', { date: fmt.fshort(c.loading.date) })}
+          </Pill>
+        )}
         {c.planRequested && <Pill color="orange">{t('cp.planRequested')}</Pill>}
         {c.planProposed && <Pill color="violet">{t('cp.planProposed')}</Pill>}
         {c.planValidated && <Pill color="green" icon={<Check size={12} />}>{t('cp.planValidated')}</Pill>}
@@ -771,12 +776,23 @@ function ContainerPanel({ c, index, portal }: { c: Container; index: number; por
             <Send size={16} /> {t('cp.request')}
           </button>
         )}
-        {c.status === 'a_booker' && !c.planValidated && auth.can('logistics.plan') && (
+        {['a_booker', 'booking_demande', 'booke'].includes(c.status) && !c.planValidated && auth.can('logistics.plan') && (
           <button className="btn" disabled={!c.allocations.length} onClick={() => dispatch({ type: 'validatePlan', containerId: c.id })}>
             <Check size={16} /> {c.planProposed ? t('cp.validateProposed') : t('cp.validate')}
           </button>
         )}
-        {auth.allowed({ type: 'proposePlan', containerId: c.id }) && (
+        {auth.allowed({ type: 'acceptPlan', containerId: c.id }) && (
+          <button
+            className="btn"
+            onClick={() => {
+              dispatch({ type: 'acceptPlan', containerId: c.id });
+              toast(t('cp.acceptToast'));
+            }}
+          >
+            <Check size={16} /> {t('cp.accept')}
+          </button>
+        )}
+        {auth.allowed({ type: 'proposePlan', containerId: c.id }) && (c.planEdited || c.planProposed || !c.planRequested) && (
           <button
             className="btn primary"
             disabled={!c.allocations.length || ratio > 1 || c.planProposed}
@@ -791,7 +807,8 @@ function ContainerPanel({ c, index, portal }: { c: Container; index: number; por
         {c.status === 'a_booker' && auth.can('logistics.booking') && (
           <button
             className="btn primary"
-            disabled={!c.allocations.length || ratio > 1}
+            title={c.loading?.status === 'validated' ? undefined : t('cp.needDate')}
+            disabled={!c.allocations.length || ratio > 1 || !auth.allowed({ type: 'requestBooking', containerId: c.id })}
             onClick={() => {
               dispatch({ type: 'requestBooking', containerId: c.id });
               toast(t('cp.bookingToast'));

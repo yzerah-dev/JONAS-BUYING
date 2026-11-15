@@ -484,6 +484,7 @@ const containerPlan: [string, number, ContainerStatus][] = [
   ['PF-2026-0141', 1, 'booke'],
   ['PF-2026-0145', 1, 'booking_demande'],
   ['PF-2026-0143', 0.8, 'a_booker'],
+  ['PF-2026-0148', 0.75, 'a_booker'],
 ];
 
 export const containers: Container[] = containerPlan.flatMap(([pfId, cov, st]) =>
@@ -577,8 +578,35 @@ export const users: User[] = [
   })),
 ];
 
-// Un plan de chargement demandé au fournisseur pour la démo du portail
+// Booking en deux circuits parallèles :
+//  1. date de chargement proposée par JONAS → validée (ou changée) par le fournisseur → demande du container à la compagnie
+//  2. plan de chargement envoyé par JONAS → validé tel quel ou modifié par le fournisseur (→ revu par JONAS)
 {
-  const c = containers.find((x) => x.status === 'a_booker');
-  if (c) c.planRequested = true;
+  containers.forEach((c) => {
+    if (c.status === 'a_booker') return;
+    const date = addDays(c.etdPlanned, -6);
+    c.loading = { date, status: 'validated', proposedBy: 'Logistique', proposedAt: `${addDays(date, -20)}T10:00`, validatedAt: `${addDays(date, -18)}T08:40` };
+    c.planValidatedBy = 'fournisseur';
+  });
+  const open = containers.filter((x) => x.status === 'a_booker');
+  // K-Beauty (Seoul) : date validée par le fournisseur (qui l'a décalée), plan envoyé en attente de sa réponse
+  const seoul = open.find((x) => x.supplierId === 'seoul');
+  if (seoul) {
+    seoul.planRequested = true;
+    seoul.loading = {
+      date: addDays(seoul.etdPlanned, -5),
+      initialDate: addDays(seoul.etdPlanned, -8),
+      status: 'validated',
+      proposedBy: 'Logistique',
+      proposedAt: '2026-11-09T09:20',
+      validatedAt: '2026-11-12T03:15',
+    };
+    seoul.dateHistory.push({ date: '2026-11-12', user: 'Ms. Park', text: `Date de chargement changée par le fournisseur : ${seoul.loading.initialDate} → ${seoul.loading.date}` });
+  }
+  // Mobilier jardin (Horizon) : une date proposée en attente du fournisseur, un conteneur encore à lancer
+  const horizon = open.filter((x) => x.supplierId === 'horizon');
+  if (horizon[0]) {
+    horizon[0].loading = { date: addDays(horizon[0].etdPlanned, -6), status: 'proposed', proposedBy: 'Logistique', proposedAt: '2026-11-10T14:05' };
+    horizon[0].planRequested = true;
+  }
 }

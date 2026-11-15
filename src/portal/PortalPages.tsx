@@ -16,6 +16,7 @@ import {
 } from '../data/store';
 import { BrandLogo, ContainerStatusPill, Kpi, PackPill, Pill, ProductThumb, ProformaStatusPill, Ring, Seg, ValidationCircuit } from '../components/ui';
 import { toast } from '../components/ui-shared';
+import type { Container } from '../data/types';
 import { LogisticsTab } from '../pages/ProformaDetail';
 import { TODAY } from '../lib/format';
 import { useT } from '../i18n';
@@ -23,7 +24,7 @@ import { usePortal } from './usePortal';
 
 // ---------------------------------------------------------------------------
 export function PortalHome() {
-  const { state, supplier, user, products, proformas, containers, packsToValidate, dieCutsRequested, plansRequested, docsMissing } = usePortal();
+  const { state, supplier, user, products, proformas, containers, packsToValidate, dieCutsRequested, plansRequested, datesToConfirm, docsMissing } = usePortal();
   const pays = payments(state).filter((p) => p.supplierId === supplier!.id);
   const nextPay = pays.find((p) => !p.paid);
   const amount = proformas.reduce((s, p) => s + proformaTotals(state, p).amount, 0);
@@ -34,6 +35,7 @@ export function PortalHome() {
   const todo: { to: string; icon: React.ReactNode; text: string; n: number }[] = [
     { to: '/portail/packs', icon: <Package size={16} className="orange" />, text: tr('home.todo.packs'), n: packsToValidate.length },
     { to: '/portail/packs?vue=diecut', icon: <Scissors size={16} className="orange" />, text: tr('home.todo.diecuts'), n: dieCutsRequested.length },
+    { to: '/portail/chargement', icon: <Calendar size={16} className="orange" />, text: tr('home.todo.dates'), n: datesToConfirm.length },
     { to: '/portail/chargement', icon: <Truck size={16} className="orange" />, text: tr('home.todo.plans'), n: plansRequested.length },
     { to: '/portail/conteneurs', icon: <FileText size={16} className="red" />, text: tr('home.todo.docs'), n: docsMissing.length },
   ];
@@ -413,7 +415,7 @@ export function PortalPacks() {
 
 // ---------------------------------------------------------------------------
 export function PortalLoading() {
-  const { proformas, plansRequested } = usePortal();
+  const { proformas, plansRequested, datesToConfirm } = usePortal();
   const open = proformas.filter((p) => !['en_transit', 'arrive'].includes(p.status));
   const [params, setParams] = useSearchParams();
   const requestedPf = plansRequested.flatMap((c) => containerProformas(c))[0];
@@ -429,6 +431,19 @@ export function PortalLoading() {
         <h1>{t('loading.title')}</h1>
         <span className="page-sub">{t('loading.sub')}</span>
       </div>
+      {datesToConfirm.length > 0 && (
+        <div className="card pad mb ld-card">
+          <div className="card-title">
+            <Calendar size={18} className="orange" /> {t('loading.dates')}
+          </div>
+          <p className="small muted" style={{ marginTop: 0 }}>
+            {t('loading.datesSub')}
+          </p>
+          {datesToConfirm.map((c) => (
+            <LoadingDateRow key={c.id} c={c} />
+          ))}
+        </div>
+      )}
       {plansRequested.length > 0 && (
         <div className="card pad mb row wrap" style={{ borderColor: 'var(--orange)' }}>
           <AlertTriangle className="orange" />
@@ -571,5 +586,62 @@ export function PortalFinance() {
         </table>
       </div>
     </>
+  );
+}
+
+/** Le fournisseur confirme la date de chargement proposée par JONAS, ou en donne une autre */
+function LoadingDateRow({ c }: { c: Container }) {
+  const { state, dispatch } = usePortal();
+  const { t, td, fmt } = useT();
+  const { fdate, weekLabel, num } = fmt;
+  const [other, setOther] = useState(false);
+  const [date, setDate] = useState(c.loading!.date);
+  const main = [...c.allocations].sort((a, b) => b.qty - a.qty)[0];
+  const p = main ? byId(state.products, main.productId) : undefined;
+  const answer = (d: string) => {
+    dispatch({ type: 'answerLoadingDate', containerId: c.id, date: d });
+    toast(d === c.loading!.date ? t('loading.dateOk') : t('loading.dateChanged', { date: fdate(d) }));
+  };
+  return (
+    <div className="ld-row">
+      <div className="ld-ctn">
+        {p && <ProductThumb product={p} size={40} />}
+        <div>
+          <b>{c.id}</b>
+          <small>
+            {p ? td(p.name) : '—'} · {num(containerQty(c))} pcs · {containerProformas(c).join(', ')}
+          </small>
+        </div>
+      </div>
+      <div className="ld-date">
+        <small>{t('loading.proposed')}</small>
+        <b>{fdate(c.loading!.date)}</b>
+        <span>
+          {t('col.etd')} {weekLabel(c.etdPlanned)}
+        </span>
+      </div>
+      <div className="ld-actions">
+        {other ? (
+          <>
+            <input className="input" type="date" aria-label={t('loading.otherDate')} value={date} onChange={(e) => setDate(e.target.value)} />
+            <button className="btn sm primary" disabled={!date} onClick={() => answer(date)}>
+              <Check size={14} /> {t('loading.send')}
+            </button>
+            <button className="btn sm ghost" onClick={() => setOther(false)} aria-label={t('loading.cancel')}>
+              <X size={14} />
+            </button>
+          </>
+        ) : (
+          <>
+            <button className="btn sm" onClick={() => setOther(true)}>
+              <Calendar size={14} /> {t('loading.other')}
+            </button>
+            <button className="btn sm primary" onClick={() => answer(c.loading!.date)}>
+              <Check size={14} /> {t('loading.confirm')}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
   );
 }

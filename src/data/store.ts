@@ -41,7 +41,7 @@ export const DEFAULT_SETTINGS: Settings = {
   fx: { EUR: 1, USD: 0.93, CNY: 0.128 },
 };
 
-export const STORAGE_KEY = 'jonas-buying-state-v7';
+export const STORAGE_KEY = 'jonas-buying-state-v8';
 
 export const currentUser = (s: State): User => s.users.find((u) => u.id === s.currentUserId) ?? s.users[0];
 
@@ -95,6 +95,9 @@ export type Action =
   | { type: 'deallocate'; containerId: string; proformaId: string; productId: string }
   | { type: 'createContainer'; supplierId: string; etd: ISODate; eta: ISODate }
   | { type: 'validatePlan'; containerId: string }
+  | { type: 'acceptPlan'; containerId: string }
+  | { type: 'proposeLoadingDate'; containerId: string; date: ISODate }
+  | { type: 'answerLoadingDate'; containerId: string; date: ISODate }
   | { type: 'requestBooking'; containerId: string; forwarder?: Forwarder; etdWanted?: ISODate }
   | { type: 'confirmBooking'; containerId: string; bookingNo?: string; carrier?: string; vessel?: string; cutoff?: ISODate; etd?: ISODate }
   | { type: 'remindBooking'; containerId: string }
@@ -167,9 +170,8 @@ const ACTION_PERM: Partial<Record<Action['type'], Perm>> = {
   uploadArtwork: 'pack.design',
   forwardPack: 'pack.design',
   createContainer: 'logistics.plan',
-  validatePlan: 'logistics.plan',
   requestPlan: 'logistics.plan',
-  requestBooking: 'logistics.booking',
+  proposeLoadingDate: 'logistics.booking',
   confirmBooking: 'logistics.booking',
   ship: 'logistics.booking',
   receive: 'logistics.booking',
@@ -192,8 +194,10 @@ const ACTION_PERM: Partial<Record<Action['type'], Perm>> = {
 /** Conteneur modifiable par un fournisseur : le sien, pas encore booké, plan non validé */
 function supplierOwnsOpenContainer(s: State, u: User, containerId: string) {
   const c = s.containers.find((x) => x.id === containerId);
-  return !!c && c.supplierId === u.supplierId && c.status === 'a_booker' && !c.planValidated;
+  return !!c && c.supplierId === u.supplierId && OPEN_STATUSES.includes(c.status) && !c.planValidated;
 }
+/** Le plan de chargement suit son propre circuit, en parallèle de la demande de container */
+const OPEN_STATUSES: Container['status'][] = ['a_booker', 'booking_demande', 'booke'];
 
 export function isAllowed(s: State, a: Action): boolean {
   const u = currentUser(s);
@@ -233,6 +237,25 @@ export function isAllowed(s: State, a: Action): boolean {
       return can(u, 'logistics.plan');
     case 'proposePlan':
       return isSupplier(u) ? supplierOwnsOpenContainer(s, u, a.containerId) : false;
+    case 'acceptPlan': {
+      // Le fournisseur valide tel quel le plan envoyé par JONAS
+      const c = s.containers.find((x) => x.id === a.containerId);
+      return isSupplier(u) && supplierOwnsOpenContainer(s, u, a.containerId) && !!c?.planRequested && !c.planProposed && !c.planEdited && c.allocations.length > 0;
+    }
+    case 'answerLoadingDate': {
+      // Le fournisseur confirme la date proposée ou en donne une autre
+      const c = s.containers.find((x) => x.id === a.containerId);
+      return isSupplier(u) && !!c && c.supplierId === u.supplierId && c.status === 'a_booker' && c.loading?.status === 'proposed';
+    }
+    case 'requestBooking': {
+      // Pas de demande de container à la compagnie sans date de chargement validée par le fournisseur
+      const c = s.containers.find((x) => x.id === a.containerId);
+      return can(u, 'logistics.booking') && !!c && c.status === 'a_booker' && c.loading?.status === 'validated';
+    }
+    case 'validatePlan': {
+      const c = s.containers.find((x) => x.id === a.containerId);
+      return can(u, 'logistics.plan') && !!c && OPEN_STATUSES.includes(c.status) && !c.planValidated;
+    }
     case 'addContainerDoc': {
       const c = s.containers.find((x) => x.id === a.containerId);
       if (isSupplier(u)) return !!c && c.supplierId === u.supplierId;
@@ -279,8 +302,37 @@ function applyAction(s: State, a: Action): State {
         ...c,
         planProposed: true,
         planRequested: false,
-        dateHistory: [...c.dateHistory, hist(me, 'Plan de chargement proposé par le fournisseur')],
+        planEdited: false,
+        dateHistory: [...c.dateHistory, hist(me, 'Plan de chargement modifié par le fournisseur')],
       }));
+    case 'acceptPlan':
+      return mapC(s, a.containerId, (c) => ({
+        ...c,
+        planValidated: true,
+        planRequested: false,
+        planProposed: false,
+        planValidatedBy: 'fournisseur',
+        planEdited: false,
+        dateHistory: [...c.dateHistory, hist(me, 'Plan de chargement validé tel quel par le fournisseur')],
+      }));
+    case 'proposeLoadingDate':
+      return mapC(s, a.containerId, (c) => ({
+        ...c,
+        loading: { date: a.date, status: 'proposed', proposedAt: nowStamp(), proposedBy: me },
+        dateHistory: [...c.dateHistory, hist(me, `Date de chargement proposée au fournisseur : ${a.date}`)],
+      }));
+    case 'answerLoadingDate':
+      return mapC(s, a.containerId, (c) => {
+        const changed = a.date !== c.loading!.date;
+        return {
+          ...c,
+          loading: { ...c.loading!, date: a.date, status: 'validated', validatedAt: nowStamp(), initialDate: changed ? c.loading!.date : undefined },
+          dateHistory: [
+            ...c.dateHistory,
+            hist(me, changed ? `Date de chargement changée par le fournisseur : ${c.loading!.date} → ${a.date}` : `Date de chargement validée par le fournisseur : ${a.date}`),
+          ],
+        };
+      });
     case 'addContainerDoc':
       return mapC(s, a.containerId, (c) => ({
         ...c,
@@ -337,7 +389,7 @@ function applyAction(s: State, a: Action): State {
         const allocations = existing
           ? c.allocations.map((x) => (x === existing ? { ...x, qty: x.qty + a.qty } : x))
           : [...c.allocations, { proformaId: a.proformaId, productId: a.productId, qty: a.qty }];
-        return { ...c, allocations, planValidated: false };
+        return { ...c, allocations, planValidated: false, planEdited: c.planEdited || isSupplier(currentUser(s)) };
       });
       return syncProformaStatuses(next);
     }
@@ -345,6 +397,7 @@ function applyAction(s: State, a: Action): State {
       return mapC(s, a.containerId, (c) => ({
         ...c,
         planValidated: false,
+        planEdited: c.planEdited || isSupplier(currentUser(s)),
         allocations: c.allocations.filter((x) => !(x.proformaId === a.proformaId && x.productId === a.productId)),
       }));
     case 'createContainer': {
@@ -369,14 +422,21 @@ function applyAction(s: State, a: Action): State {
       return { ...s, containers: [...s.containers, c] };
     }
     case 'validatePlan':
-      return mapC(s, a.containerId, (c) => ({ ...c, planValidated: true, planProposed: false, planRequested: false, dateHistory: [...c.dateHistory, hist(me, 'Plan de chargement validé')] }));
+      return mapC(s, a.containerId, (c) => ({
+        ...c,
+        planValidated: true,
+        planProposed: false,
+        planRequested: false,
+        planValidatedBy: 'jonas',
+        planEdited: false,
+        dateHistory: [...c.dateHistory, hist(me, c.planProposed ? 'Modifications du fournisseur validées' : 'Plan de chargement validé')],
+      }));
     case 'requestBooking': {
       return mapC(s, a.containerId, (c) => {
         const fwd = a.forwarder ?? c.forwarder ?? 'Logfret';
         return {
           ...c,
           status: 'booking_demande',
-          planValidated: true,
           forwarder: fwd,
           booking: { reminders: [], ...(c.booking ?? {}), requestedAt: nowStamp(), requestedBy: me, etdWanted: a.etdWanted ?? c.etdPlanned },
           dateHistory: [...c.dateHistory, hist(me, `Demande de booking envoyée à ${fwd}${a.etdWanted ? ` · départ souhaité ${a.etdWanted}` : ''}`)],
@@ -586,7 +646,15 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
     case 'requestPlan':
       return { target: ctn(a.containerId), text: 'Plan de chargement demandé au fournisseur' };
     case 'proposePlan':
-      return { target: ctn(a.containerId), text: 'Plan de chargement proposé' };
+      return { target: ctn(a.containerId), text: 'Plan de chargement modifié par le fournisseur' };
+    case 'acceptPlan':
+      return { target: ctn(a.containerId), text: 'Plan de chargement validé par le fournisseur' };
+    case 'proposeLoadingDate':
+      return { target: ctn(a.containerId), text: `Date de chargement proposée : ${a.date}` };
+    case 'answerLoadingDate': {
+      const prev = s.containers.find((c) => c.id === a.containerId)?.loading?.date;
+      return { target: ctn(a.containerId), text: prev && prev !== a.date ? `Date de chargement changée par le fournisseur : ${a.date}` : `Date de chargement validée : ${a.date}` };
+    }
     case 'addContainerDoc':
       return { target: ctn(a.containerId), text: `Document déposé : ${a.doc}` };
     case 'requestBooking':

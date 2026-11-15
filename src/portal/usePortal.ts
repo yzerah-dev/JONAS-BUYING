@@ -12,9 +12,11 @@ export function usePortal() {
 
   const packsToValidate = products.filter((p) => p.pack.sentToSupplier && p.pack.validations.fournisseur.state === 'pending' && !packDone(p));
   const dieCutsRequested = products.filter((p) => p.pack.dieCut === 'requested');
-  const plansRequested = containers.filter((c) => c.planRequested && c.status === 'a_booker');
+  const plansRequested = containers.filter((c) => c.planRequested && !c.planValidated && ['a_booker', 'booking_demande', 'booke'].includes(c.status));
+  /** Dates de chargement proposées par JONAS, à confirmer ou changer */
+  const datesToConfirm = containers.filter((c) => c.status === 'a_booker' && c.loading?.status === 'proposed');
   const REQUIRED_DOCS = ['BL.pdf', 'Invoice.pdf', 'Packing List.xlsx'];
   const docsMissing = containers.filter((c) => ['booke', 'en_transit'].includes(c.status) && REQUIRED_DOCS.some((d) => !c.documents.includes(d)));
 
-  return { state, dispatch, user, supplier, products, proformas, containers, packsToValidate, dieCutsRequested, plansRequested, docsMissing, REQUIRED_DOCS };
+  return { state, dispatch, user, supplier, products, proformas, containers, packsToValidate, dieCutsRequested, plansRequested, datesToConfirm, docsMissing, REQUIRED_DOCS };
 }

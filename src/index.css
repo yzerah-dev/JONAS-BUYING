@@ -1211,23 +1211,59 @@ th.pk-drop { background: var(--green-softer); border-radius: 10px; }
 .bk-info span { font-size: 12px; color: var(--ink-2); }
 .bk-actions { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
 .bk-dialog { width: min(560px, 100%); }
+.bk-row:has(.bk-tracks) { grid-template-columns: minmax(0, 1.5fr) minmax(0, 0.9fr) auto minmax(320px, 2.6fr) auto; }
+.bk-tracks { display: grid; gap: 8px; min-width: 0; }
+.bk-track { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.bk-track > div { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; flex: 1; }
+.bk-track small { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted); }
+.bk-track b { font-size: 14px; font-weight: 800; }
+.bk-track span:not(.bk-step) { font-size: 12px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bk-track .btn { flex-shrink: 0; }
+.bk-step { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 800; flex-shrink: 0; background: var(--grey-soft); color: var(--muted); }
+.bk-t-green .bk-step { background: var(--green); color: #fff; }
+.bk-t-green b { color: var(--green); }
+.bk-t-orange .bk-step { background: #fff1e0; color: var(--orange); box-shadow: inset 0 0 0 2px var(--orange); }
+.bk-t-orange b { color: var(--orange); }
+.bk-t-violet .bk-step { background: #efe9fd; color: var(--violet); box-shadow: inset 0 0 0 2px var(--violet); }
+.bk-t-violet b { color: var(--violet); }
+.bk-chip { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--grey-soft); color: var(--ink-2); }
+.bk-chip.bk-t-orange { background: #fff1e0; color: var(--orange); }
+.bk-chip.bk-t-violet { background: #efe9fd; color: var(--violet); }
+.ld-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+.ld-ctn { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.ld-ctn > div, .ld-date { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.ld-ctn small { font-size: 12px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ld-date small { font-size: 11px; color: var(--muted); }
+.ld-date b { font-size: 16px; color: var(--orange); }
+.ld-date span { font-size: 12px; color: var(--muted); }
+.ld-actions { display: flex; gap: 6px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
+.ld-actions .input { width: 160px; }
+@media (max-width: 720px) {
+  .ld-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .ld-ctn, .ld-actions { grid-column: 1 / -1; }
+  .ld-actions { justify-content: flex-start; }
+}
+.bk-ok { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 10px; background: #e7f6ec; color: var(--green); font-size: 14px; }
 .bk-form { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 14px 18px; }
 .bk-form label { display: grid; gap: 4px; font-size: 13px; font-weight: 600; }
 .bk-form p { grid-column: 1 / -1; margin: 0; }
 @media (max-width: 1350px) {
-  .bk-row { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) auto; }
-  .bk-info { grid-column: 1 / 3; }
+  .bk-row, .bk-row:has(.bk-tracks) { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) auto; }
+  .bk-info, .bk-tracks { grid-column: 1 / 3; }
 }
 @media (max-width: 820px) {
   .bk-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .bk-fwd { display: grid !important; grid-template-columns: repeat(3, 1fr); width: 100%; }
   .bk-fwd button { height: 40px; font-size: 13px; padding: 0 4px; justify-content: center; }
   .bk-fwd button + button { border-radius: 12px; }
-  .bk-row { grid-template-columns: minmax(0, 1fr) auto; gap: 8px 10px; padding: 12px 2px; }
+  .bk-row, .bk-row:has(.bk-tracks) { grid-template-columns: minmax(0, 1fr) auto; gap: 8px 10px; padding: 12px 2px; }
   .bk-ctn { grid-column: 1 / -1; }
   .bk-sup { grid-column: 1; }
   .bk-who { grid-column: 2; align-items: flex-end; }
-  .bk-info { grid-column: 1 / -1; }
+  .bk-info, .bk-tracks { grid-column: 1 / -1; }
+  .bk-track { flex-wrap: wrap; row-gap: 6px; }
+  .bk-track > div { flex-basis: calc(100% - 36px); }
+  .bk-track .btn { margin-left: 36px; }
   .bk-actions { grid-column: 1 / -1; justify-content: flex-start; }
   .bk-form { grid-template-columns: 1fr; }
 }

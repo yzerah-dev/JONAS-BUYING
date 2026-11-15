@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { Anchor, Ban, BellRing, CalendarCheck, CalendarClock, CalendarPlus, Check, ChevronDown, ChevronUp, Search, Send, Ship, X } from 'lucide-react';
+import { Anchor, Ban, BellRing, CalendarCheck, CalendarClock, CalendarPlus, Check, ChevronDown, ChevronUp, ClipboardList, Search, Send, Ship, X } from 'lucide-react';
 import { byId, containerCbm, containerEtd, containerProformas, containerQty, useAuth, useStore, type State } from '../data/store';
 import { FORWARDERS, type Container, type Forwarder } from '../data/types';
 import { ProductThumb, SupplierLogo } from '../components/ui';
@@ -8,6 +8,7 @@ import { toast } from '../components/ui-shared';
 import { CarrierBadge, ForwarderBadge } from '../components/ContainerCard';
 import { TODAY, addDays, dec, diffDays, fdate, fshort, fstamp, num, weekLabel } from '../lib/format';
 import { pressable } from '../lib/a11y';
+import { loadingTrack, planTrack, type TrackState } from '../data/tracks';
 
 const CARRIERS = ['MSC', 'CMA CGM', 'Maersk', 'COSCO', 'Hapag-Lloyd'];
 /** Au-delà de ce délai sans réponse du transitaire, la demande est à relancer */
@@ -21,12 +22,28 @@ function mainProduct(s: State, c: Container) {
   return { p: top ? byId(s.products, top.productId) : undefined, refs: new Set(c.allocations.map((a) => a.productId)).size };
 }
 
-type Dialog = { mode: 'request' | 'confirm'; c: Container } | null;
+type Mode = 'request' | 'confirm' | 'date';
+type Dialog = { mode: Mode; c: Container } | null;
+
+function Track({ n, label, t, children }: { n: number; label: string; t: TrackState; children?: ReactNode }) {
+  return (
+    <div className={`bk-track bk-t-${t.tone}`}>
+      <span className="bk-step">{t.tone === 'green' ? <Check size={14} strokeWidth={3} /> : n}</span>
+      <div>
+        <small>{label}</small>
+        <b>{t.title}</b>
+        <span>{t.detail}</span>
+      </div>
+      {children}
+    </div>
+  );
+}
 
 export default function Booking() {
   const { state, dispatch } = useStore();
   const auth = useAuth();
   const canBook = auth.can('logistics.booking');
+  const canPlan = auth.can('logistics.plan');
   const [q, setQ] = useState('');
   const [fwd, setFwd] = useState<'all' | Forwarder>('all');
   const [dialog, setDialog] = useState<Dialog>(null);
@@ -42,7 +59,11 @@ export default function Booking() {
       });
   }, [state, q, fwd]);
 
-  const toRequest = list.filter((c) => c.status === 'a_booker').sort((a, b) => a.etdPlanned.localeCompare(b.etdPlanned));
+  // Prêts à demander (date validée) d'abord, puis par date de départ
+  const ready = (c: Container) => (c.loading?.status === 'validated' ? 0 : 1);
+  const toRequest = list.filter((c) => c.status === 'a_booker').sort((a, b) => ready(a) - ready(b) || a.etdPlanned.localeCompare(b.etdPlanned));
+  const readyCount = toRequest.filter((c) => !ready(c)).length;
+  const waitSupplier = toRequest.filter((c) => c.loading?.status === 'proposed' || c.planRequested || c.planProposed).length;
   const waiting = list.filter((c) => c.status === 'booking_demande').sort((a, b) => waitDays(b) - waitDays(a));
   const confirmed = list.filter((c) => c.status === 'booke').sort((a, b) => containerEtd(a).localeCompare(containerEtd(b)));
   const gone = list.filter((c) => (c.status === 'en_transit' || c.status === 'arrive') && c.booking?.confirmedAt);
@@ -71,9 +92,11 @@ export default function Booking() {
 
       <div className="bk-kpis">
         <div className="kpi-box">
-          <small>À demander</small>
+          <small>En préparation</small>
           <b>{toRequest.length}</b>
-          <span className={urgentRequest ? 'red' : ''}>{urgentRequest ? `${urgentRequest} départ(s) sous 3 semaines` : 'Rien d’urgent'}</span>
+          <span className={urgentRequest ? 'red' : ''}>
+            {readyCount} prêt(s) à demander{urgentRequest ? ` · ${urgentRequest} départ(s) < 3 sem.` : ''}
+          </span>
         </div>
         <div className="kpi-box">
           <small>En attente du transitaire</small>
@@ -113,25 +136,72 @@ export default function Booking() {
         </div>
       </div>
 
-      <Stage icon={<CalendarPlus size={34} strokeWidth={1.8} />} tone="orange" title="À demander" sub="Plan de chargement prêt : demander le booking au transitaire" items={toRequest}>
-        {toRequest.map((c) => (
-          <Row key={c.id} s={state} c={c}>
-            <div className="bk-info">
-              <small>Départ prévu</small>
-              <b className={diffDays(c.etdPlanned, TODAY) < 21 ? 'red' : ''}>
-                {fshort(c.etdPlanned)} · {weekLabel(c.etdPlanned)}
-              </b>
-              <span>J-{Math.max(0, diffDays(c.etdPlanned, TODAY))}</span>
-            </div>
-            <div className="bk-actions">
-              {canBook && (
-                <button className="btn sm primary" disabled={!c.allocations.length} onClick={() => setDialog({ mode: 'request', c })}>
-                  <Send size={14} /> Demander le booking
-                </button>
-              )}
-            </div>
-          </Row>
-        ))}
+      <Stage
+        icon={<CalendarPlus size={34} strokeWidth={1.8} />}
+        tone="orange"
+        title="En préparation"
+        sub={`Date de chargement et plan validés avec le fournisseur${waitSupplier ? ` · ${waitSupplier} en attente de sa réponse` : ''}`}
+        items={toRequest}
+      >
+        {toRequest.map((c) => {
+          const dateOk = c.loading?.status === 'validated';
+          const plan = planTrack(c);
+          return (
+            <Row key={c.id} s={state} c={c}>
+              <div className="bk-tracks">
+                <Track n={1} label="Date de chargement" t={loadingTrack(c)}>
+                  {canBook && !dateOk && (
+                    <button className="btn sm" onClick={() => setDialog({ mode: 'date', c })}>
+                      <CalendarPlus size={14} /> {c.loading ? 'Modifier' : 'Proposer une date'}
+                    </button>
+                  )}
+                </Track>
+                <Track n={2} label="Plan de chargement" t={plan}>
+                  {canPlan && plan.tone === 'grey' && (
+                    <button
+                      className="btn sm"
+                      disabled={!c.allocations.length}
+                      onClick={() => {
+                        dispatch({ type: 'requestPlan', containerId: c.id });
+                        toast('Plan de chargement envoyé au fournisseur');
+                      }}
+                    >
+                      <ClipboardList size={14} /> Envoyer le plan
+                    </button>
+                  )}
+                  {canPlan && plan.tone === 'violet' && (
+                    <>
+                      <Link className="btn sm ghost" to={`/conteneurs?c=${c.id}`}>
+                        Revoir
+                      </Link>
+                      <button
+                        className="btn sm primary"
+                        onClick={() => {
+                          dispatch({ type: 'validatePlan', containerId: c.id });
+                          toast('Modifications du fournisseur validées');
+                        }}
+                      >
+                        <Check size={14} /> Valider les modifications
+                      </button>
+                    </>
+                  )}
+                </Track>
+              </div>
+              <div className="bk-actions">
+                {canBook && (
+                  <button
+                    className="btn sm primary"
+                    disabled={!auth.allowed({ type: 'requestBooking', containerId: c.id }) || !c.allocations.length}
+                    title={dateOk ? 'Demander le container à la compagnie via le transitaire' : 'Attendre la date de chargement validée par le fournisseur'}
+                    onClick={() => setDialog({ mode: 'request', c })}
+                  >
+                    <Send size={14} /> Demander le container
+                  </button>
+                )}
+              </div>
+            </Row>
+          );
+        })}
       </Stage>
 
       <Stage icon={<CalendarClock size={34} strokeWidth={1.8} />} tone="violet" title="Demandes envoyées" sub="En attente de confirmation du transitaire" items={waiting}>
@@ -296,13 +366,14 @@ function Row({ s, c, children, showCarrier }: { s: State; c: Container; children
       <div className="bk-who">
         <ForwarderBadge forwarder={c.forwarder} />
         {showCarrier && <CarrierBadge carrier={c.carrier} />}
+        {c.status !== 'a_booker' && !c.planValidated && <span className={`bk-chip bk-t-${planTrack(c).tone}`}>Plan : {planTrack(c).title.toLowerCase()}</span>}
       </div>
       {children}
     </div>
   );
 }
 
-function BookingDialog({ mode, c, onClose }: { mode: 'request' | 'confirm'; c: Container; onClose: () => void }) {
+function BookingDialog({ mode, c, onClose }: { mode: Mode; c: Container; onClose: () => void }) {
   const { state, dispatch } = useStore();
   const sup = byId(state.suppliers, c.supplierId);
   const [forwarder, setForwarder] = useState<Forwarder>(c.forwarder ?? 'Logfret');
@@ -311,12 +382,18 @@ function BookingDialog({ mode, c, onClose }: { mode: 'request' | 'confirm'; c: C
   const [carrier, setCarrier] = useState(c.carrier ?? 'MSC');
   const [vessel, setVessel] = useState('');
   const [cutoff, setCutoff] = useState(addDays(c.booking?.etdWanted ?? c.etdPlanned, -3));
+  const [loadDate, setLoadDate] = useState(c.loading?.date ?? addDays(c.etdPlanned, -6));
+  const title = { request: 'Demander le container', confirm: 'Confirmer le booking', date: 'Proposer une date de chargement' }[mode];
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (mode === 'request') {
+    if (mode === 'date') {
+      if (!loadDate) return toast('Choisissez une date de chargement');
+      dispatch({ type: 'proposeLoadingDate', containerId: c.id, date: loadDate });
+      toast(`Date de chargement proposée à ${sup.shortName}`);
+    } else if (mode === 'request') {
       dispatch({ type: 'requestBooking', containerId: c.id, forwarder, etdWanted: etd });
-      toast(`Demande de booking envoyée à ${forwarder}`);
+      toast(`Demande de container envoyée à ${forwarder}`);
     } else {
       if (!bookingNo.trim()) return toast('Indiquez le n° de booking reçu du transitaire');
       dispatch({ type: 'confirmBooking', containerId: c.id, bookingNo: bookingNo.trim(), carrier, vessel: vessel.trim() || undefined, cutoff, etd });
@@ -327,10 +404,10 @@ function BookingDialog({ mode, c, onClose }: { mode: 'request' | 'confirm'; c: C
 
   return (
     <div className="palette-back" onMouseDown={onClose}>
-      <form className="card rc-dialog bk-dialog" role="dialog" aria-label={mode === 'request' ? 'Demande de booking' : 'Confirmation du booking'} onMouseDown={(e) => e.stopPropagation()} onSubmit={submit}>
+      <form className="card rc-dialog bk-dialog" role="dialog" aria-label={title} onMouseDown={(e) => e.stopPropagation()} onSubmit={submit}>
         <header className="rc-head">
           <div>
-            <h2>{mode === 'request' ? 'Demander le booking' : 'Confirmer le booking'}</h2>
+            <h2>{title}</h2>
             <span className="muted small">
               {c.number ?? c.id} · {sup.shortName} · {c.portFrom} → {c.portTo} · {dec(containerCbm(state, c), 1)} m³
             </span>
@@ -340,8 +417,25 @@ function BookingDialog({ mode, c, onClose }: { mode: 'request' | 'confirm'; c: C
           </button>
         </header>
         <div className="bk-form">
-          {mode === 'request' ? (
+          {mode === 'date' ? (
             <>
+              <label htmlFor="bk-load">
+                Date de chargement
+                <input id="bk-load" className="input" type="date" autoFocus value={loadDate} max={c.etdPlanned} onChange={(e) => setLoadDate(e.target.value)} />
+              </label>
+              <label>
+                Départ prévu
+                <input className="input" value={`${fdate(c.etdPlanned)} · ${weekLabel(c.etdPlanned)}`} readOnly />
+              </label>
+              <p className="small muted">
+                {sup.shortName} confirme cette date ou en propose une autre depuis son portail. La demande de container à la compagnie se fait une fois la date validée.
+              </p>
+            </>
+          ) : mode === 'request' ? (
+            <>
+              <p className="bk-ok">
+                <Check size={16} /> Chargement validé par {sup.shortName} le <b>{c.loading ? fdate(c.loading.date) : '—'}</b>
+              </p>
               <label htmlFor="bk-fwd">
                 Transitaire
                 <select id="bk-fwd" className="input" value={forwarder} onChange={(e) => setForwarder(e.target.value as Forwarder)}>
@@ -354,7 +448,10 @@ function BookingDialog({ mode, c, onClose }: { mode: 'request' | 'confirm'; c: C
                 Départ souhaité
                 <input id="bk-etd" className="input" type="date" value={etd} onChange={(e) => setEtd(e.target.value)} />
               </label>
-              <p className="small muted">La demande part avec le plan de chargement, les volumes et les proformas {containerProformas(c).join(', ')}.</p>
+              <p className="small muted">
+                Le transitaire demande le container à la compagnie pour cette date de chargement · volumes et proformas {containerProformas(c).join(', ')}
+                {c.planValidated ? '' : ' · le plan de chargement peut encore être ajusté avec le fournisseur'}.
+              </p>
             </>
           ) : (
             <>
@@ -394,7 +491,11 @@ function BookingDialog({ mode, c, onClose }: { mode: 'request' | 'confirm'; c: C
             Annuler
           </button>
           <button type="submit" className="btn primary">
-            {mode === 'request' ? (
+            {mode === 'date' ? (
+              <>
+                <Send size={16} /> Envoyer au fournisseur
+              </>
+            ) : mode === 'request' ? (
               <>
                 <Send size={16} /> Envoyer la demande
               </>

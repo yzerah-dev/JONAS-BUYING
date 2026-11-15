@@ -260,13 +260,14 @@ export default function Containers() {
                               {s === 'a_booker' && canBook && (
                                 <button
                                   className="btn primary sm"
-                                  disabled={!c.allocations.length}
+                                  disabled={!c.allocations.length || !auth.allowed({ type: 'requestBooking', containerId: c.id })}
+                                  title={c.loading?.status === 'validated' ? 'Demander le container via le transitaire' : 'Date de chargement à valider par le fournisseur'}
                                   onClick={() => {
                                     dispatch({ type: 'requestBooking', containerId: c.id });
-                                    toast(`Demande de booking envoyée à ${c.forwarder ?? 'Logfret'}`);
+                                    toast(`Demande de container envoyée à ${c.forwarder ?? 'Logfret'}`);
                                   }}
                                 >
-                                  <Check size={12} /> Booker
+                                  <Check size={12} /> Demander
                                 </button>
                               )}
                               {s === 'booking_demande' && canBook && (

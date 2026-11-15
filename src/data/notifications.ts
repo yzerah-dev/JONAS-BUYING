@@ -61,8 +61,11 @@ export function notificationsFor(s: State): Notice[] {
     if (noAnswer.length)
       add({ id: `bkl-${noAnswer.map((c) => c.id).join(',')}`, level: 'red', title: `${noAnswer.length} demande(s) de booking sans réponse depuis +3 j`, detail: 'À relancer auprès du transitaire', to: '/booking' });
     else if (waiting.length) add({ id: `bkw-${waiting.map((c) => c.id).join(',')}`, level: 'info', title: `${waiting.length} booking(s) en attente de confirmation`, to: '/booking' });
+    const ready = s.containers.filter((c) => c.status === 'a_booker' && c.loading?.status === 'validated');
+    if (ready.length)
+      add({ id: `ready-${ready.map((c) => c.id + c.loading!.date).join(',')}`, level: 'orange', title: `${ready.length} date(s) de chargement validée(s) par le fournisseur`, detail: 'Container à demander à la compagnie', to: '/booking' });
     const proposed = s.containers.filter((c) => c.planProposed);
-    if (proposed.length) add({ id: `plan-${proposed.map((c) => c.id).join(',')}`, level: 'orange', title: `${proposed.length} plan(s) de chargement proposé(s) par le fournisseur`, detail: 'À valider', to: '/conteneurs' });
+    if (proposed.length) add({ id: `plan-${proposed.map((c) => c.id).join(',')}`, level: 'orange', title: `${proposed.length} plan(s) de chargement modifié(s) par le fournisseur`, detail: 'Modifications à valider', to: '/booking' });
     const revised = s.containers.filter((c) => c.etaRevised && c.status !== 'arrive');
     for (const c of revised)
       add({ id: `eta-${c.id}-${c.etaRevised}`, level: 'red', title: `ETA révisée : ${c.number ?? c.id}`, detail: `${fshort(c.etaPlanned)} → ${fshort(c.etaRevised)}`, to: `/conteneurs?c=${c.id}` });

@@ -179,6 +179,8 @@ export interface Container {
   forwarder?: Forwarder;
   /** Suivi du booking : demande au transitaire, relances, confirmation */
   booking?: BookingInfo;
+  /** Date de chargement : proposée par JONAS, validée (ou changée) par le fournisseur */
+  loading?: LoadingDate;
   portFrom: string;
   portTo: string;
   etdPlanned: ISODate;
@@ -193,8 +195,12 @@ export interface Container {
   planValidated: boolean;
   /** JONAS a demandé un plan de chargement au fournisseur */
   planRequested?: boolean;
-  /** Le fournisseur a proposé son plan, en attente de validation JONAS */
+  /** Le fournisseur a modifié le plan, en attente de validation JONAS */
   planProposed?: boolean;
+  /** Qui a validé le plan : le fournisseur tel quel, ou JONAS (après modifications) */
+  planValidatedBy?: 'fournisseur' | 'jonas';
+  /** Le fournisseur a touché au plan (il ne peut plus le valider « tel quel ») */
+  planEdited?: boolean;
   allocations: Allocation[];
   documents: string[];
   dateHistory: HistoryEntry[];
@@ -276,4 +282,15 @@ export interface JournalEntry {
   /** Objet concerné : proforma, produit, conteneur, utilisateur */
   target?: string;
   text: string;
+}
+
+/** Date de chargement d'un conteneur : la demande de container à la compagnie ne part qu'une fois validée par le fournisseur */
+export interface LoadingDate {
+  date: ISODate;
+  status: 'proposed' | 'validated';
+  proposedAt?: string;
+  proposedBy?: string;
+  /** Date initialement proposée par JONAS, si le fournisseur en a donné une autre */
+  initialDate?: ISODate;
+  validatedAt?: string;
 }

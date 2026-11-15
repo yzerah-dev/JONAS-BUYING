@@ -96,8 +96,10 @@ export default function ContainerCard({ s, c, selected, onOpen, actions }: { s: 
               {num(containerQty(c))} pcs · {containerProformas(c).join(', ') || '—'}
             </small>
             <span className="ct-flags">
-              {c.planRequested && <Pill color="orange">Plan demandé</Pill>}
-              {c.planProposed && <Pill color="violet">Plan fournisseur à valider</Pill>}
+              {c.status === 'a_booker' && c.loading?.status === 'proposed' && <Pill color="orange">Date chargement · attente fournisseur</Pill>}
+              {c.status === 'a_booker' && !c.loading && <Pill color="grey">Date de chargement à proposer</Pill>}
+              {c.planRequested && <Pill color="orange">Plan · attente fournisseur</Pill>}
+              {c.planProposed && <Pill color="violet">Plan modifié par le fournisseur</Pill>}
               {late && <Pill color="red">ETA révisée</Pill>}
             </span>
           </div>

@@ -14,8 +14,8 @@ test.describe('Proformas et logistique', () => {
     await expect(toast(page)).toHaveText(/pcs .+ → PLAN-\d+/);
     await expect(page.locator('.summary-bar').first()).toContainText('Reste à consolider : 0 pcs');
 
-    await page.getByRole('button', { name: 'Demande de booking' }).first().click();
-    await expect(toast(page)).toHaveText('Demande de booking envoyée');
+    await page.getByRole('button', { name: 'Demander le container' }).first().click();
+    await expect(toast(page)).toHaveText('Demande de container envoyée');
     await page.getByRole('button', { name: /Confirmer le booking/ }).click();
     await expect(page.getByRole('button', { name: /Confirmer le booking/ })).toHaveCount(0);
   });
@@ -25,14 +25,14 @@ test.describe('Proformas et logistique', () => {
     await loginAs(page, 'Ms. Park');
     await go(page, 'portail/chargement');
     await page.locator('tr[draggable="true"]').first().dragTo(page.locator('.ccard').first());
-    await page.getByRole('button', { name: 'Proposer ce plan à JONAS' }).click();
+    await page.getByRole('button', { name: 'Envoyer mes modifications à JONAS' }).click();
 
     await loginAs(page, 'Logistique');
     await go(page, 'proformas/PF-2026-0143');
     await page.getByRole('button', { name: 'Suivi & Logistique' }).click();
-    await page.getByRole('button', { name: /Valider le plan/ }).click();
-    await page.getByRole('button', { name: 'Demande de booking' }).click();
-    await expect(toast(page)).toHaveText('Demande de booking envoyée');
+    await page.getByRole('button', { name: /Valider les modifications/ }).click();
+    await page.getByRole('button', { name: 'Demander le container' }).click();
+    await expect(toast(page)).toHaveText('Demande de container envoyée');
   });
 
   test('signature des proformas à signer', async ({ page }) => {
