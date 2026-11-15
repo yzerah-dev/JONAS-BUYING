@@ -353,6 +353,7 @@ const pfDefs: PFDef[] = [
   { id: 'PF-2026-0129', supplier: 'gzbeauty', title: 'Coffrets parfum', status: 'arrive', etd: S50, eta: addDays(S50, 35), lines: [['PF-P020', 25, 70000], ['JB-T010', 20, 50000]], deposit: 36000, paid: true },
   // Semaine 51 — 3 proformas · 126,8 m³ · 240 000 €
   { id: 'PF-2026-0153', supplier: 'jinfa', title: 'Chapeaux & claquettes', status: 'a_signer', etd: S51, eta: addDays(S51, 35), lines: [['CP-A001', 20, 40000], ['CP-C015', 30, 60000]], deposit: 30000, paid: false },
+  { id: 'PF-2026-0152', supplier: 'tide', title: 'Tongs paillettes – réassort', status: 'en_production', etd: S51, eta: addDays(S51, 35), lines: [['CP-T001', 22, 40000]], deposit: 12000, paid: true },
   { id: 'PF-2026-0143', supplier: 'seoul', title: 'K-Beauty coffrets', status: 'en_production', etd: S51, eta: addDays(S51, 35), lines: [['JB-K001', 38.8, 80000]], deposit: 24000, paid: true },
   { id: 'PF-2026-0131', supplier: 'tide', title: 'Tongs & sabots', status: 'en_transit', etd: S51, eta: addDays(S51, 35), lines: [['CP-T001', 20, 30000], ['ORA-C006', 18, 30000]], deposit: 18000, paid: true },
   // Semaine 52 — 2 proformas · 74,0 m³ · 120 000 €
@@ -483,6 +484,7 @@ const containerPlan: [string, number, ContainerStatus][] = [
   ['PF-2026-0139', 1, 'en_transit'],
   ['PF-2026-0141', 1, 'booke'],
   ['PF-2026-0145', 1, 'booking_demande'],
+  ['PF-2026-0152', 1, 'booking_demande'],
   ['PF-2026-0143', 0.8, 'a_booker'],
   ['PF-2026-0148', 0.75, 'a_booker'],
 ];
@@ -594,7 +596,7 @@ export const users: User[] = [
     const fwd = cs[0].forwarder ?? 'Logfret';
     const fwdUser = fwd === 'Logfret' ? 'Julien Morel' : 'Anna Weber';
     if (st === 'booking_demande') {
-      // Pris en compte par le fournisseur, boîtes demandées au transitaire : en attente du booking
+      // Pris en compte par le fournisseur, transmis au transitaire choisi par JONAS : en attente de sa proposition
       const pfDate = addDays(pf.etd, -7);
       pf.booking = {
         ...pf.booking,
@@ -635,7 +637,36 @@ export const users: User[] = [
   }
   // K-Beauty (Seoul) : demande envoyée il y a 2 jours, pas encore prise en compte par le fournisseur
   const seoul = proformas.find((p) => p.id === 'PF-2026-0143')!;
-  seoul.booking = { requestedAt: '2026-11-12T15:40', requestedBy: 'Logistique', containers: 1, dateWanted: addDays(seoul.etd, -5), note: 'Merci de grouper avec les coffrets restants si possible', reminders: [] };
+  seoul.booking = {
+    requestedAt: '2026-11-12T15:40',
+    requestedBy: 'Logistique',
+    containers: 1,
+    dateWanted: addDays(seoul.etd, -5),
+    forwarder: 'Kuehne + Nagel',
+    note: 'Merci de grouper avec les coffrets restants si possible',
+    reminders: [],
+  };
+  // Tide (réassort tongs) : proposition de Kuehne + Nagel déjà acceptée par le fournisseur, JONAS doit l'accepter
+  const tide = proformas.find((p) => p.id === 'PF-2026-0152')!;
+  tide.booking = {
+    ...tide.booking!,
+    requestedAt: '2026-11-09T11:00',
+    ackAt: '2026-11-10T02:15',
+    reminders: [],
+    proposal: {
+      at: '2026-11-13T08:30',
+      by: 'Anna Weber',
+      enteredBy: 'transitaire',
+      carrier: 'CMA CGM',
+      bookingNo: 'CMA-447120',
+      vessel: 'CMA CGM ALEXANDER',
+      cutoff: addDays(tide.etd, -3),
+      loadingDate: addDays(tide.etd, -5),
+      etd: tide.etd,
+      eta: tide.eta,
+      supplierOk: { at: '2026-11-14T03:05', by: suppliers.find((x) => x.id === 'tide')!.contact.name },
+    },
+  };
   for (const c of containers.filter((x) => x.allocations.some((a) => a.proformaId === seoul.id))) c.status = 'booking_demande';
 }
 

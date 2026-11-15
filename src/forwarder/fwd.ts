@@ -8,7 +8,7 @@ export const DOC_LABEL: Record<string, string> = { 'BL.pdf': 'BL', 'Invoice.pdf'
 export type FwdStage = 'a-booker' | 'pret' | 'en-mer' | 'au-port' | 'livres';
 
 export const STAGE_DEF: Record<FwdStage, { title: string; sub: string; empty: string }> = {
-  'a-booker': { title: 'Bookings à faire', sub: 'Le fournisseur vous demande des boîtes : faites le booking (compagnie, n°, navire, dates).', empty: 'Aucun booking à faire.' },
+  'a-booker': { title: 'Bookings à faire', sub: 'JONAS vous a choisi : faites votre proposition (compagnie, n°, navire, dates). Le fournisseur et JONAS l’acceptent.', empty: 'Aucun booking à faire.' },
   pret: { title: 'Prêts au départ', sub: 'Booking fait : indiquez le n° de conteneur et le plomb, puis déclarez le départ.', empty: 'Aucun conteneur en attente de départ.' },
   'en-mer': { title: 'En mer', sub: 'Suivi de l’ETA et des documents jusqu’à l’arrivée au port.', empty: 'Aucun conteneur en mer.' },
   'au-port': { title: 'Au port', sub: 'Arrivés au port : dédouanement et livraison à l’entrepôt JONAS.', empty: 'Aucun conteneur au port.' },
@@ -18,10 +18,10 @@ export const STAGES = Object.keys(STAGE_DEF) as FwdStage[];
 
 const missingDocs = (c: Container) => REQUIRED_DOCS.some((d) => !c.documents.includes(d));
 
-/** Demandes de boîtes reçues des fournisseurs, booking à faire */
+/** Demandes reçues (proposition à faire) et propositions en attente d'acceptation */
 export const fwdBookings = (s: State, u: User): Proforma[] =>
   s.proformas
-    .filter((p) => bookingStage(p) === 'transitaire' && p.booking!.forwarder === u.forwarder)
+    .filter((p) => ['transitaire', 'validation'].includes(bookingStage(p) ?? '') && p.booking!.forwarder === u.forwarder)
     .sort((a, b) => (a.booking!.readyDate ?? '').localeCompare(b.booking!.readyDate ?? ''));
 
 /** Conteneurs par étape ('a-booker' : vide, ce sont des proformas, voir fwdBookings) */
@@ -42,7 +42,7 @@ export function fwdStages(s: State, u: User): Record<FwdStage, Container[]> {
 export function fwdActions(s: State, u: User): Record<FwdStage, number> {
   const st = fwdStages(s, u);
   return {
-    'a-booker': fwdBookings(s, u).length,
+    'a-booker': fwdBookings(s, u).filter((p) => !p.booking!.proposal).length,
     pret: st.pret.filter((c) => !c.number).length,
     'en-mer': st['en-mer'].filter(missingDocs).length,
     'au-port': st['au-port'].filter((c) => missingDocs(c) || c.customs !== 'dedouane' || !c.deliveryDate).length,

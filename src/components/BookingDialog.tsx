@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import { Lock, Send, Ship, X } from 'lucide-react';
-import { byId, proformaTotals, useAuth, useStore } from '../data/store';
+import { byId, defaultForwarder, proformaTotals, useAuth, useStore } from '../data/store';
 import { ROLE_DEFS } from '../data/permissions';
-import type { Proforma } from '../data/types';
+import { FORWARDERS, type Forwarder, type Proforma } from '../data/types';
 import { estimateContainers, toast } from './ui-shared';
 import { addDays, dec, fdate, weekLabel } from '../lib/format';
 
 
 /**
- * Demande de booking d'une proforma : nombre de containers et date souhaitée.
- * Le fournisseur reçoit l'alerte et répond avec le plan de chargement et les dates réelles.
+ * Demande de booking d'une proforma : nombre de containers, date souhaitée et transitaire choisi par JONAS.
+ * Le fournisseur prend en compte (plan, marchandise prête), le transitaire propose, le fournisseur et JONAS acceptent.
  */
 export function BookingRequestDialog({ pf, onClose }: { pf: Proforma; onClose: () => void }) {
   const { state, dispatch } = useStore();
@@ -18,11 +18,12 @@ export function BookingRequestDialog({ pf, onClose }: { pf: Proforma; onClose: (
   const [n, setN] = useState(estimateContainers(cbm));
   const [date, setDate] = useState(addDays(pf.etd, -5));
   const [note, setNote] = useState('');
+  const [fwd, setFwd] = useState<Forwarder>(defaultForwarder(state, pf.supplierId));
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!date || n < 1) return toast('Indiquez le nombre de containers et la date souhaitée');
-    dispatch({ type: 'requestPfBooking', proformaId: pf.id, containers: n, dateWanted: date, note: note.trim() || undefined });
+    dispatch({ type: 'requestPfBooking', proformaId: pf.id, containers: n, dateWanted: date, forwarder: fwd, note: note.trim() || undefined });
     toast(`Demande de booking envoyée à ${sup.shortName}`);
     onClose();
   };
@@ -50,13 +51,21 @@ export function BookingRequestDialog({ pf, onClose }: { pf: Proforma; onClose: (
             Date de chargement souhaitée
             <input id="bk-date" className="input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           </label>
+          <label htmlFor="bk-fwd" className="bk-wide">
+            Transitaire
+            <select id="bk-fwd" className="input" value={fwd} onChange={(e) => setFwd(e.target.value as Forwarder)}>
+              {FORWARDERS.map((x) => (
+                <option key={x}>{x}</option>
+              ))}
+            </select>
+          </label>
           <label htmlFor="bk-note" className="bk-wide">
             Message au fournisseur (facultatif)
             <input id="bk-note" className="input" placeholder="Ex. grouper avec la commande suivante" value={note} onChange={(e) => setNote(e.target.value)} />
           </label>
           <p className="small muted">
-            Départ prévu {fdate(pf.etd)} ({weekLabel(pf.etd)}). {sup.shortName} reçoit l’alerte « Effectuez le booking de {pf.id} » et répond avec le plan de
-            chargement et les dates réelles.
+            Départ prévu {fdate(pf.etd)} ({weekLabel(pf.etd)}). {sup.shortName} prend en compte (plan de chargement, marchandise prête), puis {fwd} fait sa
+            proposition de booking, à accepter par le fournisseur et par JONAS.
           </p>
         </div>
         <footer className="rc-foot">
@@ -84,7 +93,7 @@ export function BookingRequestButton({ pf, variant = 'btn' }: { pf: Proforma; va
   const me = state.users.find((u) => u.id === state.currentUserId);
   if (!me || ROLE_DEFS[me.role].portal) return null;
   if (pf.booking || ['booke', 'en_transit', 'arrive'].includes(pf.status)) return null;
-  const allowed = auth.allowed({ type: 'requestPfBooking', proformaId: pf.id, containers: 1, dateWanted: pf.etd });
+  const allowed = auth.allowed({ type: 'requestPfBooking', proformaId: pf.id, containers: 1, dateWanted: pf.etd, forwarder: 'Logfret' });
   const reason =
     pf.status === 'a_signer'
       ? 'Signez d’abord la proforma pour pouvoir demander le booking'

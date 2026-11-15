@@ -7,8 +7,9 @@ import { useT } from '../i18n';
 import { CARRIERS, toast } from './ui-shared';
 
 /**
- * Saisie du booking d'une proforma : par le transitaire (portail transitaire),
- * ou par le fournisseur pour son transitaire quand celui-ci ne passe pas par l'application.
+ * Proposition de booking d'une proforma : par le transitaire (portail transitaire),
+ * ou par le fournisseur pour le transitaire quand celui-ci ne passe pas par l'application.
+ * Elle doit ensuite être acceptée par le fournisseur et par JONAS.
  */
 export default function BookingEntry({ pf, onDone, onCancel, label }: { pf: Proforma; onDone?: () => void; onCancel?: () => void; label?: string }) {
   const { dispatch } = useStore();
@@ -28,7 +29,7 @@ export default function BookingEntry({ pf, onDone, onCancel, label }: { pf: Prof
     e.preventDefault();
     if (!carrier || !no.trim()) return toast(t('be.needCarrier'));
     dispatch({
-      type: 'answerPfBooking',
+      type: 'proposePfBooking',
       proformaId: pf.id,
       carrier,
       bookingNo: no.trim().toUpperCase(),

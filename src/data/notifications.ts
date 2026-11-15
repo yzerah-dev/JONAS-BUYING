@@ -58,17 +58,20 @@ export function notificationsFor(s: State): Notice[] {
     if (toAsk.length) add({ id: `ask-${toAsk.map((p) => p.id).join(',')}`, level: 'orange', title: `${toAsk.length} proforma(s) à booker (départ < 3 sem.)`, detail: toAsk.map((p) => p.id).join(', '), to: '/booking' });
     const late = s.proformas.filter((p) => bookingOpen(p) && diffDays(TODAY, (p.booking!.ackAt ?? p.booking!.requestedAt).slice(0, 10)) > 3);
     const lateSup = late.filter((p) => !p.booking!.ackAt);
-    const lateFwd = late.filter((p) => p.booking!.ackAt);
+    const lateFwd = late.filter((p) => p.booking!.ackAt && !p.booking!.proposal);
+    const toAccept = s.proformas.filter((p) => bookingOpen(p) && p.booking!.proposal && !p.booking!.proposal.jonasOk);
+    if (toAccept.length)
+      add({ id: `bkv-${toAccept.map((p) => p.id + p.booking!.proposal!.at).join(',')}`, level: 'orange', title: `${toAccept.length} proposition(s) de booking à accepter`, detail: toAccept.map((p) => `${p.id} (${p.booking!.forwarder})`).join(', '), to: '/booking' });
     if (lateSup.length)
       add({ id: `bkl-${lateSup.map((p) => p.id).join(',')}`, level: 'red', title: `${lateSup.length} demande(s) de booking pas prise(s) en compte par le fournisseur depuis +3 j`, detail: lateSup.map((p) => p.id).join(', '), to: '/booking' });
     if (lateFwd.length)
-      add({ id: `bkf-${lateFwd.map((p) => p.id).join(',')}`, level: 'red', title: `${lateFwd.length} booking(s) en attente du transitaire depuis +3 j`, detail: lateFwd.map((p) => `${p.id} (${p.booking!.forwarder})`).join(', '), to: '/booking' });
+      add({ id: `bkf-${lateFwd.map((p) => p.id).join(',')}`, level: 'red', title: `${lateFwd.length} proposition(s) de booking en attente du transitaire depuis +3 j`, detail: lateFwd.map((p) => `${p.id} (${p.booking!.forwarder})`).join(', '), to: '/booking' });
     const acked = s.proformas.filter((p) => bookingOpen(p) && p.booking!.ackAt && diffDays(TODAY, p.booking!.ackAt.slice(0, 10)) <= 2);
     for (const p of acked)
-      add({ id: `bkk-${p.id}-${p.booking!.ackAt}`, level: 'info', title: `${p.id} pris en compte par le fournisseur`, detail: `Marchandise prête le ${fshort(p.booking!.readyDate)} · boîtes demandées à ${p.booking!.forwarder}`, to: '/booking' });
+      add({ id: `bkk-${p.id}-${p.booking!.ackAt}`, level: 'info', title: `${p.id} pris en compte par le fournisseur`, detail: `Marchandise prête le ${fshort(p.booking!.readyDate)} · transmis à ${p.booking!.forwarder}`, to: '/booking' });
     const answered = s.proformas.filter((p) => p.booking?.answeredAt && diffDays(TODAY, p.booking.answeredAt.slice(0, 10)) <= 2);
     for (const p of answered)
-      add({ id: `bka-${p.id}-${p.booking!.answeredAt}`, level: 'info', title: `${p.id} booké${p.booking!.bookedBy === 'transitaire' ? ` par ${p.booking!.forwarder}` : ''}`, detail: `${p.booking!.carrier ?? ''} ${p.booking!.bookingNo ?? ''} · chargement ${fshort(p.booking!.loadingDate)} · départ ${fshort(p.booking!.etd)}`, to: '/booking' });
+      add({ id: `bka-${p.id}-${p.booking!.answeredAt}`, level: 'info', title: `${p.id} booké (${p.booking!.forwarder})`, detail: `${p.booking!.carrier ?? ''} ${p.booking!.bookingNo ?? ''} · chargement ${fshort(p.booking!.loadingDate)} · départ ${fshort(p.booking!.etd)}`, to: '/booking' });
     const revised = s.containers.filter((c) => c.etaRevised && c.status !== 'arrive');
     for (const c of revised)
       add({ id: `eta-${c.id}-${c.etaRevised}`, level: 'red', title: `ETA révisée : ${c.number ?? c.id}`, detail: `${fshort(c.etaPlanned)} → ${fshort(c.etaRevised)}`, to: `/conteneurs?c=${c.id}` });

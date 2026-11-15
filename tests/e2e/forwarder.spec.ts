@@ -23,13 +23,18 @@ test.describe('Portail transitaire', () => {
   test('booking à faire → prêt au départ → en mer → au port (douane, livraison), remonté à JONAS', async ({ page }) => {
     await loginAs(page, 'Julien Morel');
     const nav = page.locator('nav.sidebar');
-    // 1. Bookings à faire : demande de boîtes de Northbay
-    await page.locator('.bk-row', { hasText: 'PF-2026-0145' }).getByRole('button', { name: 'Faire le booking' }).click();
+    // 1. Bookings à faire : proposition pour Northbay
+    await page.locator('.bk-row', { hasText: 'PF-2026-0145' }).getByRole('button', { name: 'Faire la proposition' }).click();
     await page.locator('#be-car-PF20260145').selectOption('CMA CGM');
     await page.locator('#be-no-PF20260145').fill('CMA-339911');
     await page.locator('#be-ves-PF20260145').fill('CMA CGM Trocadero');
-    await page.getByRole('button', { name: 'Enregistrer le booking' }).click();
-    await expect(toast(page)).toContainText('Booking PF-2026-0145 enregistré');
+    await page.getByRole('button', { name: 'Envoyer la proposition' }).click();
+    await expect(toast(page)).toContainText('Proposition PF-2026-0145 envoyée');
+    // Acceptée par le fournisseur et JONAS (le pilote accepte pour les deux)
+    await setUser(page, 'yzerah', 'booking');
+    await page.locator('.bk-row', { hasText: 'PF-2026-0145' }).getByRole('button', { name: 'Accepter' }).click();
+    await expect(toast(page)).toContainText('PF-2026-0145 booké');
+    await setUser(page, 'fwd-logfret', 'transitaire/a-booker');
     await expect(page.locator('main')).toContainText('Aucun booking à faire');
     // 2. Prêts au départ : n° de conteneur puis départ
     await nav.getByRole('link', { name: /Prêts au départ/ }).click();

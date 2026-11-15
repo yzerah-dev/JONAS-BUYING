@@ -1,12 +1,13 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { Anchor, Ban, BellRing, Boxes, CalendarCheck, CalendarClock, CalendarPlus, ChevronDown, ChevronUp, Search, Send, Ship } from 'lucide-react';
+import { Anchor, Ban, BadgeCheck, BellRing, Boxes, CalendarCheck, CalendarClock, CalendarPlus, ChevronDown, ChevronUp, Search, Send, Ship } from 'lucide-react';
 import { bookingStage, byId, canRequestBooking, pfContainers, proformaTotals, useAuth, useStore, type State } from '../data/store';
 import type { Proforma } from '../data/types';
 import { ProductThumb, ProformaStatusPill, SupplierLogo } from '../components/ui';
 import { estimateContainers, toast } from '../components/ui-shared';
 import { CarrierBadge } from '../components/ContainerCard';
 import { BookingRequestDialog } from '../components/BookingDialog';
+import BookingReview, { LastRejection } from '../components/BookingReview';
 import { TODAY, dec, diffDays, fshort, fstamp, weekLabel } from '../lib/format';
 import { pressable } from '../lib/a11y';
 
@@ -39,6 +40,7 @@ export default function Booking() {
   const toAsk = list.filter(canRequestBooking).sort((a, b) => a.etd.localeCompare(b.etd));
   const atSupplier = list.filter((pf) => bookingStage(pf) === 'fournisseur').sort((a, b) => waitDays(b) - waitDays(a));
   const atForwarder = list.filter((pf) => bookingStage(pf) === 'transitaire').sort((a, b) => waitDays(b) - waitDays(a));
+  const toValidate = list.filter((pf) => bookingStage(pf) === 'validation');
   const waiting = [...atSupplier, ...atForwarder];
   const booked = list.filter((pf) => pf.booking?.answeredAt && !shipped(pf)).sort((a, b) => (a.booking!.etd ?? a.etd).localeCompare(b.booking!.etd ?? b.etd));
   const gone = list.filter((pf) => pf.booking?.answeredAt && shipped(pf));
@@ -87,9 +89,9 @@ export default function Booking() {
           <span className={urgent ? 'red' : ''}>{urgent ? `${urgent} départ(s) sous 3 semaines` : 'Rien d’urgent'}</span>
         </div>
         <div className="kpi-box">
-          <small>En attente fournisseur / transitaire</small>
+          <small>Attente fournisseur / transitaire / à valider</small>
           <b>
-            {atSupplier.length} / {atForwarder.length}
+            {atSupplier.length} / {atForwarder.length} / {toValidate.length}
           </b>
           <span className={late ? 'red' : ''}>{late ? `${late} sans réponse depuis +${WAIT_ALERT} j` : 'Réponses dans les temps'}</span>
         </div>
@@ -160,7 +162,7 @@ export default function Booking() {
         })}
       </Stage>
 
-      <Stage icon={<Boxes size={34} strokeWidth={1.8} />} tone="violet" title="Attente transitaire" sub="Boîtes demandées par le fournisseur : le transitaire fait le booking (ou le fournisseur le saisit pour lui)" items={atForwarder}>
+      <Stage icon={<Boxes size={34} strokeWidth={1.8} />} tone="violet" title="Attente transitaire" sub="Le transitaire choisi par JONAS prépare sa proposition (ou le fournisseur la saisit pour lui)" items={atForwarder}>
         {atForwarder.map((pf) => {
           const b = pf.booking!;
           const w = waitDays(pf);
@@ -168,16 +170,17 @@ export default function Booking() {
             <Row key={pf.id} s={state} pf={pf}>
               <div className="bk-info">
                 <small>
-                  {pfContainers(state, pf.id).length || b.containers} × 40HC · boîtes demandées à {b.forwarder} le {fshort(b.ackAt!.slice(0, 10))}
+                  {pfContainers(state, pf.id).length || b.containers} × 40HC · transmis à {b.forwarder} le {fshort(b.ackAt!.slice(0, 10))}
                 </small>
                 <b className={w > WAIT_ALERT ? 'red' : ''}>
-                  Marchandise prête le {fshort(b.readyDate)} · attente booking {w} j
+                  Marchandise prête le {fshort(b.readyDate)} · attente proposition {w} j
                 </b>
                 <span>
                   Pris en compte par {b.ackBy}
                   {b.ackNote ? ` · « ${b.ackNote} »` : ''}
                   {b.reminders.length ? ` · ${b.reminders.length} relance(s)` : ''}
                 </span>
+                <LastRejection pf={pf} />
               </div>
               <div className="bk-actions">{remindRemove(pf, w)}</div>
             </Row>
@@ -185,7 +188,17 @@ export default function Booking() {
         })}
       </Stage>
 
-      <Stage icon={<CalendarCheck size={34} strokeWidth={1.8} />} tone="green" title="Bookés" sub="Booking fait par le transitaire : compagnie, navire et dates réelles" items={booked}>
+      <Stage icon={<BadgeCheck size={34} strokeWidth={1.8} />} tone="blue" title="À valider" sub="Proposition du transitaire : à accepter par le fournisseur et par JONAS" items={toValidate}>
+        {toValidate.map((pf) => (
+          <Row key={pf.id} s={state} pf={pf} carrier={pf.booking!.proposal!.carrier}>
+            <div className="bk-span">
+              <BookingReview pf={pf} />
+            </div>
+          </Row>
+        ))}
+      </Stage>
+
+      <Stage icon={<CalendarCheck size={34} strokeWidth={1.8} />} tone="green" title="Bookés" sub="Proposition acceptée par le fournisseur et JONAS : compagnie, navire et dates réelles" items={booked}>
         {booked.map((pf) => (
           <BookedRow key={pf.id} s={state} pf={pf} canShip={canBook} />
         ))}
@@ -220,7 +233,7 @@ function BookedRow({ s, pf, canShip }: { s: State; pf: Proforma; canShip?: boole
           Chargement {fshort(b.loadingDate)} · départ {fshort(b.etd)} · arrivée {fshort(b.eta)}
         </b>
         <span>
-          {b.bookedBy === 'transitaire' ? `Booké par ${b.forwarder}` : `Saisi par ${b.bookedBy === 'fournisseur' ? 'le fournisseur' : 'JONAS'} pour ${b.forwarder ?? 'le transitaire'}`} le {fstamp(b.answeredAt)}
+          {b.bookedBy === 'transitaire' ? `Proposé par ${b.forwarder}` : `Saisi par ${b.bookedBy === 'fournisseur' ? 'le fournisseur' : 'JONAS'} pour ${b.forwarder ?? 'le transitaire'}`}, accepté le {fstamp(b.answeredAt)}
           {b.vessel ? ` · ${b.vessel}` : ''}
           {b.supplierNote ? ` · « ${b.supplierNote} »` : ''}
         </span>

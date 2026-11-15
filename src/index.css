@@ -1367,3 +1367,22 @@ button.fw-doc.missing:hover { background: var(--red); color: #fff; }
 .pfd-sup { flex: 1 1 300px; min-width: 0; }
 .pfd-info { flex: 3 1 340px; min-width: 0; }
 .pf-bk-state { white-space: normal; max-width: 100%; }
+
+/* Proposition de booking : acceptation fournisseur + JONAS */
+.bk-span { grid-column: 1 / -1; min-width: 0; }
+.bk-review { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; padding: 10px 12px; border-radius: 12px; background: var(--grey-soft); }
+.bk-review.compact { background: transparent; padding: 0; }
+.bk-review-main { display: grid; gap: 2px; min-width: 0; flex: 1 1 260px; }
+.bk-review-main small { color: var(--muted); font-size: 12px; }
+.bk-review-main b { font-size: 15px; overflow-wrap: anywhere; }
+.bk-review-main span { font-size: 13px; }
+.bk-review-oks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.bk-review-refuse { flex: 1 1 100%; display: grid; gap: 8px; }
+.bk-review-refuse label { display: grid; gap: 4px; font-size: 13px; font-weight: 600; }
+.bk-reject-note { margin: 4px 0 0; padding: 6px 10px; border-radius: 8px; background: var(--red-soft, #fdecec); color: var(--red, #c62828); font-size: 13px; }
+.pb-fwd-chosen { display: grid; gap: 4px; font-size: 13px; font-weight: 600; }
+.pb-fwd-chosen b { font-size: 14px; padding: 9px 12px; border-radius: 10px; background: var(--grey-soft); }
+.pb-answer.pb-val { border-color: var(--green-soft); }
+.pb-alert.green { background: var(--green-soft); color: var(--green); }
+.bk-stage.bk-blue .bk-ico { color: #2563eb; }
+.bk-stage.bk-blue .pf-week-head { background: linear-gradient(90deg, #e6efff, #f3f7ff); }

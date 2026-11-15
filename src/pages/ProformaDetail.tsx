@@ -41,6 +41,7 @@ import type { Container, Proforma, ProformaStatus } from '../data/types';
 import { BrandLogo, ContainerStatusPill, PackPill, Pill, ProductThumb, ProformaStatusPill, Progress, Ring, Seg, SupplierLogo, Tabs } from '../components/ui';
 import { toast } from '../components/ui-shared';
 import { BookingRequestButton } from '../components/BookingDialog';
+import BookingReview, { LastRejection } from '../components/BookingReview';
 import { addDays, dec, eur, eur2, fdate, m3, num, weekLabel } from '../lib/format';
 import { useT, type I18n } from '../i18n/context';
 import type { Key } from '../i18n/dict';
@@ -777,7 +778,8 @@ function BookingState({ pf }: { pf: Proforma }) {
   if (!b.answeredAt)
     return (
       <Link to="/booking" className="pill orange pf-bk-state" title={`Demandé le ${fdate(b.requestedAt.slice(0, 10))}`}>
-        <Ship size={14} /> Booking demandé · {b.containers} × 40HC · {b.ackAt ? `attente ${b.forwarder}` : 'attente fournisseur'}
+        <Ship size={14} /> Booking demandé · {b.containers} × 40HC ·{' '}
+        {b.proposal ? 'proposition à valider' : b.ackAt ? `attente ${b.forwarder}` : 'attente fournisseur'}
       </Link>
     );
   return (
@@ -798,20 +800,24 @@ function BookingBanner({ pf }: { pf: Proforma }) {
         {!b && (
           <>
             <b>{pf.status === 'a_signer' ? 'Booking : proforma à signer d’abord' : 'Booking à demander'}</b>
-            <span>Le fournisseur prend la demande en compte et demande les boîtes au transitaire, qui fait le booking.</span>
+            <span>JONAS choisit le transitaire ; le fournisseur prend en compte, le transitaire propose, le fournisseur et JONAS acceptent.</span>
           </>
         )}
         {b && !b.answeredAt && (
           <>
             <b>
-              Booking demandé · {b.containers} × 40HC · chargement souhaité {fdate(b.dateWanted)}
+              Booking demandé · {b.containers} × 40HC · chargement souhaité {fdate(b.dateWanted)} · {b.forwarder}
             </b>
             <span>
-              {b.ackAt
-                ? `Pris en compte par le fournisseur le ${fdate(b.ackAt.slice(0, 10))} · marchandise prête le ${fdate(b.readyDate)} · boîtes demandées à ${b.forwarder}, en attente de son booking`
-                : `Envoyé le ${fdate(b.requestedAt.slice(0, 10))} · en attente de la prise en compte du fournisseur`}
+              {b.proposal
+                ? `Proposition de ${b.forwarder} à valider par le fournisseur et JONAS`
+                : b.ackAt
+                  ? `Pris en compte par le fournisseur le ${fdate(b.ackAt.slice(0, 10))} · marchandise prête le ${fdate(b.readyDate)} · en attente de la proposition de ${b.forwarder}`
+                  : `Envoyé le ${fdate(b.requestedAt.slice(0, 10))} · en attente de la prise en compte du fournisseur`}
               {b.reminders.length ? ` · ${b.reminders.length} relance(s)` : ''}
             </span>
+            {b.proposal && <BookingReview pf={pf} />}
+            <LastRejection pf={pf} />
           </>
         )}
         {b?.answeredAt && (
@@ -820,7 +826,7 @@ function BookingBanner({ pf }: { pf: Proforma }) {
               Booké · chargement {fdate(b.loadingDate)} · départ {fdate(b.etd)} · arrivée {fdate(b.eta)}
             </b>
             <span>
-              {b.bookedBy === 'transitaire' ? `Booké par ${b.forwarder}` : `Saisi par le fournisseur pour ${b.forwarder ?? 'le transitaire'}`} le {fdate(b.answeredAt.slice(0, 10))}
+              {b.bookedBy === 'transitaire' ? `Proposé par ${b.forwarder}` : `Saisi par le fournisseur pour ${b.forwarder ?? 'le transitaire'}`}, accepté le {fdate(b.answeredAt.slice(0, 10))}
               {b.carrier ? ` · ${b.carrier}` : ''}
               {b.bookingNo ? ` · ${b.bookingNo}` : ''}
             </span>

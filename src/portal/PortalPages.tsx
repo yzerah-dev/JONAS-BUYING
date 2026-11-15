@@ -19,8 +19,9 @@ import {
 } from '../data/store';
 import { BrandLogo, ContainerStatusPill, Kpi, PackPill, Pill, ProductThumb, ProformaStatusPill, Ring, Seg, ValidationCircuit } from '../components/ui';
 import { toast } from '../components/ui-shared';
-import { FORWARDERS, type Forwarder, type Proforma } from '../data/types';
+import type { Proforma } from '../data/types';
 import BookingEntry from '../components/BookingEntry';
+import BookingReview, { LastRejection } from '../components/BookingReview';
 import { LogisticsTab } from '../pages/ProformaDetail';
 import { TODAY } from '../lib/format';
 import { useT } from '../i18n';
@@ -28,7 +29,7 @@ import { usePortal } from './usePortal';
 
 // ---------------------------------------------------------------------------
 export function PortalHome() {
-  const { state, supplier, user, products, proformas, containers, packsToValidate, dieCutsRequested, bookingsToDo, docsMissing } = usePortal();
+  const { state, supplier, user, products, proformas, containers, packsToValidate, dieCutsRequested, bookingsToDo, bookingsToAccept, docsMissing } = usePortal();
   const pays = payments(state).filter((p) => p.supplierId === supplier!.id);
   const nextPay = pays.find((p) => !p.paid);
   const amount = proformas.reduce((s, p) => s + proformaTotals(state, p).amount, 0);
@@ -39,7 +40,7 @@ export function PortalHome() {
   const todo: { to: string; icon: React.ReactNode; text: string; n: number }[] = [
     { to: '/portail/packs', icon: <Package size={16} className="orange" />, text: tr('home.todo.packs'), n: packsToValidate.length },
     { to: '/portail/packs?vue=diecut', icon: <Scissors size={16} className="orange" />, text: tr('home.todo.diecuts'), n: dieCutsRequested.length },
-    { to: '/portail/booking', icon: <Calendar size={16} className="orange" />, text: tr('home.todo.booking'), n: bookingsToDo.length },
+    { to: '/portail/booking', icon: <Calendar size={16} className="orange" />, text: tr('home.todo.booking'), n: bookingsToDo.length + bookingsToAccept.length },
     { to: '/portail/conteneurs', icon: <FileText size={16} className="red" />, text: tr('home.todo.docs'), n: docsMissing.length },
   ];
 
@@ -584,7 +585,7 @@ export function PortalFinance() {
  * puis le transitaire fait le booking. S'il ne passe pas par l'application, le fournisseur le saisit pour lui.
  */
 export function PortalBooking() {
-  const { proformas, bookingsToDo, bookingsAtForwarder } = usePortal();
+  const { proformas, bookingsToDo, bookingsAtForwarder, bookingsInValidation } = usePortal();
   const { t, fmt } = useT();
   const { fshort } = fmt;
   const done = proformas.filter((p) => p.booking?.answeredAt).sort((a, b) => b.booking!.answeredAt!.localeCompare(a.booking!.answeredAt!));
@@ -598,6 +599,31 @@ export function PortalBooking() {
         {t('pb.toAck')} <span className="pill orange">{bookingsToDo.length}</span>
       </h3>
       {bookingsToDo.length ? bookingsToDo.map((pf) => <BookingAck key={pf.id} pf={pf} />) : <div className="card empty mb">{t('pb.none')}</div>}
+      {bookingsInValidation.length > 0 && (
+        <>
+          <h3 className="pb-group">
+            {t('pb.toValidate')} <span className="pill green">{bookingsInValidation.length}</span>
+          </h3>
+          {bookingsInValidation.map((pf) => (
+            <div key={pf.id} className="card pad mb pb-answer pb-val">
+              <div className="pb-answer-head">
+                <span className="pb-alert green">
+                  <Ship size={22} />
+                </span>
+                <div className="grow">
+                  <h2>
+                    {pf.id} · {pf.title}
+                  </h2>
+                  <small>
+                    {t('be.ready', { date: fmt.fdate(pf.booking!.readyDate) })} · {pf.booking!.containers} × 40HC
+                  </small>
+                </div>
+              </div>
+              <BookingReview pf={pf} />
+            </div>
+          ))}
+        </>
+      )}
       {bookingsAtForwarder.length > 0 && (
         <>
           <h3 className="pb-group">
@@ -664,6 +690,7 @@ function AtForwarder({ pf }: { pf: Proforma }) {
         <div className="grow">
           <h2>{t('pb.waitFwd', { pf: pf.id, fwd, date: fmt.fdate(b.ackAt!.slice(0, 10)) })}</h2>
           <small>{t('pb.waitFwdSub', { ready: fmt.fdate(b.readyDate), n: b.containers, fwd })}</small>
+          <LastRejection pf={pf} />
         </div>
         {!open && (
           <button type="button" className="btn" onClick={() => setOpen(true)}>
@@ -684,13 +711,13 @@ function BookingAck({ pf }: { pf: Proforma }) {
   const cs = pfContainers(state, pf.id);
   const remaining = pf.lines.reduce((sum, l) => sum + Math.max(0, l.qty - allocatedQty(state, pf.id, l.productId)), 0);
   const [ready, setReady] = useState(b.dateWanted);
-  const [fwd, setFwd] = useState<Forwarder>(defaultForwarder(state, pf.supplierId));
+  const fwd = b.forwarder ?? defaultForwarder(state, pf.supplierId);
   const [note, setNote] = useState('');
   const id = pf.id.replace(/\W/g, '');
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!cs.length) return toast(t('pb.needPlan'));
-    dispatch({ type: 'ackPfBooking', proformaId: pf.id, readyDate: ready, forwarder: fwd, note: note.trim() || undefined });
+    dispatch({ type: 'ackPfBooking', proformaId: pf.id, readyDate: ready, note: note.trim() || undefined });
     toast(t('pb.ackToast', { fwd }));
   };
   return (
@@ -759,14 +786,10 @@ function BookingAck({ pf }: { pf: Proforma }) {
           {t('pb.ready')}
           <input id={`pb-ready-${id}`} className="input" type="date" required value={ready} onChange={(e) => setReady(e.target.value)} />
         </label>
-        <label htmlFor={`pb-fwd-${id}`}>
-          {t('pb.forwarder')}
-          <select id={`pb-fwd-${id}`} className="input" value={fwd} onChange={(e) => setFwd(e.target.value as Forwarder)}>
-            {FORWARDERS.map((x) => (
-              <option key={x}>{x}</option>
-            ))}
-          </select>
-        </label>
+        <div className="pb-fwd-chosen">
+          <span>{t('pb.forwarder')}</span>
+          <b>{t('pb.fwdChosen', { fwd })}</b>
+        </div>
         <label htmlFor={`pb-note-${id}`}>
           <span>
             {t('pb.note')} <em>({t('pb.optional')})</em>

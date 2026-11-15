@@ -4,6 +4,7 @@ import { Anchor, CalendarCheck, Check, ClipboardCheck, FileUp, Search, Ship, Tru
 import { byId, containerCbm, containerEta, containerEtd, containerProformas, containerQty, currentUser, pfContainers, useStore, type State } from '../data/store';
 import type { Container, Proforma } from '../data/types';
 import BookingEntry from '../components/BookingEntry';
+import BookingReview, { LastRejection } from '../components/BookingReview';
 import { ProductThumb, SupplierLogo } from '../components/ui';
 import { toast } from '../components/ui-shared';
 import { CarrierBadge } from '../components/ContainerCard';
@@ -44,7 +45,7 @@ export default function ForwarderHome() {
           <span>{def.sub}</span>
         </div>
         <span className="pf-count">
-          {stage === 'a-booker' ? `${count} booking${count > 1 ? 's' : ''}` : `${count} conteneur${count > 1 ? 's' : ''}`}
+          {stage === 'a-booker' ? `${count} demande${count > 1 ? 's' : ''}` : `${count} conteneur${count > 1 ? 's' : ''}`}
         </span>
       </div>
 
@@ -228,11 +229,15 @@ function BookingRow({ s, pf, onBook }: { s: State; pf: Proforma; onBook: () => v
         </span>
       </div>
       <div className="bk-who">
-        <span className={`pill ${wait > 2 ? 'red' : 'orange'}`}>{wait === 0 ? 'Demandé aujourd’hui' : `Demandé il y a ${wait} j`}</span>
+        {b.proposal ? (
+          <span className="pill green">Proposition envoyée</span>
+        ) : (
+          <span className={`pill ${wait > 2 ? 'red' : 'orange'}`}>{wait === 0 ? 'Demandé aujourd’hui' : `Demandé il y a ${wait} j`}</span>
+        )}
       </div>
       <div className="bk-info">
         <small>
-          Demande de {b.ackBy ?? sup.shortName} le {fdate(b.ackAt!.slice(0, 10))}
+          Transmis par {b.ackBy ?? sup.shortName} le {fdate(b.ackAt!.slice(0, 10))}
         </small>
         <b>
           Marchandise prête le {fshort(b.readyDate)} ({weekLabel(b.readyDate!)})
@@ -241,12 +246,19 @@ function BookingRow({ s, pf, onBook }: { s: State; pf: Proforma; onBook: () => v
           Chargement souhaité par JONAS {fshort(b.dateWanted)} · livraison {cs[0]?.warehouse ?? 'Péronne'}
         </span>
         {b.ackNote && <span className="muted">« {b.ackNote} »</span>}
+        <LastRejection pf={pf} />
       </div>
-      <div className="bk-actions">
-        <button className="btn sm primary" onClick={onBook}>
-          <Check size={14} /> Faire le booking
-        </button>
-      </div>
+      {b.proposal ? (
+        <div className="bk-span">
+          <BookingReview pf={pf} compact />
+        </div>
+      ) : (
+        <div className="bk-actions">
+          <button className="btn sm primary" onClick={onBook}>
+            <Check size={14} /> Faire la proposition
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -255,10 +267,10 @@ function BookingDialog({ s, pf, onClose }: { s: State; pf: Proforma; onClose: ()
   const sup = byId(s.suppliers, pf.supplierId);
   return (
     <div className="palette-back" onMouseDown={onClose}>
-      <div className="card rc-dialog bk-dialog" role="dialog" aria-label={`Booking ${pf.id}`} onMouseDown={(e) => e.stopPropagation()}>
+      <div className="card rc-dialog bk-dialog" role="dialog" aria-label={`Proposition de booking ${pf.id}`} onMouseDown={(e) => e.stopPropagation()}>
         <header className="rc-head">
           <div>
-            <h2>Booking {pf.id}</h2>
+            <h2>Proposition de booking {pf.id}</h2>
             <span className="muted small">
               {sup.shortName} · {sup.port} → Le Havre · {pf.booking!.containers} × 40HC
             </span>

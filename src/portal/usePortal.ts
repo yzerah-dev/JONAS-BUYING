@@ -15,10 +15,13 @@ export function usePortal() {
   const plansRequested = containers.filter((c) => c.planRequested && !c.planValidated && ['a_booker', 'booking_demande', 'booke'].includes(c.status));
   /** Demandes de booking de JONAS à prendre en compte (plan, marchandise prête, boîtes demandées au transitaire) */
   const bookingsToDo = proformas.filter((p) => bookingStage(p) === 'fournisseur');
-  /** Boîtes demandées au transitaire, booking pas encore fait */
+  /** Transmis au transitaire, proposition pas encore faite */
   const bookingsAtForwarder = proformas.filter((p) => bookingStage(p) === 'transitaire');
+  /** Propositions du transitaire en validation (à accepter par le fournisseur et par JONAS) */
+  const bookingsInValidation = proformas.filter((p) => bookingStage(p) === 'validation');
+  const bookingsToAccept = bookingsInValidation.filter((p) => !p.booking!.proposal!.supplierOk);
   const REQUIRED_DOCS = ['BL.pdf', 'Invoice.pdf', 'Packing List.xlsx'];
   const docsMissing = containers.filter((c) => ['booke', 'en_transit'].includes(c.status) && REQUIRED_DOCS.some((d) => !c.documents.includes(d)));
 
-  return { state, dispatch, user, supplier, products, proformas, containers, packsToValidate, dieCutsRequested, plansRequested, bookingsToDo, bookingsAtForwarder, docsMissing, REQUIRED_DOCS };
+  return { state, dispatch, user, supplier, products, proformas, containers, packsToValidate, dieCutsRequested, plansRequested, bookingsToDo, bookingsAtForwarder, bookingsInValidation, bookingsToAccept, docsMissing, REQUIRED_DOCS };
 }

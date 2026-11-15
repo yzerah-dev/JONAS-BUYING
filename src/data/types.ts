@@ -160,10 +160,11 @@ export interface Proforma {
 }
 
 /**
- * Booking d'une proforma, en trois temps :
- * 1. JONAS demande (nombre de containers, date souhaitée) ;
- * 2. le fournisseur prend en compte : plan de chargement, date de marchandise prête, boîtes demandées au transitaire ;
- * 3. le transitaire fait le booking (compagnie, n°, navire, dates). S'il ne passe pas par l'appli, le fournisseur le saisit pour lui.
+ * Booking d'une proforma :
+ * 1. JONAS demande (nombre de containers, date souhaitée) et choisit le transitaire ;
+ * 2. le fournisseur prend en compte : plan de chargement, date de marchandise prête ;
+ * 3. le transitaire fait sa proposition (compagnie, n°, navire, dates). S'il ne passe pas par l'appli, le fournisseur la saisit pour lui ;
+ * 4. le fournisseur et JONAS acceptent : booké. Un refus renvoie la demande au transitaire.
  */
 export interface BookingRequest {
   requestedAt: string;
@@ -177,10 +178,14 @@ export interface BookingRequest {
   ackBy?: string;
   /** Date à partir de laquelle la marchandise est prête */
   readyDate?: ISODate;
-  /** Transitaire à qui le fournisseur a demandé les boîtes */
+  /** Transitaire choisi par JONAS */
   forwarder?: Forwarder;
   ackNote?: string;
-  /** Booking effectué */
+  /** Proposition du transitaire, en attente d'acceptation fournisseur + JONAS */
+  proposal?: BookingProposal;
+  /** Propositions refusées (historique) */
+  rejections?: BookingRejection[];
+  /** Booking effectué (proposition acceptée par les deux) */
   answeredAt?: string;
   answeredBy?: string;
   /** Qui a saisi le booking : le transitaire, ou le fournisseur pour lui */
@@ -193,6 +198,33 @@ export interface BookingRequest {
   vessel?: string;
   cutoff?: ISODate;
   supplierNote?: string;
+}
+
+export interface BookingProposal {
+  at: string;
+  by: string;
+  /** Saisie par le transitaire, ou par le fournisseur pour lui */
+  enteredBy: 'transitaire' | 'fournisseur' | 'jonas';
+  carrier: string;
+  bookingNo: string;
+  vessel?: string;
+  cutoff?: ISODate;
+  loadingDate: ISODate;
+  etd: ISODate;
+  eta: ISODate;
+  note?: string;
+  /** Acceptations : horodatage + nom */
+  supplierOk?: { at: string; by: string };
+  jonasOk?: { at: string; by: string };
+}
+
+export interface BookingRejection {
+  at: string;
+  by: string;
+  side: 'fournisseur' | 'jonas';
+  reason: string;
+  carrier: string;
+  etd: ISODate;
 }
 
 export type ContainerStatus = 'a_booker' | 'booking_demande' | 'booke' | 'en_transit' | 'arrive';
