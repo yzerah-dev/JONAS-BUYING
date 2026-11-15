@@ -94,6 +94,7 @@ export type Action =
   | { type: 'allocate'; containerId: string; proformaId: string; productId: string; qty: number }
   | { type: 'deallocate'; containerId: string; proformaId: string; productId: string }
   | { type: 'createContainer'; supplierId: string; etd: ISODate; eta: ISODate }
+  | { type: 'autoLoad'; proformaId: string }
   | { type: 'validatePlan'; containerId: string }
   | { type: 'acceptPlan'; containerId: string }
   | { type: 'proposeLoadingDate'; containerId: string; date: ISODate }
@@ -170,6 +171,7 @@ const ACTION_PERM: Partial<Record<Action['type'], Perm>> = {
   uploadArtwork: 'pack.design',
   forwardPack: 'pack.design',
   createContainer: 'logistics.plan',
+  autoLoad: 'logistics.plan',
   requestPlan: 'logistics.plan',
   proposeLoadingDate: 'logistics.booking',
   confirmBooking: 'logistics.booking',
@@ -400,6 +402,54 @@ function applyAction(s: State, a: Action): State {
         planEdited: c.planEdited || isSupplier(currentUser(s)),
         allocations: c.allocations.filter((x) => !(x.proformaId === a.proformaId && x.productId === a.productId)),
       }));
+    case 'autoLoad': {
+      // Remplit les conteneurs ouverts du fournisseur, puis crée des 40HC pour le reste
+      const pf = s.proformas.find((x) => x.id === a.proformaId);
+      if (!pf) return s;
+      const supplier = s.suppliers.find((x) => x.id === pf.supplierId)!;
+      let containers = s.containers.map((c) => ({ ...c, allocations: [...c.allocations] }));
+      let seq = s.containers.length + 31;
+      const touched = new Set<string>();
+      const used = (c: Container) => c.allocations.reduce((t, x) => t + lineCbm(byId(s.products, x.productId), x.qty), 0);
+      for (const line of pf.lines) {
+        const p = byId(s.products, line.productId);
+        let remaining = line.qty - allocatedQty(s, pf.id, p.id);
+        while (remaining > 0) {
+          let c = containers.find(
+            (x) => x.supplierId === pf.supplierId && x.status === 'a_booker' && !x.planValidated && CONTAINER_CAPACITY[x.type] - used(x) >= p.cbmCarton,
+          );
+          if (!c) {
+            c = {
+              id: `PLAN-${String(seq++).padStart(3, '0')}`,
+              type: '40HC',
+              status: 'a_booker',
+              supplierId: pf.supplierId,
+              portFrom: supplier.port,
+              portTo: 'Le Havre',
+              etdPlanned: pf.etd,
+              etaPlanned: pf.eta,
+              warehouse: 'Péronne',
+              forwarder: 'Logfret',
+              planValidated: false,
+              allocations: [],
+              documents: [],
+              dateHistory: [hist(me, `Conteneur créé pour ${pf.id}`)],
+            };
+            containers = [...containers, c];
+          }
+          const free = Math.floor((CONTAINER_CAPACITY[c.type] - used(c)) / p.cbmCarton) * p.pcb;
+          const qty = Math.min(remaining, free);
+          if (qty <= 0) break;
+          const ex = c.allocations.find((x) => x.proformaId === pf.id && x.productId === p.id);
+          if (ex) c.allocations = c.allocations.map((x) => (x === ex ? { ...x, qty: x.qty + qty } : x));
+          else c.allocations.push({ proformaId: pf.id, productId: p.id, qty });
+          touched.add(c.id);
+          remaining -= qty;
+        }
+      }
+      containers = containers.map((c) => (touched.has(c.id) ? { ...c, dateHistory: [...c.dateHistory, hist(me, `Chargement automatique ${pf.id}`)] } : c));
+      return syncProformaStatuses({ ...s, containers });
+    }
     case 'createContainer': {
       const supplier = s.suppliers.find((x) => x.id === a.supplierId)!;
       const n = s.containers.length + 31;
@@ -641,6 +691,8 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
       return { target: ctn(a.containerId), text: `${ref(a.productId)} retiré du conteneur` };
     case 'createContainer':
       return { text: 'Conteneur créé' };
+    case 'autoLoad':
+      return { text: `Chargement préparé automatiquement pour ${a.proformaId}` };
     case 'validatePlan':
       return { target: ctn(a.containerId), text: 'Plan de chargement validé' };
     case 'requestPlan':

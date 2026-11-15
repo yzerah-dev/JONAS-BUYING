@@ -61,6 +61,21 @@ test.describe('Proformas et logistique', () => {
     await expect(toast(page)).toContainText('Date de chargement proposée à Horizon Home');
   });
 
+  test('booking depuis une proforma sans conteneur : préparer le chargement', async ({ page }) => {
+    await loginAs(page, 'Logistique');
+    await go(page, 'proformas/PF-2026-0151');
+    await page.getByRole('button', { name: /Demander le booking/ }).click();
+    const dlg = page.getByRole('dialog', { name: 'Booking PF-2026-0151' });
+    await expect(dlg.locator('.pb-steps')).toBeVisible();
+    await dlg.getByRole('button', { name: 'Préparer le chargement' }).click();
+    await expect(toast(page)).toContainText('préparé');
+    await expect(dlg.locator('.pb-ctn').first()).toBeVisible();
+    await expect(dlg.locator('.pb-start')).toHaveCount(0);
+    await dlg.getByRole('button', { name: 'Proposer une date' }).first().click();
+    await page.getByRole('button', { name: 'Envoyer au fournisseur' }).click();
+    await expect(toast(page)).toContainText('Date de chargement proposée');
+  });
+
   test('signature des proformas à signer', async ({ page }) => {
     await go(page, 'proformas');
     const chips = page.locator('.pf-chips');

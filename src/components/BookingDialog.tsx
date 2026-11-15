@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, CalendarPlus, Check, ClipboardList, Send, X } from 'lucide-react';
-import { byId, containerCbm, containerEtd, containerProformas, containerQty, useAuth, useStore } from '../data/store';
+import { Boxes, Calendar, CalendarPlus, Check, ClipboardList, Send, X } from 'lucide-react';
+import { allocatedQty, byId, containerCbm, containerEtd, containerProformas, containerQty, lineCbm, useAuth, useStore } from '../data/store';
 import { FORWARDERS, type Container, type Forwarder, type Proforma } from '../data/types';
 import { loadingTrack, planTrack, type TrackState } from '../data/tracks';
 import { toast } from './ui-shared';
@@ -172,7 +172,15 @@ export function ProformaBooking({ pf, containers, onClose }: { pf: Proforma; con
   const auth = useAuth();
   const [sub, setSub] = useState<{ mode: BookingMode; c: Container } | null>(null);
   const sup = byId(state.suppliers, pf.supplierId);
-  const list = containers.filter((c) => c.allocations.length);
+  // Conteneurs relus depuis l'état (la fenêtre reste ouverte après « Préparer le chargement »)
+  const list = state.containers.filter((c) => c.allocations.some((a) => a.proformaId === pf.id) || containers.some((x) => x.id === c.id && c.allocations.length));
+  const left = pf.lines.map((l) => {
+    const p = byId(state.products, l.productId);
+    const q = Math.max(0, l.qty - allocatedQty(state, pf.id, p.id));
+    return { q, cbm: lineCbm(p, q) };
+  });
+  const remaining = left.reduce((t, x) => t + x.q, 0);
+  const remainingCbm = left.reduce((t, x) => t + x.cbm, 0);
   if (sub) return <BookingDialog key={sub.c.id + sub.mode} mode={sub.mode} c={state.containers.find((x) => x.id === sub.c.id) ?? sub.c} onClose={() => setSub(null)} />;
   return (
     <div className="palette-back" onMouseDown={onClose}>
@@ -189,10 +197,45 @@ export function ProformaBooking({ pf, containers, onClose }: { pf: Proforma; con
           </button>
         </header>
         <div className="pb-body">
-          {!list.length && (
-            <div className="empty small">
-              Aucun conteneur chargé pour cette proforma. Préparez d’abord le plan de chargement dans l’onglet « Suivi &amp; Logistique ».
+          {remaining > 0 && (
+            <div className="pb-start">
+              <span className="pb-start-ico">
+                <Boxes size={22} />
+              </span>
+              <div>
+                <b>{list.length ? 'Il reste de la marchandise à charger' : 'Étape 1 · Préparer le chargement'}</b>
+                <small>
+                  {num(remaining)} pcs · {dec(remainingCbm, 1)} m³ pas encore dans un conteneur (≈ {Math.max(1, Math.ceil(remainingCbm / 68))} × 40HC)
+                </small>
+              </div>
+              {auth.can('logistics.plan') && (
+                <button
+                  className="btn primary"
+                  onClick={() => {
+                    dispatch({ type: 'autoLoad', proformaId: pf.id });
+                    toast('Conteneur(s) préparé(s) avec les lignes de la proforma');
+                  }}
+                >
+                  <Boxes size={16} /> Préparer le chargement
+                </button>
+              )}
             </div>
+          )}
+          {!list.length && (
+            <ol className="pb-steps">
+              <li>
+                <b>Préparer le chargement</b> : les lignes de la proforma sont réparties dans des conteneurs 40HC (ajustable ensuite dans « Suivi &amp; Logistique »).
+              </li>
+              <li>
+                <b>Date de chargement</b> : JONAS la propose, le fournisseur la confirme ou en donne une autre.
+              </li>
+              <li>
+                <b>Plan de chargement</b> : envoyé au fournisseur, qui le valide tel quel ou le modifie.
+              </li>
+              <li>
+                <b>Demander le container</b> : dès que la date est validée, la demande part au transitaire (Logfret / Kuehne + Nagel).
+              </li>
+            </ol>
           )}
           {list.map((c) => {
             const top = [...c.allocations].sort((a, b) => b.qty - a.qty)[0];
