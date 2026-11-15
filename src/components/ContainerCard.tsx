@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Anchor, Ship } from 'lucide-react';
+import { Anchor, Ship, Truck } from 'lucide-react';
 import {
   byId,
   CONTAINER_PAYLOAD,
@@ -37,6 +37,15 @@ export function CarrierBadge({ carrier }: { carrier?: string }) {
   return (
     <span className="ct-carrier" style={{ background: CARRIER_COLOR[carrier] ?? 'var(--ink-2)' }}>
       <Ship size={15} /> {carrier}
+    </span>
+  );
+}
+
+/** Transitaire : pastille sobre, distincte de la compagnie maritime */
+export function ForwarderBadge({ forwarder }: { forwarder?: string }) {
+  return (
+    <span className={`ct-fwd ${forwarder ? '' : 'none'}`} title="Transitaire">
+      <Truck size={14} /> {forwarder ?? 'Transitaire à définir'}
     </span>
   );
 }
@@ -101,7 +110,10 @@ export default function ContainerCard({ s, c, selected, onOpen, actions }: { s: 
             </small>
           </div>
         </div>
-        <CarrierBadge carrier={c.carrier} />
+        <div className="ct-ship">
+          <CarrierBadge carrier={c.carrier} />
+          <ForwarderBadge forwarder={c.forwarder} />
+        </div>
       </div>
 
       <div className="ct-bottom">

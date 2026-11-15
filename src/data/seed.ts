@@ -430,6 +430,8 @@ function buildContainers(pf: Proforma, coverage: number, status: ContainerStatus
       status,
       supplierId: pf.supplierId,
       carrier: booked || status === 'booking_demande' ? carrier : undefined,
+      // Transitaire : Kuehne + Nagel pour la Corée et Xiamen, Logfret sinon
+      forwarder: ['seoul', 'tide', 'gzbeauty'].includes(pf.supplierId) ? 'Kuehne + Nagel' : 'Logfret',
       portFrom: supplier.port,
       portTo: 'Le Havre',
       etdPlanned: pf.etd,

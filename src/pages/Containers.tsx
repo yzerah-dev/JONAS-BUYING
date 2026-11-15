@@ -17,7 +17,7 @@ import {
   useAuth,
   useStore,
 } from '../data/store';
-import { CONTAINER_STATUSES, type Container, type ContainerStatus } from '../data/types';
+import { CONTAINER_STATUSES, FORWARDERS, type Container, type ContainerStatus, type Forwarder } from '../data/types';
 import ReceptionDialog from '../components/ReceptionDialog';
 import ContainerCard from '../components/ContainerCard';
 import { ContainerStatusPill, Kpi, Pill, ProductThumb, Progress, Seg, SupplierLogo } from '../components/ui';
@@ -48,6 +48,7 @@ export default function Containers() {
   const [weekRef, setWeekRef] = useState('2026-12-14');
   const [statusF, setStatusF] = useState<'all' | ContainerStatus>('all');
   const [supplierF, setSupplierF] = useState('all');
+  const [fwdF, setFwdF] = useState('all');
   const [q, setQ] = useState('');
   const [all, setAll] = useState(false);
 
@@ -60,6 +61,7 @@ export default function Containers() {
         .filter(inPeriod)
         .filter((c) => statusF === 'all' || c.status === statusF)
         .filter((c) => supplierF === 'all' || c.supplierId === supplierF)
+        .filter((c) => fwdF === 'all' || c.forwarder === fwdF)
         .filter((c) => {
           const s = q.trim().toLowerCase();
           if (!s) return true;
@@ -67,7 +69,7 @@ export default function Containers() {
         })
         .sort((a, b) => dateOf(a).localeCompare(dateOf(b))),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [state, month, weekRef, period, basis, statusF, supplierF, q, all],
+    [state, month, weekRef, period, basis, statusF, supplierF, fwdF, q, all],
   );
 
   const sel = state.containers.find((c) => c.id === selId);
@@ -161,6 +163,12 @@ export default function Containers() {
             </option>
           ))}
         </select>
+        <select className="input" value={fwdF} onChange={(e) => setFwdF(e.target.value)} aria-label="Transitaire">
+          <option value="all">Transitaire : Tous</option>
+          {FORWARDERS.map((f) => (
+            <option key={f}>{f}</option>
+          ))}
+        </select>
         <span className="xs muted">
           {basis === 'eta'
             ? 'Par ETA : conteneurs dont l’arrivée prévue, révisée ou réelle tombe dans la période, même si l’ETD est antérieure ou qu’ils ne sont pas bookés.'
@@ -233,7 +241,7 @@ export default function Containers() {
                                   disabled={!c.allocations.length}
                                   onClick={() => {
                                     dispatch({ type: 'requestBooking', containerId: c.id });
-                                    toast('Demande de booking envoyée');
+                                    toast(`Demande de booking envoyée à ${c.forwarder ?? 'Logfret'}`);
                                   }}
                                 >
                                   <Check size={12} /> Booker
@@ -241,7 +249,7 @@ export default function Containers() {
                               )}
                               {s === 'booking_demande' && canBook && (
                                 <div className="row" style={{ gap: 4 }}>
-                                  <button className="btn sm" onClick={() => toast(`Relance envoyée à ${c.carrier}`)}>
+                                  <button className="btn sm" onClick={() => toast(`Relance envoyée à ${c.forwarder ?? c.carrier}`)}>
                                     Relancer
                                   </button>
                                   <button className="btn primary sm" onClick={() => dispatch({ type: 'confirmBooking', containerId: c.id })}>
@@ -434,8 +442,29 @@ function ContainerDetail({ c, onClose }: { c: Container; onClose: () => void }) 
           <dd>
             {fshort(containerEta(c))} ({weekLabel(containerEta(c))})
           </dd>
-          <dt>Transporteur</dt>
+          <dt>Compagnie maritime</dt>
           <dd>{c.carrier ?? '—'}</dd>
+          <dt>Transitaire</dt>
+          <dd>
+            {auth.can('logistics.plan') && c.status !== 'arrive' ? (
+              <select
+                className="input"
+                aria-label="Transitaire du conteneur"
+                value={c.forwarder ?? ''}
+                onChange={(e) => {
+                  dispatch({ type: 'setForwarder', containerId: c.id, forwarder: e.target.value as Forwarder });
+                  toast(`Transitaire : ${e.target.value}`);
+                }}
+              >
+                {!c.forwarder && <option value="">À définir</option>}
+                {FORWARDERS.map((f) => (
+                  <option key={f}>{f}</option>
+                ))}
+              </select>
+            ) : (
+              (c.forwarder ?? '—')
+            )}
+          </dd>
           <dt>Scellé</dt>
           <dd>{c.seal ?? '—'}</dd>
           <dt>Port départ</dt>

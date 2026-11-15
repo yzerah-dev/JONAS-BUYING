@@ -8,6 +8,7 @@ import type {
   ISODate,
   Product,
   Proforma,
+  Forwarder,
   JournalEntry,
   PackFile,
   ProformaStatus,
@@ -110,7 +111,8 @@ export type Action =
   | { type: 'setCapacity'; designer: string; capacity: number | null }
   | { type: 'setDefaultCapacity'; capacity: number }
   | { type: 'setFx'; currency: 'USD' | 'CNY'; rate: number }
-  | { type: 'setProformaCurrency'; id: string; currency: 'EUR' | 'USD' | 'CNY' };
+  | { type: 'setProformaCurrency'; id: string; currency: 'EUR' | 'USD' | 'CNY' }
+  | { type: 'setForwarder'; containerId: string; forwarder: Forwarder };
 
 /** Horodatage de démo : date du jour de l'application + heure réelle */
 const nowStamp = () => `${TODAY}T${new Date().toTimeString().slice(0, 5)}`;
@@ -179,6 +181,7 @@ const ACTION_PERM: Partial<Record<Action['type'], Perm>> = {
   setDefaultCapacity: 'users.manage',
   setFx: 'finance.pay',
   setProformaCurrency: 'proforma.edit',
+  setForwarder: 'logistics.plan',
   toggleUser: 'users.manage',
 };
 
@@ -353,6 +356,7 @@ function applyAction(s: State, a: Action): State {
         etdPlanned: a.etd,
         etaPlanned: a.eta,
         warehouse: 'Péronne',
+        forwarder: 'Logfret',
         planValidated: false,
         allocations: [],
         documents: [],
@@ -369,7 +373,8 @@ function applyAction(s: State, a: Action): State {
         planValidated: true,
         bookingNo: c.bookingNo ?? `BK-${1040 + s.containers.indexOf(c)}`,
         carrier: c.carrier ?? 'MSC',
-        dateHistory: [...c.dateHistory, hist(me, 'Demande de booking envoyée')],
+        forwarder: c.forwarder ?? 'Logfret',
+        dateHistory: [...c.dateHistory, hist(me, `Demande de booking envoyée à ${c.forwarder ?? 'Logfret'}`)],
       }));
     case 'confirmBooking':
       return syncProformaStatuses(
@@ -414,6 +419,12 @@ function applyAction(s: State, a: Action): State {
       }
       return syncProformaStatuses(next);
     }
+    case 'setForwarder':
+      return mapC(s, a.containerId, (c) => ({
+        ...c,
+        forwarder: a.forwarder,
+        dateHistory: [...c.dateHistory, hist(me, `Transitaire → ${a.forwarder}`)],
+      }));
     case 'setCapacity': {
       const capacity = { ...s.settings.capacity };
       if (a.capacity === null) delete capacity[a.designer];
@@ -552,7 +563,7 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
     case 'addContainerDoc':
       return { target: ctn(a.containerId), text: `Document déposé : ${a.doc}` };
     case 'requestBooking':
-      return { target: ctn(a.containerId), text: 'Booking demandé' };
+      return { target: ctn(a.containerId), text: 'Booking demandé au transitaire' };
     case 'confirmBooking':
       return { target: ctn(a.containerId), text: 'Booking confirmé' };
     case 'ship':
@@ -593,6 +604,8 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
       return { text: `Cours ${a.currency} → ${a.rate} €` };
     case 'setProformaCurrency':
       return { target: a.id, text: `Devise → ${a.currency}` };
+    case 'setForwarder':
+      return { target: ctn(a.containerId), text: `Transitaire → ${a.forwarder}` };
   }
   return null;
 }

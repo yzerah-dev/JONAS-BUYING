@@ -175,6 +175,8 @@ export interface Container {
   status: ContainerStatus;
   supplierId: string;
   carrier?: string;
+  /** Transitaire (commissionnaire de transport) qui gère le booking et le dédouanement */
+  forwarder?: Forwarder;
   portFrom: string;
   portTo: string;
   etdPlanned: ISODate;
@@ -195,6 +197,9 @@ export interface Container {
   documents: string[];
   dateHistory: HistoryEntry[];
 }
+
+export type Forwarder = 'Logfret' | 'Kuehne + Nagel';
+export const FORWARDERS: Forwarder[] = ['Logfret', 'Kuehne + Nagel'];
 
 export const CONTAINER_CAPACITY: Record<Container['type'], number> = {
   '40HC': 69,
