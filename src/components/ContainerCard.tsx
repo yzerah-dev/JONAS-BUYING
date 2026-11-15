@@ -85,15 +85,16 @@ export default function ContainerCard({ s, c, selected, onOpen, actions }: { s: 
             </span>
           )}
           <div className="ct-title">
+            <span className="ct-num">
+              {c.number ? <strong>{c.number}</strong> : <strong className="ct-num-wait">N° à venir</strong>}
+              <span className="ct-type">{c.type}</span>
+              <span className="ct-ref">{c.bookingNo ? `Booking ${c.bookingNo}` : c.id}</span>
+            </span>
             <b>{main ? main.name : 'Conteneur vide'}</b>
             <small>
               {others > 0 ? `+ ${others} autre${others > 1 ? 's' : ''} réf. · ` : ''}
               {num(containerQty(c))} pcs · {containerProformas(c).join(', ') || '—'}
             </small>
-            <span className="ct-id">
-              {ident} · {c.type}
-              {c.number && c.bookingNo ? ` · ${c.bookingNo}` : ''}
-            </span>
             <span className="ct-flags">
               {c.planRequested && <Pill color="orange">Plan demandé</Pill>}
               {c.planProposed && <Pill color="violet">Plan fournisseur à valider</Pill>}
