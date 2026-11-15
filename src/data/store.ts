@@ -43,8 +43,16 @@ export const DEFAULT_SETTINGS: Settings = {
   defaultCapacity: 40,
   capacity: {},
   fx: { EUR: 1, USD: 0.93, CNY: 0.128 },
-  company: { name: 'JONAS INTERNATIONAL', address: '', city: '', vat: '' },
+  company: { name: 'JONAS INTERNATIONAL', address: '189 rue d\'Aubervilliers', city: '75018 Paris', vat: '' },
 };
+
+/** Champs vides de l'état enregistré : on garde la valeur par défaut */
+const withDefaults = (def: Company, saved?: Partial<Company>): Company => ({
+  name: saved?.name || def.name,
+  address: saved?.address || def.address,
+  city: saved?.city || def.city,
+  vat: saved?.vat || def.vat,
+});
 
 export const STORAGE_KEY = 'jonas-buying-state-v13';
 
@@ -70,7 +78,7 @@ export function load(): State {
     if (raw) {
       const st = JSON.parse(raw) as State;
       // Compatibilité : anciens états sans paramètres ni journal
-      return { ...st, settings: { ...DEFAULT_SETTINGS, ...(st.settings ?? {}), company: { ...DEFAULT_SETTINGS.company, ...(st.settings?.company ?? {}) } }, journal: st.journal ?? [] };
+      return { ...st, settings: { ...DEFAULT_SETTINGS, ...(st.settings ?? {}), company: withDefaults(DEFAULT_SETTINGS.company, st.settings?.company) }, journal: st.journal ?? [] };
     }
   } catch {
     /* stockage indisponible */
