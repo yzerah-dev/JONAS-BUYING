@@ -91,7 +91,7 @@ export default function ProformaDetail() {
       </div>
 
       <div className="row wrap gap-lg" style={{ alignItems: 'stretch' }}>
-        <div className="card pad row" style={{ gap: 14, minWidth: 300 }}>
+        <div className="card pad row pfd-sup" style={{ gap: 14 }}>
           <SupplierLogo supplier={sup} size={56} />
           <div className="col">
             <Link to={`/fournisseurs/${sup.id}`} style={{ fontSize: 18, fontWeight: 800 }}>
@@ -113,8 +113,8 @@ export default function ProformaDetail() {
             </span>
           )}
         </div>
-        <div className="card pad grow">
-          <div className="kpis" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))' }}>
+        <div className="card pad pfd-info">
+          <div className="kpis" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(170px, 100%), 1fr))' }}>
             <Info icon={<ClipboardList size={18} />} label="N° commande Jonas" value={pf.poNumber} />
             <Info icon={<Calendar size={18} />} label="Date de la proforma" value={fdate(pf.date)} />
             <Info icon={<Ship size={18} />} label="ETD" value={weekLabel(pf.etd)} sub={`du ${fdate(pf.etd)}`} />

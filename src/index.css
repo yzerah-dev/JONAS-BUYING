@@ -1362,3 +1362,8 @@ button.fw-doc.missing:hover { background: var(--red); color: #fff; }
   .bk-ico { width: 32px; height: 32px; }
   .bk-ico svg { width: 26px; height: 26px; }
 }
+
+/* En-tête proforma : les deux cartes passent l'une sous l'autre plutôt que de s'écraser */
+.pfd-sup { flex: 1 1 300px; min-width: 0; }
+.pfd-info { flex: 3 1 340px; min-width: 0; }
+.pf-bk-state { white-space: normal; max-width: 100%; }

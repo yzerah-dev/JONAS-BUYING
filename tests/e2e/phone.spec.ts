@@ -93,3 +93,15 @@ test.describe('Téléphone : interactions tactiles', () => {
     await expect(toast(page)).toHaveText(/pcs JB-K001 → PLAN-\d+/);
   });
 });
+
+// Grand téléphone (iPhone Pro Max, 430 px) : l'en-tête de proforma ne doit pas écraser la carte d'infos
+test.describe('Grand téléphone (430 px)', () => {
+  test.use({ viewport: { width: 430, height: 932 } });
+  for (const route of ['proformas/PF-2026-0148', 'proformas/PF-2026-0145', 'booking']) {
+    test(`/${route}`, async ({ page }) => {
+      await resetApp(page, route);
+      await expect(page.locator('main h1, main .pf-title').first()).toBeVisible();
+      await expectNoHorizontalOverflow(page);
+    });
+  }
+});
