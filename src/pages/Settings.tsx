@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { CompanyStamp } from '../components/ProformaVersions';
 import { Check, Lock, RotateCcw, Users } from 'lucide-react';
 import { useAuth, useStore } from '../data/store';
 import { MODULE_LABELS, PERM_LABELS, ROLE_DEFS, ROLES, type Module, type Perm } from '../data/permissions';
@@ -186,6 +188,8 @@ export default function Settings() {
         </div>
       </div>
 
+      <CompanyCard />
+
       <div className="card pad mb">
         <div className="card-title">Matrice des droits</div>
         <div className="tbl-wrap">
@@ -273,5 +277,57 @@ export default function Settings() {
         </div>
       </div>
     </>
+  );
+}
+
+/** Société portée sur le tampon des proformas signées (Direction / Pilote) */
+function CompanyCard() {
+  const { state, dispatch } = useStore();
+  const auth = useAuth();
+  const edit = auth.can('proforma.sign');
+  const saved = state.settings.company;
+  const [c, setC] = useState(saved);
+  const dirty = JSON.stringify(c) !== JSON.stringify(saved);
+  const set = (k: keyof typeof c, v: string) => setC({ ...c, [k]: v });
+  const fields: { k: keyof typeof c; label: string; ph: string }[] = [
+    { k: 'name', label: 'Raison sociale', ph: 'JONAS INTERNATIONAL' },
+    { k: 'address', label: 'Adresse', ph: 'N° et rue' },
+    { k: 'city', label: 'Code postal et ville', ph: '75000 Paris' },
+    { k: 'vat', label: 'N° de TVA intracommunautaire', ph: 'FR00 000000000' },
+  ];
+  return (
+    <div className="card pad mb">
+      <div className="card-title">Tampon de la société</div>
+      <p className="small muted" style={{ marginTop: 0 }}>
+        Porté sur chaque proforma signée, avec la date, la signature de la Direction et la date d’expédition demandée. Modifiable par la Direction et le Pilote.
+      </p>
+      <div className="co-grid">
+        <div className="co-fields">
+          {fields.map((f) => (
+            <label key={f.k} htmlFor={`co-${f.k}`}>
+              {f.label}
+              <input id={`co-${f.k}`} className="input" disabled={!edit} placeholder={f.ph} value={c[f.k]} onChange={(e) => set(f.k, e.target.value)} />
+            </label>
+          ))}
+        </div>
+        <div className="pv-stamp-preview">
+          <CompanyStamp company={c} />
+        </div>
+      </div>
+      {edit && (
+        <div className="row" style={{ justifyContent: 'flex-end', marginTop: 12 }}>
+          <button
+            className="btn primary"
+            disabled={!dirty}
+            onClick={() => {
+              dispatch({ type: 'setCompany', company: { name: c.name.trim(), address: c.address.trim(), city: c.city.trim(), vat: c.vat.trim().toUpperCase() } });
+              toast('Tampon de la société enregistré');
+            }}
+          >
+            <Check size={16} /> Enregistrer le tampon
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

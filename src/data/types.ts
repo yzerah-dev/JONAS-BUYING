@@ -387,6 +387,18 @@ export interface Settings {
   capacity: Record<string, number>;
   /** Cours de change : 1 unité = x € */
   fx: Record<Currency, number>;
+  /** Société JONAS : portée sur le tampon des proformas signées */
+  company: Company;
+}
+
+export interface Company {
+  name: string;
+  /** Rue */
+  address: string;
+  /** Code postal et ville */
+  city: string;
+  /** N° de TVA intracommunautaire */
+  vat: string;
 }
 
 /** Entrée du journal d'activité */

@@ -374,7 +374,7 @@ const docsFor = (st: ProformaStatus) => {
 export const proformas: Proforma[] = pfDefs.map((d, i) => {
   const date = addDays(d.etd, -56);
   const history = [{ date, user: 'Yzerah', text: 'Proforma créée' }];
-  if (d.status !== 'a_signer') history.push({ date: addDays(date, 2), user: 'Direction', text: 'Proforma signée' });
+  if (d.status !== 'a_signer') history.push({ date: addDays(date, 2), user: 'Rudy Zerah', text: 'Proforma signée' });
   if (d.paid) history.push({ date: addDays(date, 6), user: 'Finance', text: 'Acompte versé' });
   if (['booke', 'en_transit', 'arrive'].includes(d.status)) history.push({ date: addDays(d.etd, -14), user: 'Logistique', text: 'Booking confirmé' });
   const lines = d.lines.map(([ref, cbm, amount]) => {
@@ -564,7 +564,8 @@ products.find((p) => p.id === 'AB-M026')!.stock.Meaux = 1800;
 export const users: User[] = [
   { id: 'yzerah', name: 'Yzerah', email: 'yzerah@jonas.example', role: 'pilote', title: 'Pilote achats', active: true },
   { id: 'david', name: 'David', email: 'david@jonas.example', role: 'acheteur', title: 'Chef de produit', validationStep: 'david', active: true },
-  { id: 'direction', name: 'Direction', email: 'direction@jonas.example', role: 'direction', title: 'Direction générale', validationStep: 'direction', active: true },
+  { id: 'direction', name: 'Rudy Zerah', email: 'rudy@jonas.example', role: 'direction', title: 'Direction générale', validationStep: 'direction', active: true },
+  { id: 'direction-yoni', name: 'Yoni Zerah', email: 'yoni@jonas.example', role: 'direction', title: 'Direction générale', validationStep: 'direction', active: true },
   { id: 'moinard', name: 'Moinard', email: 'moinard@jonas.example', role: 'validateur', title: 'Validation pack', validationStep: 'moinard', active: true },
   { id: 'lea', name: 'Léa', email: 'lea@jonas.example', role: 'designer', title: 'Designer packaging', designerName: 'Léa', active: true },
   { id: 'sarah', name: 'Sarah', email: 'sarah@jonas.example', role: 'designer', title: 'Designer packaging', designerName: 'Sarah', active: true },
@@ -686,7 +687,7 @@ export const users: User[] = [
     status: 'a_signer',
     ...extra,
   });
-  const sig = (day: string, etd: string, by = 'Yzerah', role = 'Pilote', replaces?: number) => ({ at: `${day}T10:05`, by, role, date: day, etdWanted: etd, replaces });
+  const sig = (day: string, etd: string, by = 'Rudy Zerah', role = 'Direction', replaces?: number) => ({ at: `${day}T10:05`, by, role, date: day, etdWanted: etd, replaces });
   for (const pf of proformas) {
     const up = addDays(pf.date, 1);
     if (pf.status === 'a_signer') {
@@ -706,7 +707,7 @@ export const users: User[] = [
     doc(horizon, 2, addDays(horizon.date, 11), {
       reason: 'Production décalée d’une semaine (usine fermée Golden Week)',
       status: 'signee',
-      signature: sig(hDay, horizon.etd, 'Direction', 'Direction', 1),
+      signature: sig(hDay, horizon.etd, 'Yoni Zerah', 'Direction', 1),
     }),
   ];
   // Nova : demande de modification en attente de signature de la Direction

@@ -56,8 +56,15 @@ test.describe('Proforma déposée par le fournisseur', () => {
     await expect(toast(page)).toContainText('Proforma v1 déposée');
     await expect(page.locator('.pv-row')).toContainText('PI-WZ-2026-118.pdf');
 
-    // JONAS signe avec la date d'expédition demandée
-    await loginAs(page, 'Direction');
+    // La Direction renseigne le tampon de la société, puis signe avec la date d'expédition demandée
+    await loginAs(page, 'Rudy Zerah');
+    await go(page, 'parametres');
+    await page.locator('#co-address').fill('12 rue des Importateurs');
+    await page.locator('#co-city').fill('93200 Saint-Denis');
+    await page.locator('#co-vat').fill('FR12 345678901');
+    await expect(page.locator('.pv-stamp')).toContainText('N° TVA intracom. : FR12 345678901');
+    await page.getByRole('button', { name: 'Enregistrer le tampon' }).click();
+    await expect(toast(page)).toContainText('Tampon de la société enregistré');
     await go(page, 'proformas/PF-2026-0150');
     await page.locator('.page-head').getByRole('button', { name: 'Signer' }).click();
     await page.locator('#sg-etd').fill('2026-12-16');
@@ -72,12 +79,13 @@ test.describe('Proforma déposée par le fournisseur', () => {
     const pdf = await downloadVersion(page, 1);
     expect(pdf.name).toBe('PF-2026-0150_v1_signee.pdf');
     expect(pdf.text.startsWith('%PDF')).toBe(true);
-    for (const s of ['JONAS FRANCE', 'BON POUR ACCORD', 'Direction', '16/12/2026 (S51)']) expect(pdf.text).toContain(hex(s));
-    expect(pdf.text).toMatch(new RegExp(hex('Signé le ') + '[0-9A-F]{20}'));
+    for (const s of ['JONAS INTERNATIONAL', '12 rue des Importateurs', '93200 Saint-Denis', 'N° TVA intracom. : FR12 345678901', 'Rudy Zerah', 'Direction', '16/12/2026 (S51)'])
+      expect(pdf.text).toContain(hex(s));
+    expect(pdf.text).toMatch(new RegExp(hex('Bon pour accord, le ') + '[0-9A-F]{20}'));
   });
 
   test('demande de modification : la Direction signe la nouvelle version, qui annule l’ancienne', async ({ page }) => {
-    await loginAs(page, 'Direction');
+    await loginAs(page, 'Yoni Zerah');
     await go(page, 'proformas/PF-2026-0151');
     await page.locator('.page-head').getByRole('button', { name: 'Signer la modification v2' }).click();
     await expect(page.getByRole('dialog')).toContainText('Annule et remplace la proforma v1');
@@ -107,7 +115,7 @@ test.describe('Proforma déposée par le fournisseur', () => {
     await expect(toast(page)).toContainText('Proforma v2 déposée');
     await expect(page.locator('.pv-row', { hasText: 'v2' })).toContainText('Couleur des tongs changée');
 
-    await loginAs(page, 'Direction');
+    await loginAs(page, 'Yoni Zerah');
     await go(page, 'proformas/PF-2026-0141');
     await page.getByRole('button', { name: /^Documents/ }).click();
     await page.locator('.pv-alert').getByRole('button', { name: 'Refuser' }).click();

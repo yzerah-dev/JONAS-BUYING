@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { Ban, Download, FilePen, FileText, PenLine, Stamp, Upload, X } from 'lucide-react';
 import { byId, currentUser, pendingVersion, signedVersion, useAuth, useStore } from '../data/store';
 import { ROLE_DEFS } from '../data/permissions';
-import type { Proforma, ProformaDoc } from '../data/types';
+import type { Company, Proforma, ProformaDoc } from '../data/types';
 import { newFileId, putBlob, saveBlob, fsize } from '../lib/files';
 import { versionFileName, versionPdf } from '../lib/proformaPdf';
 import { addDays, diffDays, fdate, weekLabel, TODAY } from '../lib/format';
@@ -16,7 +16,7 @@ const STATUS_COLOR: Record<ProformaDoc['status'], string> = { a_signer: 'orange'
 function useDownload() {
   const { state } = useStore();
   return async (pf: Proforma, v: ProformaDoc) => {
-    const blob = await versionPdf(pf, v, { supplier: byId(state.suppliers, pf.supplierId), products: state.products });
+    const blob = await versionPdf(pf, v, { supplier: byId(state.suppliers, pf.supplierId), products: state.products, company: state.settings.company });
     const name = versionFileName(pf, v);
     const r = await saveBlob(blob, name);
     if (r === 'saved' || r === 'zipped') toast(`${name} téléchargé`);
@@ -234,13 +234,9 @@ export function SignDialog({ pf, doc, onClose }: { pf: Proforma; doc: ProformaDo
               : `Départ prévu ${fdate(pf.etd)} (${weekLabel(pf.etd)}).`}
           </p>
           <div className="pv-stamp-preview" aria-hidden>
-            <div className="pv-stamp">
-              <b>JONAS FRANCE</b>
-              <small>Importateur · Paris</small>
-              <b>BON POUR ACCORD</b>
-              <small>Signé le {fdate(TODAY)}</small>
-            </div>
+            <CompanyStamp />
             <div className="pv-sig">
+              <small>Bon pour accord, le {fdate(TODAY)}</small>
               <i>{me.name}</i>
               <small>{ROLE_DEFS[me.role].label}</small>
               <small>
@@ -249,6 +245,9 @@ export function SignDialog({ pf, doc, onClose }: { pf: Proforma; doc: ProformaDo
               {prev && <small className="red bold">Annule et remplace la proforma v{prev.version}</small>}
             </div>
           </div>
+          {(!state.settings.company.address || !state.settings.company.vat) && (
+            <p className="small orange bold">Adresse ou n° de TVA de la société manquant sur le tampon : à compléter dans Paramètres.</p>
+          )}
           {prev && (
             <p className="small red">
               La v{prev.version} signée le {fdate(prev.signature!.date)} sera annulée : son PDF portera la mention « ANNULÉE ».{' '}
@@ -268,6 +267,20 @@ export function SignDialog({ pf, doc, onClose }: { pf: Proforma; doc: ProformaDo
           </button>
         </footer>
       </form>
+    </div>
+  );
+}
+
+/** Aperçu du tampon de la société (identique à celui du PDF) */
+export function CompanyStamp({ company }: { company?: Company }) {
+  const { state } = useStore();
+  const c = company ?? state.settings.company;
+  return (
+    <div className="pv-stamp">
+      <b>{c.name || 'JONAS INTERNATIONAL'}</b>
+      {c.address && <small>{c.address}</small>}
+      {c.city && <small>{c.city}</small>}
+      {c.vat && <small className="bold">N° TVA intracom. : {c.vat}</small>}
     </div>
   );
 }

@@ -3,7 +3,7 @@
 // Les versions signées / annulées sont recalculées à la demande depuis l'original et les métadonnées :
 // rien d'autre que le fichier du fournisseur n'est stocké.
 import { PDFDocument, StandardFonts, degrees, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
-import type { Proforma, ProformaDoc, Supplier, Product } from '../data/types';
+import type { Company, Proforma, ProformaDoc, Supplier, Product } from '../data/types';
 import { getBlob } from './files';
 
 const BLUE = rgb(0.11, 0.25, 0.69);
@@ -30,6 +30,8 @@ const safe = (s: string) =>
 export interface PdfContext {
   supplier: Supplier;
   products: Product[];
+  /** Société JONAS portée sur le tampon */
+  company: Company;
 }
 
 /** Proforma « déposée » des données de démo : régénérée depuis la proforma (pas de fichier stocké) */
@@ -46,7 +48,7 @@ export async function demoProformaPdf(pf: Proforma, doc: ProformaDoc, ctx: PdfCo
   txt(`No. ${pf.id}${doc.version > 1 ? `  (revision ${doc.version})` : ''}`, 380, 773, 10, bold);
   txt(`Date: ${fr(doc.uploadedAt.slice(0, 10))}`, 380, 759, 9);
   txt(`Buyer PO: ${pf.poNumber}`, 380, 745, 9);
-  txt('Buyer: JONAS FRANCE - Paris, France', 40, 740, 10, bold);
+  txt(`Buyer: ${ctx.company.name}${ctx.company.city ? ` - ${ctx.company.city}` : ''}, France`, 40, 740, 10, bold);
   txt(`Port of loading: ${s.port}  ·  Destination: Le Havre  ·  Incoterm: FOB`, 40, 724, 9, font, GREY);
   if (doc.reason) txt(`Revision reason: ${doc.reason}`, 40, 708, 9, font, RED);
 
@@ -111,39 +113,54 @@ function signaturePath(name: string) {
   return d;
 }
 
-/** Signature + tampon JONAS + date + date d'expédition demandée, en bas à droite de la dernière page */
-function drawSignature(page: PDFPage, doc: ProformaDoc, prev: ProformaDoc | undefined, font: PDFFont, bold: PDFFont) {
+/**
+ * Tampon de la société (encre bleue, double cadre, légèrement incliné) + « Bon pour accord » daté,
+ * signature et signataire, date d'expédition demandée. En bas à droite de la dernière page.
+ */
+function drawSignature(page: PDFPage, doc: ProformaDoc, prev: ProformaDoc | undefined, company: Company, font: PDFFont, bold: PDFFont) {
   const sig = doc.signature!;
   const { width } = page.getSize();
-  const w = 250;
-  const h = 132;
-  const x = width - w - 28;
-  const y = 28;
-  page.drawRectangle({ x: x - 6, y: y - 6, width: w + 12, height: h + (prev ? 30 : 12), color: rgb(1, 1, 1), opacity: 0.92 });
-  // Tampon : double cadre bleu, légèrement incliné
-  const rot = degrees(-3);
-  page.drawRectangle({ x, y: y + 40, width: 138, height: h - 44, borderColor: BLUE, borderWidth: 2, rotate: rot, borderOpacity: 0.9 });
-  page.drawRectangle({ x: x + 4, y: y + 44, width: 130, height: h - 52, borderColor: BLUE, borderWidth: 0.7, rotate: rot, borderOpacity: 0.9 });
-  const sx = x + 10;
-  let sy = y + h - 26;
-  const line = (t: string, size: number, f = bold, color = BLUE) => {
-    page.drawText(safe(t), { x: sx, y: sy, size, font: f, color, rotate: rot, opacity: 0.92 });
-    sy -= size + 4;
-  };
-  line('JONAS FRANCE', 13);
-  line('Importateur · Paris', 7.5, font);
-  line('BON POUR ACCORD', 10);
-  line(`Signé le ${fr(sig.date)}`, 8.5, bold);
-  // Signature manuscrite + signataire
-  page.drawSvgPath(signaturePath(sig.by), { x: x + 150, y: y + h - 40, borderColor: rgb(0.05, 0.12, 0.45), borderWidth: 1.4, scale: 0.75 });
-  page.drawText(safe(sig.by), { x: x + 150, y: y + h - 70, size: 8.5, font: bold, color: INK });
-  page.drawText(safe(sig.role), { x: x + 150, y: y + h - 81, size: 7.5, font, color: GREY });
-  // Date d'expédition demandée
-  page.drawText(safe('Date d’expédition demandée :'), { x, y: y + 22, size: 8.5, font, color: INK });
-  page.drawText(safe(`${fr(sig.etdWanted)} (S${d2(isoWeek(sig.etdWanted))})`), { x: x + 128, y: y + 22, size: 10, font: bold, color: BLUE });
-  page.drawText(safe(`Version ${doc.version} · ${doc.name}`.slice(0, 60)), { x, y: y + 8, size: 7, font, color: GREY });
+  const W = 300;
+  const x0 = width - W - 24;
+  const y0 = 24;
+  page.drawRectangle({ x: x0 - 6, y: y0 - 6, width: W + 12, height: prev ? 182 : 166, color: rgb(1, 1, 1), opacity: 0.94 });
   if (prev?.signature)
-    page.drawText(safe(`Annule et remplace la proforma v${prev.version} signée le ${fr(prev.signature.date)}`), { x, y: y + h + 10, size: 8, font: bold, color: RED });
+    page.drawText(safe(`Annule et remplace la proforma v${prev.version} signée le ${fr(prev.signature.date)}`), { x: x0, y: y0 + 166, size: 8.5, font: bold, color: RED });
+
+  // Tampon : cadre double, texte centré, rotation de -4° autour du coin bas gauche
+  const lines: { t: string; size: number; f: PDFFont }[] = [
+    { t: company.name || 'JONAS INTERNATIONAL', size: 14, f: bold },
+    ...(company.address ? [{ t: company.address, size: 8.5, f: font }] : []),
+    ...(company.city ? [{ t: company.city, size: 8.5, f: font }] : []),
+    ...(company.vat ? [{ t: `N° TVA intracom. : ${company.vat}`, size: 8, f: bold }] : []),
+  ];
+  const sw = Math.max(150, ...lines.map((l) => l.f.widthOfTextAtSize(safe(l.t), l.size) + 26));
+  const sh = 18 + lines.reduce((s, l) => s + l.size + 5, 0);
+  const sx = x0;
+  const sy = y0 + 84;
+  const a = (-4 * Math.PI) / 180;
+  const at = (dx: number, dy: number) => ({ x: sx + dx * Math.cos(a) - dy * Math.sin(a), y: sy + dx * Math.sin(a) + dy * Math.cos(a) });
+  const rot = degrees(-4);
+  page.drawRectangle({ ...at(0, 0), width: sw, height: sh, borderColor: BLUE, borderWidth: 2.2, rotate: rot, borderOpacity: 0.88 });
+  page.drawRectangle({ ...at(4, 4), width: sw - 8, height: sh - 8, borderColor: BLUE, borderWidth: 0.8, rotate: rot, borderOpacity: 0.88 });
+  let dy = sh - 12;
+  for (const l of lines) {
+    dy -= l.size;
+    const tw = l.f.widthOfTextAtSize(safe(l.t), l.size);
+    page.drawText(safe(l.t), { ...at((sw - tw) / 2, dy), size: l.size, font: l.f, color: BLUE, rotate: rot, opacity: 0.9 });
+    dy -= 5;
+  }
+
+  // Bon pour accord, date, signature et signataire
+  page.drawText(safe(`Bon pour accord, le ${fr(sig.date)}`), { x: x0, y: y0 + 40, size: 9, font: bold, color: INK });
+  page.drawSvgPath(signaturePath(sig.by), { x: x0 + 205, y: y0 + 74, borderColor: rgb(0.05, 0.12, 0.45), borderWidth: 1.3, scale: 0.7 });
+  page.drawText(safe(sig.by), { x: x0 + 205, y: y0 + 40, size: 9, font: bold, color: INK });
+  page.drawText(safe(sig.role), { x: x0 + 205, y: y0 + 30, size: 7.5, font, color: GREY });
+
+  // Date d'expédition demandée
+  page.drawText(safe('Date d’expédition demandée :'), { x: x0, y: y0 + 16, size: 9, font, color: INK });
+  page.drawText(safe(`${fr(sig.etdWanted)} (S${d2(isoWeek(sig.etdWanted))})`), { x: x0 + 132, y: y0 + 16, size: 10.5, font: bold, color: BLUE });
+  page.drawText(safe(`Version ${doc.version} · ${doc.name}`.slice(0, 70)), { x: x0, y: y0 + 3, size: 7, font, color: GREY });
 }
 
 /** Bandeau « ANNULÉE » sur chaque page d'une version remplacée */
@@ -167,7 +184,7 @@ export async function versionPdf(pf: Proforma, doc: ProformaDoc, ctx: PdfContext
   const pages = pdf.getPages();
   if (doc.signature) {
     const prev = pf.versions?.find((v) => v.version === doc.signature!.replaces);
-    drawSignature(pages[pages.length - 1], doc, prev, font, bold);
+    drawSignature(pages[pages.length - 1], doc, prev, ctx.company, font, bold);
   }
   if (doc.status === 'annulee' && doc.cancelledBy) {
     const by = pf.versions?.find((v) => v.version === doc.cancelledBy!.version);

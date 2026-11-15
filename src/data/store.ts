@@ -3,6 +3,7 @@ import * as seed from './seed';
 import type {
   Brand,
   BookingProposal,
+  Company,
   ProformaDoc,
   Container,
   ContainerStatus,
@@ -42,6 +43,7 @@ export const DEFAULT_SETTINGS: Settings = {
   defaultCapacity: 40,
   capacity: {},
   fx: { EUR: 1, USD: 0.93, CNY: 0.128 },
+  company: { name: 'JONAS INTERNATIONAL', address: '', city: '', vat: '' },
 };
 
 export const STORAGE_KEY = 'jonas-buying-state-v13';
@@ -68,7 +70,7 @@ export function load(): State {
     if (raw) {
       const st = JSON.parse(raw) as State;
       // Compatibilité : anciens états sans paramètres ni journal
-      return { ...st, settings: { ...DEFAULT_SETTINGS, ...(st.settings ?? {}) }, journal: st.journal ?? [] };
+      return { ...st, settings: { ...DEFAULT_SETTINGS, ...(st.settings ?? {}), company: { ...DEFAULT_SETTINGS.company, ...(st.settings?.company ?? {}) } }, journal: st.journal ?? [] };
     }
   } catch {
     /* stockage indisponible */
@@ -143,6 +145,7 @@ export type Action =
   | { type: 'removePackFile'; productId: string; fileId: string }
   | { type: 'setCapacity'; designer: string; capacity: number | null }
   | { type: 'setDefaultCapacity'; capacity: number }
+  | { type: 'setCompany'; company: Company }
   | { type: 'setFx'; currency: 'USD' | 'CNY'; rate: number }
   | { type: 'setProformaCurrency'; id: string; currency: 'EUR' | 'USD' | 'CNY' }
   | { type: 'setForwarder'; containerId: string; forwarder: Forwarder };
@@ -211,6 +214,7 @@ const ACTION_PERM: Partial<Record<Action['type'], Perm>> = {
   setCapacity: 'users.manage',
   setDefaultCapacity: 'users.manage',
   setFx: 'finance.pay',
+  setCompany: 'proforma.sign',
   setProformaCurrency: 'proforma.edit',
   setForwarder: 'logistics.plan',
   remindBooking: 'logistics.booking',
@@ -933,6 +937,8 @@ function applyAction(s: State, a: Action): State {
       return { ...s, settings: { ...s.settings, defaultCapacity: a.capacity } };
     case 'setFx':
       return { ...s, settings: { ...s.settings, fx: { ...s.settings.fx, [a.currency]: a.rate } } };
+    case 'setCompany':
+      return { ...s, settings: { ...s.settings, company: a.company } };
     case 'setProformaCurrency':
       return mapPF(s, a.id, (pf) => {
         // Même valeur en € : les prix de ligne sont convertis dans la nouvelle devise
@@ -1168,6 +1174,8 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
       return { text: `Capacité par défaut → ${a.capacity} packs / semaine` };
     case 'setFx':
       return { text: `Cours ${a.currency} → ${a.rate} €` };
+    case 'setCompany':
+      return { text: `Tampon société : ${a.company.name} · TVA ${a.company.vat || '—'}` };
     case 'setProformaCurrency':
       return { target: a.id, text: `Devise → ${a.currency}` };
     case 'setForwarder':
