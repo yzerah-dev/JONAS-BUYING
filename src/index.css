@@ -1140,3 +1140,39 @@ th.pk-drop { background: var(--green-softer); border-radius: 10px; }
 .ct-ref { font-size: 12px; color: var(--muted); font-weight: 600; }
 .ct-title > b { font-size: 16px !important; font-weight: 700 !important; }
 @media (max-width: 820px) { .ct-num strong { font-size: 18px; } }
+
+/* =====================================================================
+   Conteneurs : en-tête simplifié (recherche + filtres, période, statuts)
+   ===================================================================== */
+.ctn-head { margin-bottom: 14px; gap: 14px; }
+.ctn-filters { width: 300px; left: auto; right: 0; gap: 12px; }
+.ctn-f-row { display: grid; gap: 4px; }
+.ctn-f-row .seg { width: 100%; }
+.ctn-f-row .seg button { flex: 1; justify-content: center; }
+.ctn-period { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.ctn-nav { display: flex; align-items: center; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 14px; background: #fff; box-shadow: var(--shadow); }
+.ctn-nav button { width: 40px; height: 40px; border: 0; border-radius: 10px; background: transparent; display: grid; place-items: center; color: var(--ink); }
+.ctn-nav button:hover:not(:disabled) { background: var(--green-softer); color: var(--green-dark); }
+.ctn-nav button:disabled { opacity: 0.3; }
+.ctn-nav span { min-width: 180px; text-align: center; display: flex; flex-direction: column; line-height: 1.15; }
+.ctn-nav b { font-size: 18px; font-weight: 800; }
+.ctn-nav small { font-size: 12px; color: var(--muted); }
+.ctn-range { margin-left: auto; }
+.ctn-range button { height: 42px; padding: 0 18px; font-size: 15px; }
+.ctn-chips .pf-chip { height: 44px; font-size: 15px; }
+.ctn-chips .pf-chip b { font-size: 18px; }
+.pf-chip.zero:not(.active) { opacity: 0.45; }
+.ctn-summary { font-size: 14px; color: var(--ink-2); }
+.ctn-summary b { color: var(--ink); font-weight: 800; }
+@media (max-width: 820px) {
+  .ctn-head { gap: 10px; }
+  .ctn-period { gap: 8px; }
+  .ctn-nav { flex: 1 1 100%; justify-content: space-between; }
+  .ctn-nav span { min-width: 0; flex: 1; }
+  .ctn-range { margin-left: 0; flex: 1 1 100%; display: grid !important; grid-template-columns: repeat(3, 1fr); }
+  .ctn-range button { height: 38px; justify-content: center; padding: 0; }
+  .ctn-range button + button { border-radius: 12px; }
+  .ctn-filters { position: fixed; left: 16px; right: 16px; top: auto; width: auto; z-index: 40; }
+  .ctn-chips .pf-chip { height: 40px; font-size: 14px; }
+  .ctn-chips .pf-chip b { font-size: 16px; }
+}

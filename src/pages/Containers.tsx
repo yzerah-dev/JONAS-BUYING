@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Calendar, CalendarClock, Check, ChevronLeft, ChevronRight, Container as Ctn, FileText, Home, Mail, Phone, Search, Ship, Truck, User, X } from 'lucide-react';
+import { Calendar, CalendarClock, Check, ChevronLeft, ChevronRight, FileText, Home, Mail, Phone, Search, Ship, SlidersHorizontal, Truck, User, X } from 'lucide-react';
 import {
   CONTAINER_STATUS_LABEL,
   byId,
@@ -20,7 +20,7 @@ import {
 import { CONTAINER_STATUSES, FORWARDERS, type Container, type ContainerStatus, type Forwarder } from '../data/types';
 import ReceptionDialog from '../components/ReceptionDialog';
 import ContainerCard from '../components/ContainerCard';
-import { ContainerStatusPill, Kpi, Pill, ProductThumb, Progress, Seg, SupplierLogo } from '../components/ui';
+import { ContainerStatusPill, Pill, ProductThumb, Progress, Seg, SupplierLogo } from '../components/ui';
 import { toast } from '../components/ui-shared';
 import { TODAY, addDays, dec, diffDays, eur, fshort, m3, monthKey, monthLabel, num, shiftMonth, weekKey, weekLabel, weekRange } from '../lib/format';
 
@@ -30,6 +30,14 @@ const GROUP_COLOR: Record<ContainerStatus, string> = {
   booke: 'green',
   en_transit: 'blue',
   arrive: 'teal',
+};
+
+const STATUS_ICON: Record<ContainerStatus, { icon: typeof Calendar; color: string }> = {
+  a_booker: { icon: Calendar, color: 'var(--orange)' },
+  booking_demande: { icon: CalendarClock, color: 'var(--violet)' },
+  booke: { icon: Check, color: 'var(--green)' },
+  en_transit: { icon: Truck, color: 'var(--blue)' },
+  arrive: { icon: Home, color: 'var(--green-dark)' },
 };
 
 export default function Containers() {
@@ -55,11 +63,11 @@ export default function Containers() {
   const dateOf = (c: Container) => (basis === 'eta' ? containerEta(c) : containerEtd(c));
   const inPeriod = (c: Container) => (all ? true : period === 'mois' ? monthKey(dateOf(c)) === month : weekKey(dateOf(c)) === weekKey(weekRef));
 
-  const filtered = useMemo(
+  // Conteneurs de la période et des filtres (hors statut) : sert aux compteurs des pastilles
+  const base = useMemo(
     () =>
       state.containers
         .filter(inPeriod)
-        .filter((c) => statusF === 'all' || c.status === statusF)
         .filter((c) => supplierF === 'all' || c.supplierId === supplierF)
         .filter((c) => fwdF === 'all' || c.forwarder === fwdF)
         .filter((c) => {
@@ -69,8 +77,11 @@ export default function Containers() {
         })
         .sort((a, b) => dateOf(a).localeCompare(dateOf(b))),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [state, month, weekRef, period, basis, statusF, supplierF, fwdF, q, all],
+    [state, month, weekRef, period, basis, supplierF, fwdF, q, all],
   );
+  const filtered = statusF === 'all' ? base : base.filter((c) => c.status === statusF);
+  const activeFilters = (supplierF !== 'all' ? 1 : 0) + (fwdF !== 'all' ? 1 : 0) + (basis === 'etd' ? 1 : 0);
+  const [showFilters, setShowFilters] = useState(false);
 
   const sel = state.containers.find((c) => c.id === selId);
   const select = (id: string | null) => {
@@ -80,133 +91,144 @@ export default function Containers() {
     if (id) revealPanel();
   };
 
-  const count = (s: ContainerStatus) => state.containers.filter((c) => c.status === s).length;
   const cbmOf = (list: Container[]) => list.reduce((s, c) => s + containerCbm(state, c), 0);
   const transitValue = filtered.filter((c) => c.status === 'en_transit').reduce((s, c) => s + containerValue(state, c), 0);
 
   return (
     <>
-      <div className="page-head">
-        <div className="cal-icon" style={{ width: 54, height: 54 }}>
-          <Ctn size={28} />
-        </div>
-        <div>
-          <h1>Mes conteneurs</h1>
-          <div className="page-sub">Suivi, planning, bookings, productions et arrivages</div>
-        </div>
-      </div>
-      <div className="kpis mb">
-        <Kpi icon={<Ctn size={18} />} value={state.containers.length} label="Conteneurs" />
-        <Kpi icon={<Check size={18} />} value={count('booke')} label="Bookés" onClick={() => setStatusF('booke')} />
-        <Kpi icon={<Truck size={18} />} value={count('en_transit')} label="En transit" color="blue" onClick={() => setStatusF('en_transit')} />
-        <Kpi icon={<Home size={18} />} value={count('arrive')} label="Arrivés" onClick={() => setStatusF('arrive')} />
-        <Kpi icon={<Calendar size={18} />} value={count('a_booker')} label="À booker" color="orange" onClick={() => setStatusF('a_booker')} />
-        <Kpi icon={<CalendarClock size={18} />} value={count('booking_demande')} label="Booking demandé" color="violet" onClick={() => setStatusF('booking_demande')} />
-        <Kpi icon={<Ship size={18} />} value={`${num(cbmOf(state.containers))} m³`} label="Total (CBM)" />
-      </div>
+      <div className="pf-page ctn-head">
+        <h1 className="pf-title">Conteneurs</h1>
 
-      <div className="row wrap mb">
-        <Seg
-          value={all ? 'tous' : 'periode'}
-          onChange={(v) => setAll(v === 'tous')}
-          options={[
-            { id: 'periode', label: 'Période' },
-            { id: 'tous', label: 'Tous' },
-          ]}
-        />
-        <Seg
-          value={period}
-          onChange={setPeriod}
-          options={[
-            { id: 'semaine', label: 'Vue par semaine' },
-            { id: 'mois', label: 'Vue par mois' },
-          ]}
-        />
-        <Seg
-          value={basis}
-          onChange={setBasis}
-          options={[
-            { id: 'etd', label: 'Par ETD (départ)' },
-            { id: 'eta', label: 'Par ETA (arrivée)' },
-          ]}
-        />
-        <div className="seg">
-          <button onClick={() => (period === 'mois' ? setMonth(shiftMonth(month, -1)) : setWeekRef(addDays(weekRef, -7)))}>
-            <ChevronLeft size={16} />
-          </button>
-          <button className="active" style={{ minWidth: 150, justifyContent: 'center' }}>
-            {period === 'mois' ? monthLabel(month) : `${weekLabel(weekRef)} · ${weekRange(weekRef)}`}
-          </button>
-          <button onClick={() => (period === 'mois' ? setMonth(shiftMonth(month, 1)) : setWeekRef(addDays(weekRef, 7)))}>
-            <ChevronRight size={16} />
-          </button>
+        <div className="pf-toolbar">
+          <label className="pf-search">
+            <Search size={20} />
+            <input placeholder="N° conteneur, booking, proforma, fournisseur…" value={q} onChange={(e) => setQ(e.target.value)} />
+          </label>
+          <div style={{ position: 'relative' }}>
+            <button className={`pf-btn ${activeFilters ? 'on' : ''}`} onClick={() => setShowFilters(!showFilters)} aria-expanded={showFilters}>
+              <SlidersHorizontal size={19} /> Filtrer{activeFilters ? ` (${activeFilters})` : ''}
+            </button>
+            {showFilters && (
+              <div className="card pf-popover ctn-filters">
+                <div className="ctn-f-row">
+                  <span className="xs muted">Dates</span>
+                  <Seg
+                    value={basis}
+                    onChange={setBasis}
+                    options={[
+                      { id: 'eta', label: 'Arrivée' },
+                      { id: 'etd', label: 'Départ' },
+                    ]}
+                  />
+                </div>
+                <label className="ctn-f-row" htmlFor="ctn-sup">
+                  <span className="xs muted">Fournisseur</span>
+                  <select id="ctn-sup" className="input" value={supplierF} onChange={(e) => setSupplierF(e.target.value)}>
+                    <option value="all">Tous</option>
+                    {state.suppliers.map((x) => (
+                      <option key={x.id} value={x.id}>
+                        {x.shortName}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="ctn-f-row" htmlFor="ctn-fwd">
+                  <span className="xs muted">Transitaire</span>
+                  <select id="ctn-fwd" className="input" value={fwdF} onChange={(e) => setFwdF(e.target.value)} aria-label="Transitaire">
+                    <option value="all">Tous</option>
+                    {FORWARDERS.map((f) => (
+                      <option key={f}>{f}</option>
+                    ))}
+                  </select>
+                </label>
+                <p className="xs muted" style={{ margin: 0 }}>
+                  {basis === 'eta'
+                    ? 'Arrivée : conteneurs dont l’arrivée (prévue, révisée ou réelle) tombe dans la période, même partis avant ou pas encore bookés.'
+                    : 'Départ : conteneurs dont le départ (prévu ou réel) tombe dans la période.'}
+                </p>
+                {activeFilters > 0 && (
+                  <button
+                    className="btn sm ghost"
+                    onClick={() => {
+                      setSupplierF('all');
+                      setFwdF('all');
+                      setBasis('eta');
+                    }}
+                  >
+                    Réinitialiser
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
-        <div className="search grow">
-          <Search size={16} className="muted" />
-          <input placeholder="N° conteneur, booking, proforma, fournisseur…" value={q} onChange={(e) => setQ(e.target.value)} />
+
+        <div className="ctn-period">
+          <div className="ctn-nav">
+            <button aria-label="Période précédente" disabled={all} onClick={() => (period === 'mois' ? setMonth(shiftMonth(month, -1)) : setWeekRef(addDays(weekRef, -7)))}>
+              <ChevronLeft size={20} />
+            </button>
+            <span>
+              <b>{all ? 'Tous les conteneurs' : period === 'mois' ? monthLabel(month) : `Semaine ${weekLabel(weekRef).slice(1)}`}</b>
+              <small>{all ? 'toutes dates' : period === 'mois' ? `par ${basis === 'eta' ? 'arrivée' : 'départ'}` : weekRange(weekRef)}</small>
+            </span>
+            <button aria-label="Période suivante" disabled={all} onClick={() => (period === 'mois' ? setMonth(shiftMonth(month, 1)) : setWeekRef(addDays(weekRef, 7)))}>
+              <ChevronRight size={20} />
+            </button>
+          </div>
+          <div className="pf-views ctn-range">
+            {(
+              [
+                ['mois', 'Mois'],
+                ['semaine', 'Semaine'],
+                ['tout', 'Tout'],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                className={(id === 'tout' ? all : !all && period === id) ? 'active' : ''}
+                onClick={() => {
+                  if (id === 'tout') setAll(true);
+                  else {
+                    setAll(false);
+                    setPeriod(id);
+                  }
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
-      <div className="row wrap mb">
-        <select className="input" value={statusF} onChange={(e) => setStatusF(e.target.value as ContainerStatus | 'all')}>
-          <option value="all">Statut : Tous</option>
-          {CONTAINER_STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {CONTAINER_STATUS_LABEL[s]}
-            </option>
-          ))}
-        </select>
-        <select className="input" value={supplierF} onChange={(e) => setSupplierF(e.target.value)}>
-          <option value="all">Fournisseur : Tous</option>
-          {state.suppliers.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.shortName}
-            </option>
-          ))}
-        </select>
-        <select className="input" value={fwdF} onChange={(e) => setFwdF(e.target.value)} aria-label="Transitaire">
-          <option value="all">Transitaire : Tous</option>
-          {FORWARDERS.map((f) => (
-            <option key={f}>{f}</option>
-          ))}
-        </select>
-        <span className="xs muted">
-          {basis === 'eta'
-            ? 'Par ETA : conteneurs dont l’arrivée prévue, révisée ou réelle tombe dans la période, même si l’ETD est antérieure ou qu’ils ne sont pas bookés.'
-            : 'Par ETD : conteneurs dont le départ prévu ou réel tombe dans la période.'}
-        </span>
+
+        <div className="pf-chips ctn-chips">
+          <button className={`pf-chip ${statusF === 'all' ? 'active' : ''}`} onClick={() => setStatusF('all')}>
+            Tous <b>{base.length}</b>
+          </button>
+          {CONTAINER_STATUSES.map((st) => {
+            const n = base.filter((c) => c.status === st).length;
+            const Icon = STATUS_ICON[st].icon;
+            return (
+              <button key={st} className={`pf-chip ${statusF === st ? 'active' : ''} ${n ? '' : 'zero'}`} onClick={() => setStatusF(st)}>
+                <Icon size={18} style={{ color: statusF === st ? undefined : STATUS_ICON[st].color }} /> {CONTAINER_STATUS_LABEL[st]} <b>{n}</b>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="ctn-summary">
+          <b>{filtered.length}</b> conteneur{filtered.length > 1 ? 's' : ''} · <b>{num(cbmOf(filtered))}</b> m³
+          {transitValue > 0 && (
+            <>
+              {' '}
+              · <b>{eur(transitValue)}</b> en transit
+            </>
+          )}
+        </div>
       </div>
 
       <div className="split">
         <div>
-          <div className="card pad row wrap gap-lg mb">
-            <Calendar className="green" />
-            <div>
-              <div className="bold" style={{ fontSize: 20 }}>
-                {all ? 'Tous les conteneurs' : period === 'mois' ? monthLabel(month) : `Semaine ${weekLabel(weekRef)}`}
-              </div>
-              <div className="small muted">
-                {filtered.length} conteneurs | {num(cbmOf(filtered))} m³
-              </div>
-            </div>
-            {CONTAINER_STATUSES.map((s) => {
-              const l = filtered.filter((c) => c.status === s);
-              return (
-                <div key={s} className="metric" style={{ borderLeft: '1px solid var(--line)', paddingLeft: 14 }}>
-                  <div className="bold" style={{ fontSize: 18 }}>
-                    {l.length}
-                  </div>
-                  <div className="xs muted">{CONTAINER_STATUS_LABEL[s]}</div>
-                  <div className="xs muted">{num(cbmOf(l))} m³</div>
-                </div>
-              );
-            })}
-            <div className="grow" />
-            <div className="pill green" style={{ flexDirection: 'column', padding: '8px 14px', borderRadius: 12 }}>
-              <span className="xs">Valeur en transit</span>
-              <span style={{ fontSize: 18 }}>{eur(transitValue)}</span>
-            </div>
-          </div>
-
           {filtered.length === 0 && <div className="card empty">Aucun conteneur sur cette période.</div>}
 
           {CONTAINER_STATUSES.map((s) => {
