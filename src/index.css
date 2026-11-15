@@ -1289,6 +1289,21 @@ th.pk-drop { background: var(--green-softer); border-radius: 10px; }
   .pb-dates { grid-template-columns: 1fr; }
   .pb-answer .btn.primary { width: 100%; justify-content: center; }
 }
+.fw-head { display: flex; align-items: center; gap: 14px; padding: 16px 20px; border-radius: 18px; border: 1px solid var(--line); margin-bottom: 14px; }
+.fw-head > div { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.fw-head h1 { font-size: 28px; margin: 0; }
+.fw-head > div > span { color: var(--ink-2); font-size: 15px; }
+.fw-head.bk-orange { background: linear-gradient(90deg, #fff1e0, #fff8ef); }
+.fw-head.bk-violet { background: linear-gradient(90deg, #efe9fd, #f7f3ff); }
+.fw-head.bk-green { background: linear-gradient(90deg, var(--green-soft), var(--green-softer)); }
+.fw-head.bk-grey { background: var(--grey-soft); }
+.fw-list { padding: 4px 12px; }
+.fw-list .empty { padding: 40px 0; }
+@media (max-width: 720px) {
+  .fw-head { padding: 12px 14px; gap: 10px; }
+  .fw-head h1 { font-size: 21px; }
+  .fw-head > div > span { font-size: 13px; }
+}
 .fw-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
 .fw-doc { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 999px; border: 0; font-family: inherit; }
 .fw-doc.ok { background: var(--green-soft); color: var(--green-dark); }

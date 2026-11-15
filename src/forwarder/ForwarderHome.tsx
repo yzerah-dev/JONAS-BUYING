@@ -1,59 +1,47 @@
 import { useState, type ReactNode } from 'react';
-import { Anchor, CalendarCheck, Check, ChevronDown, ChevronUp, ClipboardCheck, FileUp, Search, Ship, Truck, Warehouse, X } from 'lucide-react';
+import { Navigate, useParams } from 'react-router-dom';
+import { Anchor, CalendarCheck, Check, ClipboardCheck, FileUp, Search, Ship, Truck, Warehouse, X } from 'lucide-react';
 import { byId, containerCbm, containerEta, containerEtd, containerProformas, containerQty, currentUser, useStore, type State } from '../data/store';
 import type { Container } from '../data/types';
 import { ProductThumb, SupplierLogo } from '../components/ui';
 import { toast } from '../components/ui-shared';
 import { CarrierBadge } from '../components/ContainerCard';
 import { TODAY, addDays, dec, diffDays, fdate, fshort, num, weekLabel } from '../lib/format';
-import { pressable } from '../lib/a11y';
-import { DOC_LABEL, REQUIRED_DOCS, fwdStages } from './fwd';
+import { DOC_LABEL, REQUIRED_DOCS, STAGES, STAGE_DEF, fwdStages, type FwdStage } from './fwd';
 
 type Dialog = { mode: 'confirm' | 'eta' | 'delivery'; c: Container } | null;
 
 export default function ForwarderHome() {
   const { state } = useStore();
   const user = currentUser(state);
+  const { etape } = useParams();
   const [q, setQ] = useState('');
   const [dialog, setDialog] = useState<Dialog>(null);
-  const st = fwdStages(state, user);
-  const match = (c: Container) => {
-    const s = q.trim().toLowerCase();
+  if (!STAGES.includes(etape as FwdStage)) return <Navigate to="/transitaire/a-confirmer" replace />;
+  const stage = etape as FwdStage;
+  const def = STAGE_DEF[stage];
+  const s = q.trim().toLowerCase();
+  const list = fwdStages(state, user)[stage].filter((c) => {
     if (!s) return true;
     const sup = byId(state.suppliers, c.supplierId);
     return `${c.id} ${c.number ?? ''} ${c.bookingNo ?? ''} ${c.booking?.vessel ?? ''} ${sup.name} ${containerProformas(c).join(' ')}`.toLowerCase().includes(s);
-  };
-  const [toConfirm, ready, atSea, arrived] = [st.toConfirm, st.ready, st.atSea, st.arrived].map((l) => l.filter(match));
-  const soon = st.atSea.filter((c) => diffDays(containerEta(c), TODAY) <= 7).length;
+  });
+  const Icon = { 'a-confirmer': ClipboardCheck, pret: CalendarCheck, 'en-mer': Ship, 'au-port': Anchor, livres: Warehouse }[stage];
+  const tone = { 'a-confirmer': 'orange', pret: 'violet', 'en-mer': 'green', 'au-port': 'orange', livres: 'grey' }[stage];
 
   return (
     <div className="pf-page">
-      <div className="page-head">
-        <h1>Mes conteneurs</h1>
-        <span className="page-sub">Bookings JONAS confiés à {user.forwarder} : confirmation, départ, suivi, douane et livraison.</span>
-      </div>
-
-      <div className="bk-kpis">
-        <div className="kpi-box">
-          <small>À confirmer</small>
-          <b>{st.toConfirm.length}</b>
-          <span className={st.toConfirm.length ? 'orange' : ''}>{st.toConfirm.length ? 'N° de conteneur et navire attendus' : 'Tout est confirmé'}</span>
+      <div className={`fw-head bk-stage bk-${tone}`}>
+        <span className="bk-ico">
+          <Icon size={34} strokeWidth={1.8} />
+        </span>
+        <div>
+          <h1>{def.title}</h1>
+          <span>{def.sub}</span>
         </div>
-        <div className="kpi-box">
-          <small>Prêts au départ</small>
-          <b>{st.ready.length}</b>
-          <span>en attente de chargement</span>
-        </div>
-        <div className="kpi-box">
-          <small>En mer</small>
-          <b>{st.atSea.length}</b>
-          <span className={soon ? 'orange' : ''}>{soon ? `${soon} arrivée(s) sous 7 j` : 'Aucune arrivée proche'}</span>
-        </div>
-        <div className="kpi-box">
-          <small>Arrivés</small>
-          <b>{st.arrived.length}</b>
-          <span>{st.arrived.filter((c) => c.customs === 'dedouane').length} dédouané(s)</span>
-        </div>
+        <span className="pf-count">
+          {list.length} conteneur{list.length > 1 ? 's' : ''}
+        </span>
       </div>
 
       <div className="pf-toolbar">
@@ -63,36 +51,23 @@ export default function ForwarderHome() {
         </label>
       </div>
 
-      <Stage icon={<ClipboardCheck size={34} strokeWidth={1.8} />} tone="orange" title="Bookings à confirmer" sub="Booké par le fournisseur : confirmez le n° de conteneur, le navire et le cut-off" items={toConfirm}>
-        {toConfirm.map((c) => (
-          <Row key={c.id} s={state} c={c}>
-            <Info c={c} s={state} />
-            <div className="bk-actions">
-              <button className="btn sm primary" onClick={() => setDialog({ mode: 'confirm', c })}>
-                <Check size={14} /> Confirmer
-              </button>
-            </div>
-          </Row>
-        ))}
-      </Stage>
-
-      <Stage icon={<CalendarCheck size={34} strokeWidth={1.8} />} tone="violet" title="Prêts au départ" sub="Booking confirmé, en attente du chargement et du départ" items={ready}>
-        {ready.map((c) => (
-          <ShipRow key={c.id} s={state} c={c} onDialog={setDialog} />
-        ))}
-      </Stage>
-
-      <Stage icon={<Ship size={34} strokeWidth={1.8} />} tone="green" title="En mer" sub="Suivi de l’ETA, documents, dédouanement et livraison à l’entrepôt" items={atSea}>
-        {atSea.map((c) => (
-          <ShipRow key={c.id} s={state} c={c} onDialog={setDialog} />
-        ))}
-      </Stage>
-
-      <Stage icon={<Anchor size={30} strokeWidth={1.8} />} tone="grey" title="Arrivés" sub="Historique : dédouanement et livraison" items={arrived} defaultOpen={false}>
-        {arrived.map((c) => (
-          <ShipRow key={c.id} s={state} c={c} onDialog={setDialog} />
-        ))}
-      </Stage>
+      <div className="card bk-body fw-list">
+        {list.length === 0 && <div className="empty small">{s ? 'Aucun résultat.' : def.empty}</div>}
+        {list.map((c) =>
+          stage === 'a-confirmer' ? (
+            <Row key={c.id} s={state} c={c}>
+              <Info c={c} s={state} />
+              <div className="bk-actions">
+                <button className="btn sm primary" onClick={() => setDialog({ mode: 'confirm', c })}>
+                  <Check size={14} /> Confirmer
+                </button>
+              </div>
+            </Row>
+          ) : (
+            <ShipRow key={c.id} s={state} c={c} onDialog={setDialog} />
+          ),
+        )}
+      </div>
 
       {dialog && <FwdDialog key={dialog.c.id + dialog.mode} mode={dialog.mode} c={dialog.c} onClose={() => setDialog(null)} />}
     </div>
@@ -105,6 +80,7 @@ function ShipRow({ s, c, onDialog }: { s: State; c: Container; onDialog: (d: Dia
   const eta = containerEta(c);
   const left = diffDays(eta, TODAY);
   const missing = REQUIRED_DOCS.filter((d) => !c.documents.includes(d));
+  const atPort = c.status === 'en_transit' && !!c.etaReal;
   return (
     <Row s={s} c={c} carrier>
       <div className="bk-info">
@@ -115,11 +91,16 @@ function ShipRow({ s, c, onDialog }: { s: State; c: Container; onDialog: (d: Dia
           <b>
             Départ {fshort(containerEtd(c))} · cut-off {fshort(c.booking?.cutoff)}
           </b>
-        ) : (
-          <b className={c.etaRevised && c.status === 'en_transit' ? 'red' : ''}>
-            Arrivée {c.portTo} {fshort(eta)}
-            {c.status === 'en_transit' ? ` · J-${Math.max(0, left)}` : ''}
+        ) : atPort ? (
+          <b>
+            Au port de {c.portTo} depuis le {fshort(c.etaReal)}
           </b>
+        ) : c.status === 'en_transit' ? (
+          <b className={c.etaRevised ? 'red' : ''}>
+            Arrivée {c.portTo} {fshort(eta)} · {left >= 0 ? `J-${left}` : `retard ${-left} j`}
+          </b>
+        ) : (
+          <b>Livré à {c.warehouse} le {fshort(c.receivedOn ?? c.deliveryDate)}</b>
         )}
         <span className="fw-tags">
           {c.status !== 'booke' &&
@@ -167,27 +148,36 @@ function ShipRow({ s, c, onDialog }: { s: State; c: Container; onDialog: (d: Dia
             </button>
           </>
         )}
-        {c.status === 'en_transit' && (
+        {c.status === 'en_transit' && !atPort && (
           <>
             <button className="btn sm ghost" onClick={() => onDialog({ mode: 'eta', c })}>
               Nouvelle ETA
             </button>
-            {!c.customs && (
-              <button
-                className={`btn sm ${left <= 7 ? 'primary' : ''}`}
-                disabled={missing.length > 0}
-                title={missing.length ? `Documents manquants : ${missing.map((d) => DOC_LABEL[d]).join(', ')}` : undefined}
-                onClick={() => {
-                  dispatch({ type: 'setCustoms', containerId: c.id, status: 'en_cours' });
-                  toast('Dédouanement lancé');
-                }}
-              >
-                Lancer la douane
-              </button>
-            )}
+            <button
+              className={`btn sm ${left <= 3 ? 'primary' : ''}`}
+              onClick={() => {
+                dispatch({ type: 'portArrival', containerId: c.id });
+                toast(`${c.number ?? c.id} arrivé au port de ${c.portTo}`);
+              }}
+            >
+              <Anchor size={14} /> Arrivé au port
+            </button>
           </>
         )}
-        {c.customs === 'en_cours' && (
+        {atPort && !c.customs && (
+          <button
+            className="btn sm primary"
+            disabled={missing.length > 0}
+            title={missing.length ? `Documents manquants : ${missing.map((d) => DOC_LABEL[d]).join(', ')}` : undefined}
+            onClick={() => {
+              dispatch({ type: 'setCustoms', containerId: c.id, status: 'en_cours' });
+              toast('Dédouanement lancé');
+            }}
+          >
+            Lancer la douane
+          </button>
+        )}
+        {atPort && c.customs === 'en_cours' && (
           <button
             className="btn sm primary"
             onClick={() => {
@@ -198,9 +188,9 @@ function ShipRow({ s, c, onDialog }: { s: State; c: Container; onDialog: (d: Dia
             <Check size={14} /> Dédouané
           </button>
         )}
-        {c.customs === 'dedouane' && !c.deliveryDate && (
-          <button className="btn sm primary" onClick={() => onDialog({ mode: 'delivery', c })}>
-            <Truck size={14} /> Planifier la livraison
+        {atPort && c.customs === 'dedouane' && (
+          <button className={`btn sm ${c.deliveryDate ? 'ghost' : 'primary'}`} onClick={() => onDialog({ mode: 'delivery', c })}>
+            <Truck size={14} /> {c.deliveryDate ? 'Modifier la livraison' : 'Planifier la livraison'}
           </button>
         )}
       </div>
@@ -222,26 +212,6 @@ function Info({ c, s }: { c: Container; s: State }) {
       </b>
       <span>Arrivée prévue {fshort(c.etaPlanned)} · livraison {c.warehouse}</span>
     </div>
-  );
-}
-
-function Stage({ icon, tone, title, sub, items, children, defaultOpen = true }: { icon: ReactNode; tone: string; title: string; sub: string; items: unknown[]; children: ReactNode; defaultOpen?: boolean }) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <section className={`pf-week bk-stage bk-${tone} ${open ? 'open' : ''}`}>
-      <header className="pf-week-head" {...pressable(() => setOpen(!open))} aria-expanded={open}>
-        <span className="bk-ico">{icon}</span>
-        <div className="pf-week-title">
-          <h2>{title}</h2>
-          <span>{sub}</span>
-        </div>
-        <span className="pf-count">
-          {items.length} conteneur{items.length > 1 ? 's' : ''}
-        </span>
-        <span className="pf-chevron">{open ? <ChevronUp size={24} /> : <ChevronDown size={24} />}</span>
-      </header>
-      {open && <div className="pf-body bk-body">{items.length ? children : <div className="empty small">Rien ici.</div>}</div>}
-    </section>
   );
 }
 

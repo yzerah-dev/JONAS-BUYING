@@ -122,6 +122,7 @@ export type Action =
   | { type: 'reviseEta'; containerId: string; eta: ISODate }
   | { type: 'fwdConfirm'; containerId: string; number: string; seal?: string; vessel: string; cutoff?: ISODate; etd: ISODate }
   | { type: 'setCustoms'; containerId: string; status: CustomsStatus }
+  | { type: 'portArrival'; containerId: string }
   | { type: 'planDelivery'; containerId: string; date: ISODate }
   | { type: 'advanceDev'; productId: string }
   | { type: 'toggleUrgent'; productId: string }
@@ -308,6 +309,12 @@ export function isAllowed(s: State, a: Action): boolean {
       const c = s.containers.find((x) => x.id === a.containerId);
       if (!c || c.status !== 'booke') return false;
       if (isForwarder(u)) return forwarderOwns(u, c) && (a.type === 'fwdConfirm' || !!c.fwdConfirmedAt);
+      return can(u, 'logistics.booking');
+    }
+    case 'portArrival': {
+      const c = s.containers.find((x) => x.id === a.containerId);
+      if (!c || c.status !== 'en_transit' || c.etaReal) return false;
+      if (isForwarder(u)) return forwarderOwns(u, c);
       return can(u, 'logistics.booking');
     }
     case 'reviseEta':
@@ -793,6 +800,12 @@ function applyAction(s: State, a: Action): State {
         booking: { reminders: [], ...(c.booking ?? {}), vessel: a.vessel, cutoff: a.cutoff ?? c.booking?.cutoff },
         dateHistory: [...c.dateHistory, hist(me, `Booking confirmé par ${c.forwarder ?? 'le transitaire'} : ${a.number} · ${a.vessel} · ETD ${a.etd}`)],
       }));
+    case 'portArrival':
+      return mapC(s, a.containerId, (c) => ({
+        ...c,
+        etaReal: TODAY,
+        dateHistory: [...c.dateHistory, hist(me, `Arrivé au port de ${c.portTo} le ${TODAY}`)],
+      }));
     case 'setCustoms':
       return mapC(s, a.containerId, (c) => ({
         ...c,
@@ -896,6 +909,8 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
       return { target: ctn(a.containerId), text: `Booking confirmé par le transitaire (${a.vessel})` };
     case 'setCustoms':
       return { target: ctn(a.containerId), text: a.status === 'dedouane' ? 'Dédouané' : 'Dédouanement lancé' };
+    case 'portArrival':
+      return { target: ctn(a.containerId), text: 'Arrivé au port' };
     case 'planDelivery':
       return { target: ctn(a.containerId), text: `Livraison planifiée le ${a.date}` };
     case 'advanceDev':

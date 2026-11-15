@@ -1,70 +1,72 @@
 import { expect, expectNoHorizontalOverflow, go, loginAs, resetApp, setUser, sidebarItems, test, toast } from './fixtures';
 
-const count = async (page: import('@playwright/test').Page, title: string) =>
-  parseInt((await page.locator('.bk-stage', { hasText: title }).locator('.pf-count').innerText()).trim(), 10);
-
 test.describe('Portail transitaire', () => {
   test.beforeEach(async ({ page }) => {
     await resetApp(page);
   });
 
-  test('connexion transitaire : redirection et données isolées', async ({ page }) => {
+  test('connexion transitaire : onglets séparés et données isolées', async ({ page }) => {
     await loginAs(page, 'Anna Weber');
-    await expect(page).toHaveURL(/#\/transitaire$/);
-    expect(await sidebarItems(page)).toEqual(expect.arrayContaining(['Mes conteneurs']));
-    // Kuehne + Nagel ne voit pas les conteneurs Logfret (Jinfa, Yiwu)
+    await expect(page).toHaveURL(/#\/transitaire\/a-confirmer$/);
+    const nav = await sidebarItems(page);
+    for (const tab of ['Bookings à confirmer', 'Prêts au départ', 'En mer', 'Au port', 'Livrés']) expect(nav.join(' | ')).toContain(tab);
     await expect(page.locator('main')).toContainText('Tide Living');
+    // Kuehne + Nagel ne voit pas les conteneurs Logfret (Jinfa)
+    await go(page, 'transitaire/en-mer');
     await expect(page.locator('main')).not.toContainText('Jinfa');
     // Pas d'accès à l'application JONAS
     await setUser(page, 'fwd-kn', 'proformas');
-    await expect(page).toHaveURL(/#\/transitaire$/);
+    await expect(page).toHaveURL(/#\/transitaire\/a-confirmer$/);
   });
 
-  test('confirmation, départ, ETA, douane et livraison — remontés à JONAS', async ({ page }) => {
+  test('à confirmer → prêt au départ → en mer → au port (douane, livraison), remonté à JONAS', async ({ page }) => {
     await go(page, 'booking');
-    const pfRow = page.locator('.bk-stage.bk-green .bk-row', { hasText: 'PF-2026-0141' });
-    await expect(pfRow).toContainText('En attente de confirmation Kuehne + Nagel');
+    await expect(page.locator('.bk-stage.bk-green .bk-row', { hasText: 'PF-2026-0141' })).toContainText('En attente de confirmation Kuehne + Nagel');
 
     await loginAs(page, 'Anna Weber');
-    const atSea0 = await count(page, 'En mer');
-    // 1. Confirmer le booking
-    await page.locator('.bk-stage', { hasText: 'Bookings à confirmer' }).locator('.bk-actions').getByRole('button', { name: 'Confirmer' }).first().click();
+    const nav = page.locator('nav.sidebar');
+    // 1. Bookings à confirmer
+    await page.locator('.bk-actions').getByRole('button', { name: 'Confirmer' }).first().click();
     await page.locator('#fw-num').fill('CMAU7654321');
     await page.locator('#fw-vessel').fill('CMA CGM Trocadero');
     await page.getByRole('button', { name: 'Confirmer le booking' }).click();
     await expect(toast(page)).toContainText('CMAU7654321');
-    const ready = page.locator('.bk-stage', { hasText: 'Prêts au départ' });
-    await expect(ready).toContainText('CMA CGM TROCADERO');
-    // 2. Départ
-    await ready.locator('.bk-actions').getByRole('button', { name: 'Départ effectué' }).click();
-    expect(await count(page, 'En mer')).toBe(atSea0 + 1);
-    const row = page.locator('.bk-stage', { hasText: 'En mer' }).locator('.bk-row', { hasText: 'CMAU7654321' });
-    // 3. ETA, douane, livraison
+    await expect(page.locator('main')).toContainText('Aucun booking à confirmer');
+    // 2. Prêts au départ
+    await nav.getByRole('link', { name: /Prêts au départ/ }).click();
+    const row = page.locator('.bk-row', { hasText: 'CMAU7654321' });
+    await expect(row).toContainText('CMA CGM TROCADERO');
+    await row.getByRole('button', { name: 'Départ effectué' }).click();
+    // 3. En mer
+    await nav.getByRole('link', { name: /En mer/ }).click();
     await row.getByRole('button', { name: 'Nouvelle ETA' }).click();
     await page.locator('#fw-date').fill('2027-01-12');
     await page.getByRole('button', { name: 'Enregistrer' }).click();
     await expect(toast(page)).toContainText('ETA mise à jour');
+    await row.getByRole('button', { name: 'Arrivé au port' }).click();
+    await expect(row).toHaveCount(0);
+    // 4. Au port : douane puis livraison
+    await nav.getByRole('link', { name: /Au port/ }).click();
     await row.getByRole('button', { name: 'Lancer la douane' }).click();
     await row.getByRole('button', { name: 'Dédouané' }).click();
     await row.getByRole('button', { name: 'Planifier la livraison' }).click();
-    await page.locator('#fw-date').fill('2027-01-15');
+    await page.locator('#fw-date').fill('2026-11-18');
     await page.getByRole('button', { name: 'Enregistrer' }).click();
-    await expect(row).toContainText('Livraison 15 janv.');
+    await expect(row).toContainText('Livraison 18 nov.');
 
-    // Côté JONAS : conteneur parti, ETA révisée, dédouané, livraison planifiée
+    // Côté JONAS
     await loginAs(page, 'Logistique');
     await go(page, 'conteneurs');
     await page.getByRole('button', { name: 'Tout' }).click();
     const card = page.locator('.ct-card', { hasText: 'CMAU7654321' });
     await expect(card).toContainText('Dédouané');
-    await expect(card).toContainText('Livraison 15 janv.');
-    await expect(card).toContainText('ETA révisée');
+    await expect(card).toContainText('Livraison 18 nov.');
   });
 
   test('téléphone : pas de débordement', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await setUser(page, 'fwd-logfret', 'transitaire');
-    await expect(page.locator('.bk-kpis')).toBeVisible();
+    await setUser(page, 'fwd-logfret', 'transitaire/en-mer');
+    await expect(page.locator('.fw-head')).toBeVisible();
     await expectNoHorizontalOverflow(page);
   });
 

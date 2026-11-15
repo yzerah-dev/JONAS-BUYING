@@ -1,5 +1,5 @@
 import { lazy, Suspense, type ReactNode } from 'react';
-import { HashRouter, MemoryRouter, Route, Routes } from 'react-router-dom';
+import { HashRouter, MemoryRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { StoreProvider } from './data/StoreProvider';
 import Layout from './components/Layout';
 import Landing from './components/Landing';
@@ -71,7 +71,8 @@ export default function App() {
             <Route path="finance" element={page(<PortalFinance />)} />
           </Route>
           <Route path="transitaire" element={page(<ForwarderLayout />)}>
-            <Route index element={page(<ForwarderHome />)} />
+            <Route index element={<Navigate to="a-confirmer" replace />} />
+            <Route path=":etape" element={page(<ForwarderHome />)} />
           </Route>
         </Routes>
       </Router>
