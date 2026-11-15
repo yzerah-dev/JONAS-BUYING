@@ -1289,6 +1289,14 @@ th.pk-drop { background: var(--green-softer); border-radius: 10px; }
   .pb-dates { grid-template-columns: 1fr; }
   .pb-answer .btn.primary { width: 100%; justify-content: center; }
 }
+.pf-bkcell { display: inline-flex; flex-direction: column; align-items: center; gap: 4px; }
+.pf-bk-btn { display: flex; align-items: center; gap: 4px; border: 0; background: var(--grad); color: #fff; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 8px; white-space: nowrap; cursor: pointer; font-family: inherit; }
+.pf-bk-wait { font-size: 11px; color: var(--violet); font-weight: 600; text-align: center; }
+.pf-bk-banner { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; border: 1px dashed var(--green); background: var(--green-softer); color: var(--green); }
+.pf-bk-banner > div { display: flex; flex-direction: column; min-width: 200px; color: var(--ink); }
+.pf-bk-banner > div span { font-size: 13px; color: var(--ink-2); }
+.pf-bk-banner.wait { border: 1px solid var(--violet); background: #f7f3ff; color: var(--violet); }
+.pf-bk-banner.done { border: 1px solid var(--green); }
 .fw-head { display: flex; align-items: center; gap: 14px; padding: 16px 20px; border-radius: 18px; border: 1px solid var(--line); margin-bottom: 14px; }
 .fw-head > div { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .fw-head h1 { font-size: 28px; margin: 0; }

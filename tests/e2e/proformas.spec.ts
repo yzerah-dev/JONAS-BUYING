@@ -26,6 +26,26 @@ test.describe('Proformas et logistique', () => {
     await expect(page.getByRole('button', { name: 'Demande de booking' })).toHaveCount(0);
   });
 
+  test('demande de booking depuis la liste des proformas et depuis l’onglet Suivi & Logistique', async ({ page }) => {
+    await loginAs(page, 'Logistique');
+    await go(page, 'proformas');
+    await page.getByRole('button', { name: 'Vue liste' }).click();
+    await page.getByPlaceholder(/Rechercher une proforma/).fill('PF-2026-0151');
+    await page.locator('tr', { hasText: 'PF-2026-0151' }).locator('.pf-bk-btn').click();
+    await page.getByRole('button', { name: 'Envoyer au fournisseur' }).click();
+    await expect(toast(page)).toContainText('Demande de booking envoyée à Nova Beauty');
+    await expect(page).toHaveURL(/#\/proformas$/);
+    await expect(page.locator('.pf-bk-wait').first()).toBeVisible();
+
+    await go(page, 'proformas/PF-2026-0148');
+    await page.getByRole('button', { name: 'Suivi & Logistique' }).click();
+    const banner = page.locator('.pf-bk-banner');
+    await expect(banner).toContainText('Booking à demander');
+    await banner.getByRole('button', { name: 'Demande de booking' }).click();
+    await page.getByRole('button', { name: 'Envoyer au fournisseur' }).click();
+    await expect(banner).toContainText('Booking demandé');
+  });
+
   test('signature des proformas à signer', async ({ page }) => {
     await go(page, 'proformas');
     const chips = page.locator('.pf-chips');

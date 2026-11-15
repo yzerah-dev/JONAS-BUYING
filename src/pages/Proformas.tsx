@@ -11,6 +11,7 @@ import {
   Layers,
   List,
   PenLine,
+  Ship,
   Search,
   SlidersHorizontal,
 } from 'lucide-react';
@@ -20,6 +21,7 @@ import { ContainerGlyph, ProformaStatusPill, SupplierMark } from '../components/
 import { PROFORMA_ICON, toast } from '../components/ui-shared';
 import { TODAY, dec, eur, weekKey, weekLabel, weekRange } from '../lib/format';
 import { pressable } from '../lib/a11y';
+import { BookingRequestDialog } from '../components/BookingDialog';
 
 type View = 'liste' | 'semaine' | 'fournisseur';
 
@@ -300,7 +302,36 @@ function StatusCell({ p, onSign }: { p: Proforma; onSign?: (id: string) => void 
         )}
       </div>
     );
-  return <ProformaStatusPill status={p.status} big />;
+  return <BookingStatus p={p} />;
+}
+
+/** Statut + accès direct à la demande de booking depuis la liste */
+function BookingStatus({ p }: { p: Proforma }) {
+  const auth = useAuth();
+  const [open, setOpen] = useState(false);
+  const canAsk = auth.allowed({ type: 'requestPfBooking', proformaId: p.id, containers: 1, dateWanted: p.etd });
+  return (
+    <div className="pf-bkcell">
+      <ProformaStatusPill status={p.status} big />
+      {canAsk && (
+        <button
+          className="pf-bk-btn"
+          onClick={(e) => {
+            e.stopPropagation();
+            setOpen(true);
+          }}
+        >
+          <Ship size={11} /> Demande de booking
+        </button>
+      )}
+      {p.booking && !p.booking.answeredAt && <small className="pf-bk-wait">Booking demandé · attente fournisseur</small>}
+      {open && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <BookingRequestDialog pf={p} onClose={() => setOpen(false)} />
+        </div>
+      )}
+    </div>
+  );
 }
 
 function AmountCell({ p, amount, deposit, amountCur, currency }: { p: Proforma; amount: number; deposit: number; amountCur?: number; currency?: string }) {

@@ -503,6 +503,7 @@ export function LogisticsTab({ pf, portal }: { pf: Proforma; portal?: boolean })
 
   return (
     <>
+      {!portal && <BookingBanner pf={pf} />}
       <div className="card pad mb">
         <div className="row mb">
           <Truck className="green" />
@@ -790,5 +791,56 @@ function BookingState({ pf }: { pf: Proforma }) {
     <Link to="/booking" className="pill green pf-bk-state">
       <Check size={14} /> Booké · chargement {fdate(b.loadingDate)} · départ {fdate(b.etd)}
     </Link>
+  );
+}
+
+/** Onglet Suivi & Logistique : demande de booking et son état, au-dessus du plan de chargement */
+function BookingBanner({ pf }: { pf: Proforma }) {
+  const auth = useAuth();
+  const [open, setOpen] = useState(false);
+  const canAsk = auth.allowed({ type: 'requestPfBooking', proformaId: pf.id, containers: 1, dateWanted: pf.etd });
+  const b = pf.booking;
+  if (!canAsk && !b) return null;
+  return (
+    <div className={`card pad mb pf-bk-banner ${b?.answeredAt ? 'done' : b ? 'wait' : ''}`}>
+      <Ship size={22} />
+      <div className="grow">
+        {!b && (
+          <>
+            <b>Booking à demander</b>
+            <span>Le fournisseur reçoit l’alerte et répond avec le plan de chargement et les dates réelles.</span>
+          </>
+        )}
+        {b && !b.answeredAt && (
+          <>
+            <b>
+              Booking demandé · {b.containers} × 40HC · chargement souhaité {fdate(b.dateWanted)}
+            </b>
+            <span>
+              Envoyé le {fdate(b.requestedAt.slice(0, 10))} · en attente de la réponse du fournisseur
+              {b.reminders.length ? ` · ${b.reminders.length} relance(s)` : ''}
+            </span>
+          </>
+        )}
+        {b?.answeredAt && (
+          <>
+            <b>
+              Booké · chargement {fdate(b.loadingDate)} · départ {fdate(b.etd)} · arrivée {fdate(b.eta)}
+            </b>
+            <span>
+              Réponse du fournisseur le {fdate(b.answeredAt.slice(0, 10))}
+              {b.carrier ? ` · ${b.carrier}` : ''}
+              {b.bookingNo ? ` · ${b.bookingNo}` : ''}
+            </span>
+          </>
+        )}
+      </div>
+      {canAsk && (
+        <button className="btn primary" onClick={() => setOpen(true)}>
+          <Ship size={16} /> Demande de booking
+        </button>
+      )}
+      {open && <BookingRequestDialog pf={pf} onClose={() => setOpen(false)} />}
+    </div>
   );
 }
