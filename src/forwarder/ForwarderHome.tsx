@@ -1,13 +1,14 @@
 import { useState, type ReactNode } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import { Anchor, CalendarCheck, Check, ClipboardCheck, FileUp, Search, Ship, Truck, Warehouse, X } from 'lucide-react';
-import { byId, containerCbm, containerEta, containerEtd, containerProformas, containerQty, currentUser, useStore, type State } from '../data/store';
-import type { Container } from '../data/types';
+import { byId, containerCbm, containerEta, containerEtd, containerProformas, containerQty, currentUser, pfContainers, useStore, type State } from '../data/store';
+import type { Container, Proforma } from '../data/types';
+import BookingEntry from '../components/BookingEntry';
 import { ProductThumb, SupplierLogo } from '../components/ui';
 import { toast } from '../components/ui-shared';
 import { CarrierBadge } from '../components/ContainerCard';
 import { TODAY, addDays, dec, diffDays, fdate, fshort, num, weekLabel } from '../lib/format';
-import { DOC_LABEL, REQUIRED_DOCS, STAGES, STAGE_DEF, fwdStages, type FwdStage } from './fwd';
+import { DOC_LABEL, REQUIRED_DOCS, STAGES, STAGE_DEF, fwdBookings, fwdStages, type FwdStage } from './fwd';
 
 type Dialog = { mode: 'confirm' | 'eta' | 'delivery'; c: Container } | null;
 
@@ -17,7 +18,8 @@ export default function ForwarderHome() {
   const { etape } = useParams();
   const [q, setQ] = useState('');
   const [dialog, setDialog] = useState<Dialog>(null);
-  if (!STAGES.includes(etape as FwdStage)) return <Navigate to="/transitaire/a-confirmer" replace />;
+  const [booking, setBooking] = useState<Proforma | null>(null);
+  if (!STAGES.includes(etape as FwdStage)) return <Navigate to="/transitaire/a-booker" replace />;
   const stage = etape as FwdStage;
   const def = STAGE_DEF[stage];
   const s = q.trim().toLowerCase();
@@ -26,8 +28,10 @@ export default function ForwarderHome() {
     const sup = byId(state.suppliers, c.supplierId);
     return `${c.id} ${c.number ?? ''} ${c.bookingNo ?? ''} ${c.booking?.vessel ?? ''} ${sup.name} ${containerProformas(c).join(' ')}`.toLowerCase().includes(s);
   });
-  const Icon = { 'a-confirmer': ClipboardCheck, pret: CalendarCheck, 'en-mer': Ship, 'au-port': Anchor, livres: Warehouse }[stage];
-  const tone = { 'a-confirmer': 'orange', pret: 'violet', 'en-mer': 'green', 'au-port': 'orange', livres: 'grey' }[stage];
+  const toBook = fwdBookings(state, user).filter((pf) => !s || `${pf.id} ${pf.title} ${byId(state.suppliers, pf.supplierId).name}`.toLowerCase().includes(s));
+  const count = stage === 'a-booker' ? toBook.length : list.length;
+  const Icon = { 'a-booker': ClipboardCheck, pret: CalendarCheck, 'en-mer': Ship, 'au-port': Anchor, livres: Warehouse }[stage];
+  const tone = { 'a-booker': 'orange', pret: 'violet', 'en-mer': 'green', 'au-port': 'orange', livres: 'grey' }[stage];
 
   return (
     <div className="pf-page">
@@ -40,7 +44,7 @@ export default function ForwarderHome() {
           <span>{def.sub}</span>
         </div>
         <span className="pf-count">
-          {list.length} conteneur{list.length > 1 ? 's' : ''}
+          {stage === 'a-booker' ? `${count} booking${count > 1 ? 's' : ''}` : `${count} conteneur${count > 1 ? 's' : ''}`}
         </span>
       </div>
 
@@ -52,24 +56,14 @@ export default function ForwarderHome() {
       </div>
 
       <div className="card bk-body fw-list">
-        {list.length === 0 && <div className="empty small">{s ? 'Aucun résultat.' : def.empty}</div>}
-        {list.map((c) =>
-          stage === 'a-confirmer' ? (
-            <Row key={c.id} s={state} c={c}>
-              <Info c={c} s={state} />
-              <div className="bk-actions">
-                <button className="btn sm primary" onClick={() => setDialog({ mode: 'confirm', c })}>
-                  <Check size={14} /> Confirmer
-                </button>
-              </div>
-            </Row>
-          ) : (
-            <ShipRow key={c.id} s={state} c={c} onDialog={setDialog} />
-          ),
-        )}
+        {count === 0 && <div className="empty small">{s ? 'Aucun résultat.' : def.empty}</div>}
+        {stage === 'a-booker'
+          ? toBook.map((pf) => <BookingRow key={pf.id} s={state} pf={pf} onBook={() => setBooking(pf)} />)
+          : list.map((c) => <ShipRow key={c.id} s={state} c={c} onDialog={setDialog} />)}
       </div>
 
       {dialog && <FwdDialog key={dialog.c.id + dialog.mode} mode={dialog.mode} c={dialog.c} onClose={() => setDialog(null)} />}
+      {booking && <BookingDialog key={booking.id} s={state} pf={booking} onClose={() => setBooking(null)} />}
     </div>
   );
 }
@@ -82,7 +76,7 @@ function ShipRow({ s, c, onDialog }: { s: State; c: Container; onDialog: (d: Dia
   const missing = REQUIRED_DOCS.filter((d) => !c.documents.includes(d));
   const atPort = c.status === 'en_transit' && !!c.etaReal;
   return (
-    <Row s={s} c={c} carrier>
+    <Row s={s} c={c}>
       <div className="bk-info">
         <small>
           <Ship size={12} /> {c.booking?.vessel ?? 'Navire à préciser'} · {c.bookingNo ?? '—'}
@@ -134,11 +128,13 @@ function ShipRow({ s, c, onDialog }: { s: State; c: Container; onDialog: (d: Dia
       <div className="bk-actions">
         {c.status === 'booke' && (
           <>
-            <button className="btn sm ghost" onClick={() => onDialog({ mode: 'confirm', c })}>
-              Modifier
+            <button className={`btn sm ${c.number ? 'ghost' : 'primary'}`} onClick={() => onDialog({ mode: 'confirm', c })}>
+              {c.number ? 'Modifier' : 'N° de conteneur'}
             </button>
             <button
-              className="btn sm primary"
+              className={`btn sm ${c.number ? 'primary' : ''}`}
+              disabled={!c.number}
+              title={c.number ? undefined : 'Indiquez d’abord le n° de conteneur'}
               onClick={() => {
                 dispatch({ type: 'ship', containerId: c.id });
                 toast(`${c.number ?? c.id} parti : en mer`);
@@ -198,24 +194,88 @@ function ShipRow({ s, c, onDialog }: { s: State; c: Container; onDialog: (d: Dia
   );
 }
 
-function Info({ c, s }: { c: Container; s: State }) {
-  const pf = s.proformas.find((p) => containerProformas(c).includes(p.id));
-  const b = pf?.booking;
+/** Demande de boîtes d'un fournisseur : booking à faire */
+function BookingRow({ s, pf, onBook }: { s: State; pf: Proforma; onBook: () => void }) {
+  const b = pf.booking!;
+  const sup = byId(s.suppliers, pf.supplierId);
+  const cs = pfContainers(s, pf.id);
+  const cbm = cs.reduce((t, c) => t + containerCbm(s, c), 0);
+  const top = pf.lines[0] ? byId(s.products, pf.lines[0].productId) : undefined;
+  const wait = diffDays(TODAY, b.ackAt!.slice(0, 10));
   return (
-    <div className="bk-info">
-      <small>
-        Booké par le fournisseur {b?.answeredAt ? `le ${fdate(b.answeredAt.slice(0, 10))}` : ''} · {c.carrier ?? 'compagnie à préciser'}
-        {c.bookingNo ? ` · ${c.bookingNo}` : ''}
-      </small>
-      <b>
-        Chargement {fshort(c.loading?.date ?? b?.loadingDate)} · départ {fshort(c.etdPlanned)} ({weekLabel(c.etdPlanned)})
-      </b>
-      <span>Arrivée prévue {fshort(c.etaPlanned)} · livraison {c.warehouse}</span>
+    <div className="bk-row">
+      <div className="bk-ctn">
+        {top && <ProductThumb product={top} size={44} />}
+        <div>
+          <span className="bk-num">
+            <strong>{pf.id}</strong>
+            <span className="ct-type">
+              {cs.length || b.containers} × 40HC
+            </span>
+          </span>
+          <small>
+            {pf.title} · {dec(cbm, 1)} m³
+          </small>
+        </div>
+      </div>
+      <div className="bk-sup">
+        <SupplierLogo supplier={sup} size={32} />
+        <span>
+          <b>{sup.shortName}</b>
+          <small>
+            {sup.port} → Le Havre
+          </small>
+        </span>
+      </div>
+      <div className="bk-who">
+        <span className={`pill ${wait > 2 ? 'red' : 'orange'}`}>{wait === 0 ? 'Demandé aujourd’hui' : `Demandé il y a ${wait} j`}</span>
+      </div>
+      <div className="bk-info">
+        <small>
+          Demande de {b.ackBy ?? sup.shortName} le {fdate(b.ackAt!.slice(0, 10))}
+        </small>
+        <b>
+          Marchandise prête le {fshort(b.readyDate)} ({weekLabel(b.readyDate!)})
+        </b>
+        <span>
+          Chargement souhaité par JONAS {fshort(b.dateWanted)} · livraison {cs[0]?.warehouse ?? 'Péronne'}
+        </span>
+        {b.ackNote && <span className="muted">« {b.ackNote} »</span>}
+      </div>
+      <div className="bk-actions">
+        <button className="btn sm primary" onClick={onBook}>
+          <Check size={14} /> Faire le booking
+        </button>
+      </div>
     </div>
   );
 }
 
-function Row({ s, c, children, carrier }: { s: State; c: Container; children: ReactNode; carrier?: boolean }) {
+function BookingDialog({ s, pf, onClose }: { s: State; pf: Proforma; onClose: () => void }) {
+  const sup = byId(s.suppliers, pf.supplierId);
+  return (
+    <div className="palette-back" onMouseDown={onClose}>
+      <div className="card rc-dialog bk-dialog" role="dialog" aria-label={`Booking ${pf.id}`} onMouseDown={(e) => e.stopPropagation()}>
+        <header className="rc-head">
+          <div>
+            <h2>Booking {pf.id}</h2>
+            <span className="muted small">
+              {sup.shortName} · {sup.port} → Le Havre · {pf.booking!.containers} × 40HC
+            </span>
+          </div>
+          <button type="button" className="icon-btn" onClick={onClose} aria-label="Fermer">
+            <X size={20} />
+          </button>
+        </header>
+        <div className="bk-form">
+          <BookingEntry pf={pf} onDone={onClose} onCancel={onClose} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Row({ s, c, children }: { s: State; c: Container; children: ReactNode }) {
   const sup = byId(s.suppliers, c.supplierId);
   const top = [...c.allocations].sort((a, b) => b.qty - a.qty)[0];
   const p = top ? byId(s.products, top.productId) : undefined;
@@ -242,7 +302,9 @@ function Row({ s, c, children, carrier }: { s: State; c: Container; children: Re
           </small>
         </span>
       </div>
-      <div className="bk-who">{carrier ? <CarrierBadge carrier={c.carrier} /> : <span className="pill orange">À confirmer</span>}</div>
+      <div className="bk-who">
+        <CarrierBadge carrier={c.carrier} />
+      </div>
       {children}
     </div>
   );
@@ -259,7 +321,7 @@ function FwdDialog({ mode, c, onClose }: { mode: 'confirm' | 'eta' | 'delivery';
   const [cutoff, setCutoff] = useState(c.booking?.cutoff ?? addDays(c.etdPlanned, -3));
   const [etd, setEtd] = useState(c.etdPlanned);
   const [date, setDate] = useState(mode === 'eta' ? containerEta(c) : addDays(containerEta(c), 4));
-  const title = { confirm: 'Confirmer le booking', eta: 'Nouvelle ETA', delivery: 'Planifier la livraison' }[mode];
+  const title = { confirm: 'Conteneur et plomb', eta: 'Nouvelle ETA', delivery: 'Planifier la livraison' }[mode];
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -267,7 +329,7 @@ function FwdDialog({ mode, c, onClose }: { mode: 'confirm' | 'eta' | 'delivery';
       if (!/^[A-Z]{4}\d{7}$/.test(number.trim().toUpperCase())) return toast('N° de conteneur attendu : 4 lettres + 7 chiffres (ex. MSCU1234567)');
       if (!vessel.trim()) return toast('Indiquez le navire');
       dispatch({ type: 'fwdConfirm', containerId: c.id, number: number.trim().toUpperCase(), seal: seal.trim() || undefined, vessel: vessel.trim().toUpperCase(), cutoff, etd });
-      toast(`Booking confirmé : ${number.trim().toUpperCase()}`);
+      toast(`Conteneur ${number.trim().toUpperCase()} enregistré`);
     } else if (mode === 'eta') {
       dispatch({ type: 'reviseEta', containerId: c.id, eta: date });
       toast(`ETA mise à jour : ${fdate(date)}`);
@@ -316,7 +378,7 @@ function FwdDialog({ mode, c, onClose }: { mode: 'confirm' | 'eta' | 'delivery';
                 <input id="fw-etd" className="input" type="date" value={etd} onChange={(e) => setEtd(e.target.value)} />
               </label>
               <p className="small muted">
-                Booking fournisseur : {c.carrier ?? 'compagnie à préciser'} {c.bookingNo ? `· ${c.bookingNo}` : ''} · chargement {fshort(c.loading?.date)}
+                Booking {c.carrier ?? ''} {c.bookingNo ? `· ${c.bookingNo}` : ''} · chargement {fshort(c.loading?.date)}
               </p>
             </>
           ) : (
@@ -337,7 +399,7 @@ function FwdDialog({ mode, c, onClose }: { mode: 'confirm' | 'eta' | 'delivery';
             Annuler
           </button>
           <button type="submit" className="btn primary">
-            <Check size={16} /> {mode === 'confirm' ? 'Confirmer le booking' : 'Enregistrer'}
+            <Check size={16} /> Enregistrer
           </button>
         </footer>
       </form>

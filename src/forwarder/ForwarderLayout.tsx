@@ -7,9 +7,9 @@ import { Toaster } from '../components/ui';
 import UserSwitcher from '../components/UserSwitcher';
 import { I18nProvider } from '../i18n';
 import '../i18n/i18n.css';
-import { STAGES, STAGE_DEF, fwdActions, fwdStages, fwdTodo, type FwdStage } from './fwd';
+import { STAGES, STAGE_DEF, fwdActions, fwdBookings, fwdStages, fwdTodo, type FwdStage } from './fwd';
 
-const NAV_ICON: Record<FwdStage, LucideIcon> = { 'a-confirmer': ClipboardCheck, pret: CalendarCheck, 'en-mer': Ship, 'au-port': Anchor, livres: Warehouse };
+const NAV_ICON: Record<FwdStage, LucideIcon> = { 'a-booker': ClipboardCheck, pret: CalendarCheck, 'en-mer': Ship, 'au-port': Anchor, livres: Warehouse };
 
 /** Portail transitaire (Logfret, Kuehne + Nagel) : uniquement ses conteneurs bookés. */
 export default function ForwarderLayout() {
@@ -52,7 +52,7 @@ function ForwarderShell() {
       <nav className="sidebar">
         {STAGES.map((st) => {
           const Icon = NAV_ICON[st];
-          const n = stages[st].length;
+          const n = st === 'a-booker' ? fwdBookings(state, user).length : stages[st].length;
           return (
             <NavLink key={st} to={`/transitaire/${st}`}>
               <Icon size={19} /> <span className="grow">{STAGE_DEF[st].title}</span>

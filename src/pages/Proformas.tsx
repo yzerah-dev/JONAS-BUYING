@@ -310,7 +310,7 @@ function BookingStatus({ p }: { p: Proforma }) {
     <div className="pf-bkcell">
       <ProformaStatusPill status={p.status} big />
       <BookingRequestButton pf={p} variant="chip" />
-      {p.booking && !p.booking.answeredAt && <small className="pf-bk-wait">Booking demandé · attente fournisseur</small>}
+      {p.booking && !p.booking.answeredAt && <small className="pf-bk-wait">Booking demandé · {p.booking.ackAt ? `attente ${p.booking.forwarder}` : 'attente fournisseur'}</small>}
     </div>
   );
 }

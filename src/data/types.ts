@@ -160,8 +160,10 @@ export interface Proforma {
 }
 
 /**
- * Booking d'une proforma, en deux temps :
- * JONAS demande (nombre de containers, date souhaitée) → le fournisseur répond avec le plan de chargement et les dates réelles.
+ * Booking d'une proforma, en trois temps :
+ * 1. JONAS demande (nombre de containers, date souhaitée) ;
+ * 2. le fournisseur prend en compte : plan de chargement, date de marchandise prête, boîtes demandées au transitaire ;
+ * 3. le transitaire fait le booking (compagnie, n°, navire, dates). S'il ne passe pas par l'appli, le fournisseur le saisit pour lui.
  */
 export interface BookingRequest {
   requestedAt: string;
@@ -170,13 +172,26 @@ export interface BookingRequest {
   dateWanted: ISODate;
   note?: string;
   reminders: string[];
+  /** Prise en compte par le fournisseur */
+  ackAt?: string;
+  ackBy?: string;
+  /** Date à partir de laquelle la marchandise est prête */
+  readyDate?: ISODate;
+  /** Transitaire à qui le fournisseur a demandé les boîtes */
+  forwarder?: Forwarder;
+  ackNote?: string;
+  /** Booking effectué */
   answeredAt?: string;
   answeredBy?: string;
+  /** Qui a saisi le booking : le transitaire, ou le fournisseur pour lui */
+  bookedBy?: 'transitaire' | 'fournisseur' | 'jonas';
   loadingDate?: ISODate;
   etd?: ISODate;
   eta?: ISODate;
   carrier?: string;
   bookingNo?: string;
+  vessel?: string;
+  cutoff?: ISODate;
   supplierNote?: string;
 }
 

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, Boxes, Calendar, Check, Container as Ctn, Download, Euro, FileText, Package, Scissors, Send, Truck, Upload, X } from 'lucide-react';
+import { AlertTriangle, Boxes, Calendar, Check, Container as Ctn, Download, Euro, FileText, Package, Pencil, Scissors, Send, Ship, Truck, Upload, X } from 'lucide-react';
 import {
   allocatedQty,
   byId,
@@ -13,12 +13,14 @@ import {
   packDone,
   pfContainers,
   containerCapacity,
+  defaultForwarder,
   payments,
   proformaTotals,
 } from '../data/store';
 import { BrandLogo, ContainerStatusPill, Kpi, PackPill, Pill, ProductThumb, ProformaStatusPill, Ring, Seg, ValidationCircuit } from '../components/ui';
 import { toast } from '../components/ui-shared';
-import type { Proforma } from '../data/types';
+import { FORWARDERS, type Forwarder, type Proforma } from '../data/types';
+import BookingEntry from '../components/BookingEntry';
 import { LogisticsTab } from '../pages/ProformaDetail';
 import { TODAY } from '../lib/format';
 import { useT } from '../i18n';
@@ -577,9 +579,12 @@ export function PortalFinance() {
 
 
 // ---------------------------------------------------------------------------
-/** Demandes de booking : le fournisseur effectue le booking et répond avec le plan de chargement et les dates réelles. */
+/**
+ * Demandes de booking : le fournisseur prend en compte (plan, marchandise prête, boîtes demandées au transitaire),
+ * puis le transitaire fait le booking. S'il ne passe pas par l'application, le fournisseur le saisit pour lui.
+ */
 export function PortalBooking() {
-  const { proformas, bookingsToDo } = usePortal();
+  const { proformas, bookingsToDo, bookingsAtForwarder } = usePortal();
   const { t, fmt } = useT();
   const { fshort } = fmt;
   const done = proformas.filter((p) => p.booking?.answeredAt).sort((a, b) => b.booking!.answeredAt!.localeCompare(a.booking!.answeredAt!));
@@ -589,63 +594,104 @@ export function PortalBooking() {
         <h1>{t('pb.title')}</h1>
         <span className="page-sub">{t('pb.sub')}</span>
       </div>
-      {bookingsToDo.length ? bookingsToDo.map((pf) => <BookingAnswer key={pf.id} pf={pf} />) : <div className="card empty mb">{t('pb.none')}</div>}
+      <h3 className="pb-group">
+        {t('pb.toAck')} <span className="pill orange">{bookingsToDo.length}</span>
+      </h3>
+      {bookingsToDo.length ? bookingsToDo.map((pf) => <BookingAck key={pf.id} pf={pf} />) : <div className="card empty mb">{t('pb.none')}</div>}
+      {bookingsAtForwarder.length > 0 && (
+        <>
+          <h3 className="pb-group">
+            {t('pb.atFwd')} <span className="pill violet">{bookingsAtForwarder.length}</span>
+          </h3>
+          {bookingsAtForwarder.map((pf) => (
+            <AtForwarder key={pf.id} pf={pf} />
+          ))}
+        </>
+      )}
       {done.length > 0 && (
         <div className="card pad">
           <div className="card-title">
             <Check size={18} className="green" /> {t('pb.history')}
           </div>
-          <table className="tbl">
-            <thead>
-              <tr>
-                <th>{t('pb.proforma')}</th>
-                <th className="num">40HC</th>
-                <th>{t('pb.loading')}</th>
-                <th>{t('pb.etd')}</th>
-                <th>{t('pb.eta')}</th>
-                <th>{t('pb.bookingNo')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {done.map((p) => (
-                <tr key={p.id}>
-                  <td className="bold">{p.id}</td>
-                  <td className="num">{p.booking!.containers}</td>
-                  <td>{fshort(p.booking!.loadingDate)}</td>
-                  <td>{fshort(p.booking!.etd)}</td>
-                  <td>{fshort(p.booking!.eta)}</td>
-                  <td>{p.booking!.bookingNo ?? '—'}</td>
+          <div className="tbl-wrap">
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>{t('pb.proforma')}</th>
+                  <th className="num">40HC</th>
+                  <th>{t('pb.fwdCol')}</th>
+                  <th>{t('pb.loading')}</th>
+                  <th>{t('pb.etd')}</th>
+                  <th>{t('pb.eta')}</th>
+                  <th>{t('pb.bookingNo')}</th>
+                  <th>{t('pb.byCol')}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {done.map((p) => (
+                  <tr key={p.id}>
+                    <td className="bold">{p.id}</td>
+                    <td className="num">{p.booking!.containers}</td>
+                    <td>{p.booking!.forwarder ?? '—'}</td>
+                    <td>{fshort(p.booking!.loadingDate)}</td>
+                    <td>{fshort(p.booking!.etd)}</td>
+                    <td>{fshort(p.booking!.eta)}</td>
+                    <td>{p.booking!.bookingNo ?? '—'}</td>
+                    <td>{p.booking!.bookedBy === 'fournisseur' ? t('pb.bySup') : t('pb.byFwd')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </>
   );
 }
 
-const CARRIERS = ['MSC', 'CMA CGM', 'Maersk', 'COSCO', 'Hapag-Lloyd', 'ONE', 'Evergreen'];
+/** Boîtes demandées au transitaire : attente de son booking, ou saisie par le fournisseur pour lui */
+function AtForwarder({ pf }: { pf: Proforma }) {
+  const { t, fmt } = useT();
+  const [open, setOpen] = useState(false);
+  const b = pf.booking!;
+  const fwd = b.forwarder ?? '';
+  return (
+    <div className="card pad mb pb-answer pb-fwd">
+      <div className="pb-answer-head">
+        <span className="pb-alert violet">
+          <Ship size={22} />
+        </span>
+        <div className="grow">
+          <h2>{t('pb.waitFwd', { pf: pf.id, fwd, date: fmt.fdate(b.ackAt!.slice(0, 10)) })}</h2>
+          <small>{t('pb.waitFwdSub', { ready: fmt.fdate(b.readyDate), n: b.containers, fwd })}</small>
+        </div>
+        {!open && (
+          <button type="button" className="btn" onClick={() => setOpen(true)}>
+            <Pencil size={15} /> {t('pb.enterFor', { fwd })}
+          </button>
+        )}
+      </div>
+      {open && <BookingEntry pf={pf} onCancel={() => setOpen(false)} onDone={() => setOpen(false)} />}
+    </div>
+  );
+}
 
-function BookingAnswer({ pf }: { pf: Proforma }) {
+function BookingAck({ pf }: { pf: Proforma }) {
   const { state, dispatch } = usePortal();
   const { t, fmt } = useT();
   const { fdate, num, dec } = fmt;
   const b = pf.booking!;
   const cs = pfContainers(state, pf.id);
   const remaining = pf.lines.reduce((sum, l) => sum + Math.max(0, l.qty - allocatedQty(state, pf.id, l.productId)), 0);
-  const [loading, setLoading] = useState(b.dateWanted);
-  const [etd, setEtd] = useState(pf.etd);
-  const [eta, setEta] = useState(pf.eta);
-  const [carrier, setCarrier] = useState('');
-  const [bookingNo, setBookingNo] = useState('');
+  const [ready, setReady] = useState(b.dateWanted);
+  const [fwd, setFwd] = useState<Forwarder>(defaultForwarder(state, pf.supplierId));
   const [note, setNote] = useState('');
   const id = pf.id.replace(/\W/g, '');
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!cs.length) return toast(t('pb.needPlan'));
-    dispatch({ type: 'answerPfBooking', proformaId: pf.id, loadingDate: loading, etd, eta, carrier: carrier || undefined, bookingNo: bookingNo.trim() || undefined, note: note.trim() || undefined });
-    toast(t('pb.sentToast'));
+    dispatch({ type: 'ackPfBooking', proformaId: pf.id, readyDate: ready, forwarder: fwd, note: note.trim() || undefined });
+    toast(t('pb.ackToast', { fwd }));
   };
   return (
     <form className="card pad mb pb-answer" onSubmit={submit} aria-label={t('pb.ask', { pf: pf.id })}>
@@ -707,36 +753,19 @@ function BookingAnswer({ pf }: { pf: Proforma }) {
         </Link>
       </div>
 
-      <h3 className="pb-sec">{t('pb.dates')}</h3>
+      <h3 className="pb-sec">{t('pb.readySec')}</h3>
       <div className="pb-dates">
-        <label htmlFor={`pb-load-${id}`}>
-          {t('pb.loading')}
-          <input id={`pb-load-${id}`} className="input" type="date" required value={loading} onChange={(e) => setLoading(e.target.value)} />
+        <label htmlFor={`pb-ready-${id}`}>
+          {t('pb.ready')}
+          <input id={`pb-ready-${id}`} className="input" type="date" required value={ready} onChange={(e) => setReady(e.target.value)} />
         </label>
-        <label htmlFor={`pb-etd-${id}`}>
-          {t('pb.etd')}
-          <input id={`pb-etd-${id}`} className="input" type="date" required value={etd} onChange={(e) => setEtd(e.target.value)} />
-        </label>
-        <label htmlFor={`pb-eta-${id}`}>
-          {t('pb.eta')}
-          <input id={`pb-eta-${id}`} className="input" type="date" required value={eta} onChange={(e) => setEta(e.target.value)} />
-        </label>
-        <label htmlFor={`pb-car-${id}`}>
-          <span>
-            {t('pb.carrier')} <em>({t('pb.optional')})</em>
-          </span>
-          <select id={`pb-car-${id}`} className="input" value={carrier} onChange={(e) => setCarrier(e.target.value)}>
-            <option value="">—</option>
-            {CARRIERS.map((x) => (
+        <label htmlFor={`pb-fwd-${id}`}>
+          {t('pb.forwarder')}
+          <select id={`pb-fwd-${id}`} className="input" value={fwd} onChange={(e) => setFwd(e.target.value as Forwarder)}>
+            {FORWARDERS.map((x) => (
               <option key={x}>{x}</option>
             ))}
           </select>
-        </label>
-        <label htmlFor={`pb-no-${id}`}>
-          <span>
-            {t('pb.bookingNo')} <em>({t('pb.optional')})</em>
-          </span>
-          <input id={`pb-no-${id}`} className="input" value={bookingNo} onChange={(e) => setBookingNo(e.target.value)} />
         </label>
         <label htmlFor={`pb-note-${id}`}>
           <span>
@@ -747,7 +776,7 @@ function BookingAnswer({ pf }: { pf: Proforma }) {
       </div>
       <div className="row" style={{ justifyContent: 'flex-end', marginTop: 12 }}>
         <button type="submit" className="btn primary" disabled={!cs.length} title={cs.length ? undefined : t('pb.needPlan')}>
-          <Send size={16} /> {t('pb.send')}
+          <Send size={16} /> {t('pb.ackSend')}
         </button>
       </div>
     </form>

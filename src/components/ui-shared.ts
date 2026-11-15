@@ -56,3 +56,4 @@ export function onToast(fn: ToastListener) {
 /** Volume utile d'un 40HC pour estimer le nombre de containers */
 export const CBM_40HC = 68;
 export const estimateContainers = (cbm: number) => Math.max(1, Math.ceil(cbm / CBM_40HC));
+export const CARRIERS = ['MSC', 'CMA CGM', 'Maersk', 'COSCO', 'Hapag-Lloyd', 'ONE', 'Evergreen'];

@@ -777,7 +777,7 @@ function BookingState({ pf }: { pf: Proforma }) {
   if (!b.answeredAt)
     return (
       <Link to="/booking" className="pill orange pf-bk-state" title={`Demandé le ${fdate(b.requestedAt.slice(0, 10))}`}>
-        <Ship size={14} /> Booking demandé · {b.containers} × 40HC · attente fournisseur
+        <Ship size={14} /> Booking demandé · {b.containers} × 40HC · {b.ackAt ? `attente ${b.forwarder}` : 'attente fournisseur'}
       </Link>
     );
   return (
@@ -798,7 +798,7 @@ function BookingBanner({ pf }: { pf: Proforma }) {
         {!b && (
           <>
             <b>{pf.status === 'a_signer' ? 'Booking : proforma à signer d’abord' : 'Booking à demander'}</b>
-            <span>Le fournisseur reçoit l’alerte et répond avec le plan de chargement et les dates réelles.</span>
+            <span>Le fournisseur prend la demande en compte et demande les boîtes au transitaire, qui fait le booking.</span>
           </>
         )}
         {b && !b.answeredAt && (
@@ -807,7 +807,9 @@ function BookingBanner({ pf }: { pf: Proforma }) {
               Booking demandé · {b.containers} × 40HC · chargement souhaité {fdate(b.dateWanted)}
             </b>
             <span>
-              Envoyé le {fdate(b.requestedAt.slice(0, 10))} · en attente de la réponse du fournisseur
+              {b.ackAt
+                ? `Pris en compte par le fournisseur le ${fdate(b.ackAt.slice(0, 10))} · marchandise prête le ${fdate(b.readyDate)} · boîtes demandées à ${b.forwarder}, en attente de son booking`
+                : `Envoyé le ${fdate(b.requestedAt.slice(0, 10))} · en attente de la prise en compte du fournisseur`}
               {b.reminders.length ? ` · ${b.reminders.length} relance(s)` : ''}
             </span>
           </>
@@ -818,7 +820,7 @@ function BookingBanner({ pf }: { pf: Proforma }) {
               Booké · chargement {fdate(b.loadingDate)} · départ {fdate(b.etd)} · arrivée {fdate(b.eta)}
             </b>
             <span>
-              Réponse du fournisseur le {fdate(b.answeredAt.slice(0, 10))}
+              {b.bookedBy === 'transitaire' ? `Booké par ${b.forwarder}` : `Saisi par le fournisseur pour ${b.forwarder ?? 'le transitaire'}`} le {fdate(b.answeredAt.slice(0, 10))}
               {b.carrier ? ` · ${b.carrier}` : ''}
               {b.bookingNo ? ` · ${b.bookingNo}` : ''}
             </span>

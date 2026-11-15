@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { Anchor, Ban, BellRing, CalendarCheck, CalendarClock, CalendarPlus, ChevronDown, ChevronUp, Search, Send, Ship } from 'lucide-react';
-import { bookingOpen, byId, canRequestBooking, pfContainers, proformaTotals, useAuth, useStore, type State } from '../data/store';
+import { Anchor, Ban, BellRing, Boxes, CalendarCheck, CalendarClock, CalendarPlus, ChevronDown, ChevronUp, Search, Send, Ship } from 'lucide-react';
+import { bookingStage, byId, canRequestBooking, pfContainers, proformaTotals, useAuth, useStore, type State } from '../data/store';
 import type { Proforma } from '../data/types';
 import { ProductThumb, ProformaStatusPill, SupplierLogo } from '../components/ui';
 import { estimateContainers, toast } from '../components/ui-shared';
@@ -10,9 +10,10 @@ import { BookingRequestDialog } from '../components/BookingDialog';
 import { TODAY, dec, diffDays, fshort, fstamp, weekLabel } from '../lib/format';
 import { pressable } from '../lib/a11y';
 
-/** Au-delà de ce délai sans réponse du fournisseur, la demande est à relancer */
+/** Au-delà de ce délai sans réponse (fournisseur ou transitaire), la demande est à relancer */
 const WAIT_ALERT = 3;
-const waitDays = (pf: Proforma) => (pf.booking ? diffDays(TODAY, pf.booking.requestedAt.slice(0, 10)) : 0);
+/** Jours d'attente à l'étape en cours : depuis la demande (fournisseur) ou depuis la prise en compte (transitaire) */
+const waitDays = (pf: Proforma) => (pf.booking ? diffDays(TODAY, (pf.booking.ackAt ?? pf.booking.requestedAt).slice(0, 10)) : 0);
 
 export default function Booking() {
   const { state, dispatch } = useStore();
@@ -36,13 +37,41 @@ export default function Booking() {
 
   const shipped = (pf: Proforma) => ['en_transit', 'arrive'].includes(pf.status);
   const toAsk = list.filter(canRequestBooking).sort((a, b) => a.etd.localeCompare(b.etd));
-  const waiting = list.filter(bookingOpen).sort((a, b) => waitDays(b) - waitDays(a));
+  const atSupplier = list.filter((pf) => bookingStage(pf) === 'fournisseur').sort((a, b) => waitDays(b) - waitDays(a));
+  const atForwarder = list.filter((pf) => bookingStage(pf) === 'transitaire').sort((a, b) => waitDays(b) - waitDays(a));
+  const waiting = [...atSupplier, ...atForwarder];
   const booked = list.filter((pf) => pf.booking?.answeredAt && !shipped(pf)).sort((a, b) => (a.booking!.etd ?? a.etd).localeCompare(b.booking!.etd ?? b.etd));
   const gone = list.filter((pf) => pf.booking?.answeredAt && shipped(pf));
 
   const delays = state.proformas
     .filter((pf) => pf.booking?.answeredAt)
     .map((pf) => diffDays(pf.booking!.answeredAt!.slice(0, 10), pf.booking!.requestedAt.slice(0, 10)));
+  const remindRemove = (pf: Proforma, w: number) =>
+    canBook && (
+      <>
+        <button
+          className={`btn sm ${w > WAIT_ALERT ? 'danger' : ''}`}
+          onClick={() => {
+            dispatch({ type: 'remindPfBooking', proformaId: pf.id });
+            const sup = byId(state.suppliers, pf.supplierId).shortName;
+            toast(pf.booking!.ackAt ? `Relance envoyée à ${pf.booking!.forwarder} et ${sup}` : `Relance envoyée à ${sup}`);
+          }}
+        >
+          <BellRing size={14} /> Relancer
+        </button>
+        <button
+          className="btn sm ghost"
+          title="Annuler la demande"
+          aria-label="Annuler la demande"
+          onClick={() => {
+            dispatch({ type: 'cancelPfBooking', proformaId: pf.id });
+            toast('Demande de booking annulée');
+          }}
+        >
+          <Ban size={14} />
+        </button>
+      </>
+    );
   const avgDelay = delays.length ? delays.reduce((a, b) => a + b, 0) / delays.length : 0;
   const urgent = toAsk.filter((pf) => diffDays(pf.etd, TODAY) < 21).length;
   const late = waiting.filter((pf) => waitDays(pf) > WAIT_ALERT).length;
@@ -58,12 +87,14 @@ export default function Booking() {
           <span className={urgent ? 'red' : ''}>{urgent ? `${urgent} départ(s) sous 3 semaines` : 'Rien d’urgent'}</span>
         </div>
         <div className="kpi-box">
-          <small>En attente fournisseur</small>
-          <b>{waiting.length}</b>
+          <small>En attente fournisseur / transitaire</small>
+          <b>
+            {atSupplier.length} / {atForwarder.length}
+          </b>
           <span className={late ? 'red' : ''}>{late ? `${late} sans réponse depuis +${WAIT_ALERT} j` : 'Réponses dans les temps'}</span>
         </div>
         <div className="kpi-box">
-          <small>Délai moyen de réponse</small>
+          <small>Délai moyen demande → booking</small>
           <b>{delays.length ? `${dec(avgDelay, 1)} j` : '—'}</b>
           <span>sur {delays.length} booking(s)</span>
         </div>
@@ -108,8 +139,8 @@ export default function Booking() {
         })}
       </Stage>
 
-      <Stage icon={<CalendarClock size={34} strokeWidth={1.8} />} tone="violet" title="Demandes envoyées" sub="Le fournisseur effectue le booking et répond avec le plan et les dates réelles" items={waiting}>
-        {waiting.map((pf) => {
+      <Stage icon={<CalendarClock size={34} strokeWidth={1.8} />} tone="violet" title="Attente fournisseur" sub="Le fournisseur prend en compte : plan de chargement, date de marchandise prête, boîtes demandées au transitaire" items={atSupplier}>
+        {atSupplier.map((pf) => {
           const b = pf.booking!;
           const w = waitDays(pf);
           return (
@@ -118,43 +149,43 @@ export default function Booking() {
                 <small>
                   {b.containers} × 40HC · chargement souhaité {fshort(b.dateWanted)}
                 </small>
-                <b className={w > WAIT_ALERT ? 'red' : ''}>En attente depuis {w} j</b>
+                <b className={w > WAIT_ALERT ? 'red' : ''}>Pas encore pris en compte · {w} j</b>
                 <span>
                   Envoyée le {fstamp(b.requestedAt)} · {b.reminders.length ? `${b.reminders.length} relance(s), dernière ${fstamp(b.reminders.at(-1))}` : 'aucune relance'}
                 </span>
               </div>
-              <div className="bk-actions">
-                {canBook && (
-                  <>
-                    <button
-                      className={`btn sm ${w > WAIT_ALERT ? 'danger' : ''}`}
-                      onClick={() => {
-                        dispatch({ type: 'remindPfBooking', proformaId: pf.id });
-                        toast(`Relance envoyée à ${byId(state.suppliers, pf.supplierId).shortName}`);
-                      }}
-                    >
-                      <BellRing size={14} /> Relancer
-                    </button>
-                    <button
-                      className="btn sm ghost"
-                      title="Annuler la demande"
-                      aria-label="Annuler la demande"
-                      onClick={() => {
-                        dispatch({ type: 'cancelPfBooking', proformaId: pf.id });
-                        toast('Demande de booking annulée');
-                      }}
-                    >
-                      <Ban size={14} />
-                    </button>
-                  </>
-                )}
-              </div>
+              <div className="bk-actions">{remindRemove(pf, w)}</div>
             </Row>
           );
         })}
       </Stage>
 
-      <Stage icon={<CalendarCheck size={34} strokeWidth={1.8} />} tone="green" title="Bookés" sub="Réponse du fournisseur : plan de chargement et dates réelles" items={booked}>
+      <Stage icon={<Boxes size={34} strokeWidth={1.8} />} tone="violet" title="Attente transitaire" sub="Boîtes demandées par le fournisseur : le transitaire fait le booking (ou le fournisseur le saisit pour lui)" items={atForwarder}>
+        {atForwarder.map((pf) => {
+          const b = pf.booking!;
+          const w = waitDays(pf);
+          return (
+            <Row key={pf.id} s={state} pf={pf}>
+              <div className="bk-info">
+                <small>
+                  {pfContainers(state, pf.id).length || b.containers} × 40HC · boîtes demandées à {b.forwarder} le {fshort(b.ackAt!.slice(0, 10))}
+                </small>
+                <b className={w > WAIT_ALERT ? 'red' : ''}>
+                  Marchandise prête le {fshort(b.readyDate)} · attente booking {w} j
+                </b>
+                <span>
+                  Pris en compte par {b.ackBy}
+                  {b.ackNote ? ` · « ${b.ackNote} »` : ''}
+                  {b.reminders.length ? ` · ${b.reminders.length} relance(s)` : ''}
+                </span>
+              </div>
+              <div className="bk-actions">{remindRemove(pf, w)}</div>
+            </Row>
+          );
+        })}
+      </Stage>
+
+      <Stage icon={<CalendarCheck size={34} strokeWidth={1.8} />} tone="green" title="Bookés" sub="Booking fait par le transitaire : compagnie, navire et dates réelles" items={booked}>
         {booked.map((pf) => (
           <BookedRow key={pf.id} s={state} pf={pf} canShip={canBook} />
         ))}
@@ -189,16 +220,11 @@ function BookedRow({ s, pf, canShip }: { s: State; pf: Proforma; canShip?: boole
           Chargement {fshort(b.loadingDate)} · départ {fshort(b.etd)} · arrivée {fshort(b.eta)}
         </b>
         <span>
-          Répondu le {fstamp(b.answeredAt)} par {b.answeredBy}
+          {b.bookedBy === 'transitaire' ? `Booké par ${b.forwarder}` : `Saisi par ${b.bookedBy === 'fournisseur' ? 'le fournisseur' : 'JONAS'} pour ${b.forwarder ?? 'le transitaire'}`} le {fstamp(b.answeredAt)}
+          {b.vessel ? ` · ${b.vessel}` : ''}
           {b.supplierNote ? ` · « ${b.supplierNote} »` : ''}
         </span>
-        {toShip.length > 0 && (
-          <span className={toShip.every((c) => c.fwdConfirmedAt) ? 'green bold' : 'orange bold'}>
-            {toShip.every((c) => c.fwdConfirmedAt)
-              ? `Confirmé par ${toShip[0].forwarder ?? 'le transitaire'} · ${toShip[0].booking?.vessel ?? ''}`
-              : `En attente de confirmation ${toShip[0].forwarder ?? 'transitaire'}`}
-          </span>
-        )}
+        {toShip.length > 0 && toShip.some((c) => !c.number) && <span className="orange bold">N° de conteneur à venir ({b.forwarder ?? 'transitaire'})</span>}
       </div>
       <div className="bk-actions">
         {canShip && toShip.length > 0 && (

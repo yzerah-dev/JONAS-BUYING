@@ -71,7 +71,7 @@ export default function App() {
             <Route path="finance" element={page(<PortalFinance />)} />
           </Route>
           <Route path="transitaire" element={page(<ForwarderLayout />)}>
-            <Route index element={<Navigate to="a-confirmer" replace />} />
+            <Route index element={<Navigate to="a-booker" replace />} />
             <Route path=":etape" element={page(<ForwarderHome />)} />
           </Route>
         </Routes>

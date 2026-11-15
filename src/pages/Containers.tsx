@@ -262,7 +262,7 @@ export default function Containers() {
                                   Demande de booking
                                 </Link>
                               )}
-                              {s === 'booking_demande' && <Pill color="violet">Attente fournisseur</Pill>}
+                              {s === 'booking_demande' && <Pill color="violet">{c.planValidated ? `Attente ${c.forwarder ?? 'transitaire'}` : 'Attente fournisseur'}</Pill>}
                               {s === 'booke' && canBook && (
                                 <button className="btn sm" onClick={() => dispatch({ type: 'ship', containerId: c.id })}>
                                   <Ship size={12} /> Parti

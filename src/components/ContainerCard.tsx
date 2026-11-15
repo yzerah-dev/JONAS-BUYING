@@ -96,7 +96,6 @@ export default function ContainerCard({ s, c, selected, onOpen, actions }: { s: 
               {num(containerQty(c))} pcs · {containerProformas(c).join(', ') || '—'}
             </small>
             <span className="ct-flags">
-              {c.status === 'booke' && !c.fwdConfirmedAt && <Pill color="orange">Attente {c.forwarder ?? 'transitaire'}</Pill>}
               {c.customs === 'en_cours' && <Pill color="orange">Douane en cours</Pill>}
               {c.customs === 'dedouane' && c.status !== 'arrive' && <Pill color="green">Dédouané</Pill>}
               {c.deliveryDate && c.status !== 'arrive' && <Pill color="violet">Livraison {fshort(c.deliveryDate)}</Pill>}

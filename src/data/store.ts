@@ -42,7 +42,7 @@ export const DEFAULT_SETTINGS: Settings = {
   fx: { EUR: 1, USD: 0.93, CNY: 0.128 },
 };
 
-export const STORAGE_KEY = 'jonas-buying-state-v10';
+export const STORAGE_KEY = 'jonas-buying-state-v11';
 
 export const currentUser = (s: State): User => s.users.find((u) => u.id === s.currentUserId) ?? s.users[0];
 
@@ -99,6 +99,7 @@ export type Action =
   | { type: 'requestPfBooking'; proformaId: string; containers: number; dateWanted: ISODate; note?: string }
   | { type: 'remindPfBooking'; proformaId: string }
   | { type: 'cancelPfBooking'; proformaId: string }
+  | { type: 'ackPfBooking'; proformaId: string; readyDate: ISODate; forwarder: Forwarder; note?: string }
   | {
       type: 'answerPfBooking';
       proformaId: string;
@@ -107,6 +108,8 @@ export type Action =
       eta: ISODate;
       carrier?: string;
       bookingNo?: string;
+      vessel?: string;
+      cutoff?: ISODate;
       note?: string;
     }
   | { type: 'validatePlan'; containerId: string }
@@ -260,7 +263,7 @@ export function isAllowed(s: State, a: Action): boolean {
     case 'autoLoad': {
       const pf = s.proformas.find((x) => x.id === a.proformaId);
       if (!pf) return false;
-      if (isSupplier(u)) return pf.supplierId === u.supplierId && bookingOpen(pf);
+      if (isSupplier(u)) return pf.supplierId === u.supplierId && bookingOpen(pf) && !pf.booking!.ackAt;
       return can(u, 'logistics.plan');
     }
     case 'requestPfBooking': {
@@ -273,11 +276,20 @@ export function isAllowed(s: State, a: Action): boolean {
       const pf = s.proformas.find((x) => x.id === a.proformaId);
       return can(u, 'logistics.booking') && !!pf && bookingOpen(pf);
     }
-    case 'answerPfBooking': {
+    case 'ackPfBooking': {
+      // Le fournisseur prend la demande en compte : il faut un plan (au moins un container chargé)
       const pf = s.proformas.find((x) => x.id === a.proformaId);
-      if (!pf || !bookingOpen(pf)) return false;
+      if (!pf || bookingStage(pf) !== 'fournisseur') return false;
       if (!(isSupplier(u) ? pf.supplierId === u.supplierId : u.role === 'pilote')) return false;
-      // Il faut un plan : au moins un container chargé pour cette proforma
+      return s.containers.some((c) => c.allocations.some((x) => x.proformaId === pf.id) && ['a_booker', 'booking_demande'].includes(c.status));
+    }
+    case 'answerPfBooking': {
+      // Le transitaire fait le booking ; s'il ne passe pas par l'appli, le fournisseur le saisit pour lui
+      const pf = s.proformas.find((x) => x.id === a.proformaId);
+      if (!pf || bookingStage(pf) !== 'transitaire') return false;
+      if (isForwarder(u)) { if (u.forwarder !== pf.booking!.forwarder) return false; }
+      else if (isSupplier(u)) { if (pf.supplierId !== u.supplierId) return false; }
+      else if (u.role !== 'pilote') return false;
       return s.containers.some((c) => c.allocations.some((x) => x.proformaId === pf.id) && ['a_booker', 'booking_demande'].includes(c.status));
     }
     case 'acceptPlan': {
@@ -336,8 +348,14 @@ export function isAllowed(s: State, a: Action): boolean {
 /** Conteneur suivi par ce transitaire : le sien, une fois booké par le fournisseur */
 export const forwarderOwns = (u: User, c: Container) => isForwarder(u) && c.forwarder === u.forwarder && ['booke', 'en_transit', 'arrive'].includes(c.status);
 
-/** Demande de booking envoyée, pas encore répondue par le fournisseur */
+/** Demande de booking envoyée, booking pas encore effectué */
 export const bookingOpen = (pf: Proforma) => !!pf.booking && !pf.booking.answeredAt;
+/** Étape du booking : chez le fournisseur (à prendre en compte), chez le transitaire (à booker), ou booké */
+export const bookingStage = (pf: Proforma): 'fournisseur' | 'transitaire' | 'booke' | undefined =>
+  !pf.booking ? undefined : pf.booking.answeredAt ? 'booke' : pf.booking.ackAt ? 'transitaire' : 'fournisseur';
+/** Transitaire habituel du fournisseur (celui de ses derniers conteneurs) */
+export const defaultForwarder = (s: State, supplierId: string): Forwarder =>
+  [...s.containers].reverse().find((c) => c.supplierId === supplierId && c.forwarder)?.forwarder ?? 'Logfret';
 /** Proforma signée, pas encore partie, sans demande en cours ni réponse */
 export const canRequestBooking = (pf: Proforma) => !pf.booking && ['en_dev', 'en_production'].includes(pf.status);
 /** Containers d'une proforma (au moins une ligne chargée) */
@@ -542,8 +560,33 @@ function applyAction(s: State, a: Action): State {
       return mapPF(s, a.proformaId, (pf) => ({
         ...pf,
         booking: { ...pf.booking!, reminders: [...pf.booking!.reminders, nowStamp()] },
-        history: [...pf.history, hist(me, 'Relance booking envoyée au fournisseur')],
+        history: [...pf.history, hist(me, `Relance booking envoyée ${pf.booking!.ackAt ? `à ${pf.booking!.forwarder} et au fournisseur` : 'au fournisseur'}`)],
       }));
+    case 'ackPfBooking': {
+      const next = mapPF(s, a.proformaId, (pf) => ({
+        ...pf,
+        booking: { ...pf.booking!, ackAt: nowStamp(), ackBy: me, readyDate: a.readyDate, forwarder: a.forwarder, ackNote: a.note, reminders: [] },
+        history: [...pf.history, hist(me, `Booking pris en compte : marchandise prête le ${a.readyDate}, boîtes demandées à ${a.forwarder}`)],
+      }));
+      return {
+        ...next,
+        containers: next.containers.map((c) =>
+          ['a_booker', 'booking_demande'].includes(c.status) && c.allocations.some((x) => x.proformaId === a.proformaId)
+            ? {
+                ...c,
+                status: 'booking_demande',
+                forwarder: a.forwarder,
+                planValidated: true,
+                planValidatedBy: 'fournisseur',
+                planRequested: false,
+                planProposed: false,
+                booking: { reminders: [], ...(c.booking ?? {}), requestedAt: nowStamp(), requestedBy: me },
+                dateHistory: [...c.dateHistory, hist(me, `Boîtes demandées à ${a.forwarder} · marchandise prête le ${a.readyDate}`)],
+              }
+            : c,
+        ),
+      };
+    }
     case 'cancelPfBooking': {
       const next = mapPF(s, a.proformaId, (pf) => ({ ...pf, booking: undefined, history: [...pf.history, hist(me, 'Demande de booking annulée')] }));
       return {
@@ -555,6 +598,11 @@ function applyAction(s: State, a: Action): State {
     }
     case 'answerPfBooking': {
       const at = nowStamp();
+      const u = currentUser(s);
+      const pf0 = s.proformas.find((x) => x.id === a.proformaId)!;
+      const fwd = pf0.booking?.forwarder ?? 'le transitaire';
+      const bookedBy = isForwarder(u) ? 'transitaire' : isSupplier(u) ? 'fournisseur' : 'jonas';
+      const who = bookedBy === 'transitaire' ? `Booké par ${fwd}` : `Booking saisi ${bookedBy === 'fournisseur' ? 'par le fournisseur' : 'par JONAS'} pour ${fwd}`;
       const next = mapPF(s, a.proformaId, (pf) => ({
         ...pf,
         etd: a.etd,
@@ -568,9 +616,12 @@ function applyAction(s: State, a: Action): State {
           eta: a.eta,
           carrier: a.carrier,
           bookingNo: a.bookingNo,
+          vessel: a.vessel,
+          cutoff: a.cutoff,
+          bookedBy,
           supplierNote: a.note,
         },
-        history: [...pf.history, hist(me, `Booking effectué : chargement ${a.loadingDate}, départ ${a.etd}, arrivée ${a.eta}`)],
+        history: [...pf.history, hist(me, `${who} : chargement ${a.loadingDate}, départ ${a.etd}, arrivée ${a.eta}`)],
       }));
       return syncProformaStatuses({
         ...next,
@@ -583,13 +634,15 @@ function applyAction(s: State, a: Action): State {
                 etaPlanned: a.eta,
                 carrier: a.carrier ?? c.carrier,
                 bookingNo: a.bookingNo || c.bookingNo,
+                forwarder: pf0.booking?.forwarder ?? c.forwarder,
                 planValidated: true,
-                planValidatedBy: 'fournisseur',
+                planValidatedBy: c.planValidatedBy ?? 'fournisseur',
                 planRequested: false,
                 planProposed: false,
+                fwdConfirmedAt: at,
                 loading: { date: a.loadingDate, status: 'validated', validatedAt: at },
-                booking: { reminders: [], ...(c.booking ?? {}), confirmedAt: at },
-                dateHistory: [...c.dateHistory, hist(me, `Booké par le fournisseur · chargement ${a.loadingDate} · ETD ${a.etd} · ETA ${a.eta}`)],
+                booking: { reminders: [], ...(c.booking ?? {}), confirmedAt: at, vessel: a.vessel, cutoff: a.cutoff },
+                dateHistory: [...c.dateHistory, hist(me, `${who} · chargement ${a.loadingDate} · ETD ${a.etd} · ETA ${a.eta}`)],
               }
             : c,
         ),
@@ -799,7 +852,7 @@ function applyAction(s: State, a: Action): State {
         etdPlanned: a.etd,
         fwdConfirmedAt: nowStamp(),
         booking: { reminders: [], ...(c.booking ?? {}), vessel: a.vessel, cutoff: a.cutoff ?? c.booking?.cutoff },
-        dateHistory: [...c.dateHistory, hist(me, `Booking confirmé par ${c.forwarder ?? 'le transitaire'} : ${a.number} · ${a.vessel} · ETD ${a.etd}`)],
+        dateHistory: [...c.dateHistory, hist(me, `Conteneur ${a.number}${a.seal ? ` · plomb ${a.seal}` : ''} · ${a.vessel} · ETD ${a.etd}`)],
       }));
     case 'portArrival':
       return mapC(s, a.containerId, (c) => ({
@@ -872,8 +925,10 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
       return { text: `${a.proformaId} : relance booking` };
     case 'cancelPfBooking':
       return { text: `${a.proformaId} : demande de booking annulée` };
+    case 'ackPfBooking':
+      return { text: `${a.proformaId} : booking pris en compte par le fournisseur (prêt le ${a.readyDate}, boîtes demandées à ${a.forwarder})` };
     case 'answerPfBooking':
-      return { text: `${a.proformaId} : booké par le fournisseur (départ ${a.etd})` };
+      return { text: `${a.proformaId} : booké${a.bookingNo ? ` ${a.bookingNo}` : ''} (départ ${a.etd})` };
     case 'validatePlan':
       return { target: ctn(a.containerId), text: 'Plan de chargement validé' };
     case 'requestPlan':
@@ -907,7 +962,7 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
     case 'reviseEta':
       return { target: ctn(a.containerId), text: `ETA révisée au ${a.eta}` };
     case 'fwdConfirm':
-      return { target: ctn(a.containerId), text: `Booking confirmé par le transitaire (${a.vessel})` };
+      return { target: ctn(a.containerId), text: `N° de conteneur ${a.number} saisi par le transitaire` };
     case 'setCustoms':
       return { target: ctn(a.containerId), text: a.status === 'dedouane' ? 'Dédouané' : 'Dédouanement lancé' };
     case 'portArrival':
