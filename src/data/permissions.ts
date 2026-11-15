@@ -12,7 +12,8 @@ export type Module =
   | 'fournisseurs'
   | 'finance'
   | 'parametres'
-  | 'journal';
+  | 'journal'
+  | 'booking';
 
 export type Perm =
   | 'proforma.sign' // signer une proforma (engagement d'achat)
@@ -35,7 +36,7 @@ export interface RoleDef {
   portal?: boolean;
 }
 
-const ALL_MODULES: Module[] = ['home', 'proformas', 'produits', 'developpement', 'design', 'conteneurs', 'fournisseurs', 'finance', 'parametres', 'journal'];
+const ALL_MODULES: Module[] = ['home', 'proformas', 'produits', 'developpement', 'design', 'conteneurs', 'fournisseurs', 'finance', 'parametres', 'journal', 'booking'];
 const ALL_PERMS: Perm[] = [
   'proforma.sign',
   'proforma.edit',
@@ -66,7 +67,7 @@ export const ROLE_DEFS: Record<Role, RoleDef> = {
   acheteur: {
     label: 'Acheteur',
     description: 'Proformas, développement produit, consolidation des conteneurs.',
-    modules: ['home', 'proformas', 'produits', 'developpement', 'design', 'conteneurs', 'fournisseurs', 'parametres'],
+    modules: ['home', 'proformas', 'produits', 'developpement', 'design', 'conteneurs', 'booking', 'fournisseurs', 'parametres'],
     perms: ['proforma.edit', 'finance.view', 'dev.advance', 'logistics.plan', 'pack.reject'],
   },
   designer: {
@@ -90,7 +91,7 @@ export const ROLE_DEFS: Record<Role, RoleDef> = {
   logistique: {
     label: 'Logistique',
     description: 'Plans de chargement, bookings, transit et réception.',
-    modules: ['home', 'proformas', 'produits', 'conteneurs', 'fournisseurs', 'parametres'],
+    modules: ['home', 'proformas', 'produits', 'conteneurs', 'booking', 'fournisseurs', 'parametres'],
     perms: ['logistics.plan', 'logistics.booking'],
   },
   fournisseur: {
@@ -141,4 +142,5 @@ export const MODULE_LABELS: Record<Module, string> = {
   finance: 'Finance',
   parametres: 'Paramètres',
   journal: 'Journal d’activité',
+  booking: 'Booking',
 };

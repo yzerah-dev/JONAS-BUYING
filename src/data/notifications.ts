@@ -55,9 +55,12 @@ export function notificationsFor(s: State): Notice[] {
   // Logistique
   if (can(u, 'logistics.booking') || can(u, 'logistics.plan')) {
     const toBook = s.containers.filter((c) => c.status === 'a_booker' && diffDays(c.etdPlanned, TODAY) < 21);
-    if (toBook.length) add({ id: `book-${toBook.map((c) => c.id).join(',')}`, level: 'orange', title: `${toBook.length} conteneur(s) à booker (départ < 3 sem.)`, to: '/conteneurs' });
+    if (toBook.length) add({ id: `book-${toBook.map((c) => c.id).join(',')}`, level: 'orange', title: `${toBook.length} conteneur(s) à booker (départ < 3 sem.)`, to: '/booking' });
     const waiting = s.containers.filter((c) => c.status === 'booking_demande');
-    if (waiting.length) add({ id: `bkw-${waiting.map((c) => c.id).join(',')}`, level: 'info', title: `${waiting.length} booking(s) en attente de confirmation`, to: '/conteneurs' });
+    const noAnswer = waiting.filter((c) => c.booking?.requestedAt && diffDays(TODAY, c.booking.requestedAt.slice(0, 10)) > 3);
+    if (noAnswer.length)
+      add({ id: `bkl-${noAnswer.map((c) => c.id).join(',')}`, level: 'red', title: `${noAnswer.length} demande(s) de booking sans réponse depuis +3 j`, detail: 'À relancer auprès du transitaire', to: '/booking' });
+    else if (waiting.length) add({ id: `bkw-${waiting.map((c) => c.id).join(',')}`, level: 'info', title: `${waiting.length} booking(s) en attente de confirmation`, to: '/booking' });
     const proposed = s.containers.filter((c) => c.planProposed);
     if (proposed.length) add({ id: `plan-${proposed.map((c) => c.id).join(',')}`, level: 'orange', title: `${proposed.length} plan(s) de chargement proposé(s) par le fournisseur`, detail: 'À valider', to: '/conteneurs' });
     const revised = s.containers.filter((c) => c.etaRevised && c.status !== 'arrive');

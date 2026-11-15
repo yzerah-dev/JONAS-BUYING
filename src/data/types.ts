@@ -177,6 +177,8 @@ export interface Container {
   carrier?: string;
   /** Transitaire (commissionnaire de transport) qui gère le booking et le dédouanement */
   forwarder?: Forwarder;
+  /** Suivi du booking : demande au transitaire, relances, confirmation */
+  booking?: BookingInfo;
   portFrom: string;
   portTo: string;
   etdPlanned: ISODate;
@@ -196,6 +198,19 @@ export interface Container {
   allocations: Allocation[];
   documents: string[];
   dateHistory: HistoryEntry[];
+}
+
+export interface BookingInfo {
+  requestedAt?: string;
+  requestedBy?: string;
+  /** Départ souhaité indiqué dans la demande */
+  etdWanted?: ISODate;
+  /** Horodatages des relances envoyées au transitaire */
+  reminders: string[];
+  confirmedAt?: string;
+  vessel?: string;
+  /** Date limite de livraison du conteneur au terminal */
+  cutoff?: ISODate;
 }
 
 export type Forwarder = 'Logfret' | 'Kuehne + Nagel';

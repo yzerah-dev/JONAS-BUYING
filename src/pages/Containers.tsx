@@ -271,7 +271,13 @@ export default function Containers() {
                               )}
                               {s === 'booking_demande' && canBook && (
                                 <div className="row" style={{ gap: 4 }}>
-                                  <button className="btn sm" onClick={() => toast(`Relance envoyée à ${c.forwarder ?? c.carrier}`)}>
+                                  <button
+                                    className="btn sm"
+                                    onClick={() => {
+                                      dispatch({ type: 'remindBooking', containerId: c.id });
+                                      toast(`Relance envoyée à ${c.forwarder ?? 'transitaire'}`);
+                                    }}
+                                  >
                                     Relancer
                                   </button>
                                   <button className="btn primary sm" onClick={() => dispatch({ type: 'confirmBooking', containerId: c.id })}>

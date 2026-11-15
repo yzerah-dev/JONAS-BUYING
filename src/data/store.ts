@@ -95,8 +95,10 @@ export type Action =
   | { type: 'deallocate'; containerId: string; proformaId: string; productId: string }
   | { type: 'createContainer'; supplierId: string; etd: ISODate; eta: ISODate }
   | { type: 'validatePlan'; containerId: string }
-  | { type: 'requestBooking'; containerId: string }
-  | { type: 'confirmBooking'; containerId: string }
+  | { type: 'requestBooking'; containerId: string; forwarder?: Forwarder; etdWanted?: ISODate }
+  | { type: 'confirmBooking'; containerId: string; bookingNo?: string; carrier?: string; vessel?: string; cutoff?: ISODate; etd?: ISODate }
+  | { type: 'remindBooking'; containerId: string }
+  | { type: 'cancelBooking'; containerId: string }
   | { type: 'ship'; containerId: string }
   | { type: 'receive'; containerId: string; lines?: ReceptionLine[]; note?: string }
   | { type: 'reviseEta'; containerId: string; eta: ISODate }
@@ -182,6 +184,8 @@ const ACTION_PERM: Partial<Record<Action['type'], Perm>> = {
   setFx: 'finance.pay',
   setProformaCurrency: 'proforma.edit',
   setForwarder: 'logistics.plan',
+  remindBooking: 'logistics.booking',
+  cancelBooking: 'logistics.booking',
   toggleUser: 'users.manage',
 };
 
@@ -366,25 +370,48 @@ function applyAction(s: State, a: Action): State {
     }
     case 'validatePlan':
       return mapC(s, a.containerId, (c) => ({ ...c, planValidated: true, planProposed: false, planRequested: false, dateHistory: [...c.dateHistory, hist(me, 'Plan de chargement validé')] }));
-    case 'requestBooking':
+    case 'requestBooking': {
+      return mapC(s, a.containerId, (c) => {
+        const fwd = a.forwarder ?? c.forwarder ?? 'Logfret';
+        return {
+          ...c,
+          status: 'booking_demande',
+          planValidated: true,
+          forwarder: fwd,
+          booking: { reminders: [], ...(c.booking ?? {}), requestedAt: nowStamp(), requestedBy: me, etdWanted: a.etdWanted ?? c.etdPlanned },
+          dateHistory: [...c.dateHistory, hist(me, `Demande de booking envoyée à ${fwd}${a.etdWanted ? ` · départ souhaité ${a.etdWanted}` : ''}`)],
+        };
+      });
+    }
+    case 'remindBooking':
       return mapC(s, a.containerId, (c) => ({
         ...c,
-        status: 'booking_demande',
-        planValidated: true,
-        bookingNo: c.bookingNo ?? `BK-${1040 + s.containers.indexOf(c)}`,
-        carrier: c.carrier ?? 'MSC',
-        forwarder: c.forwarder ?? 'Logfret',
-        dateHistory: [...c.dateHistory, hist(me, `Demande de booking envoyée à ${c.forwarder ?? 'Logfret'}`)],
+        booking: { ...(c.booking ?? {}), reminders: [...(c.booking?.reminders ?? []), nowStamp()] },
+        dateHistory: [...c.dateHistory, hist(me, `Relance booking envoyée à ${c.forwarder ?? 'transitaire'}`)],
+      }));
+    case 'cancelBooking':
+      return mapC(s, a.containerId, (c) => ({
+        ...c,
+        status: 'a_booker',
+        booking: { reminders: [] },
+        dateHistory: [...c.dateHistory, hist(me, 'Demande de booking annulée')],
       }));
     case 'confirmBooking':
       return syncProformaStatuses(
         mapC(s, a.containerId, (c) => ({
           ...c,
           status: 'booke',
+          bookingNo: a.bookingNo || c.bookingNo || `BK-${98750 + s.containers.indexOf(c)}`,
+          carrier: a.carrier || c.carrier || 'MSC',
+          etdPlanned: a.etd ?? c.etdPlanned,
           number: c.number ?? `MSCU${7845300 + s.containers.indexOf(c)}`,
           seal: c.seal ?? `SL${400100 + s.containers.indexOf(c)}`,
-          documents: [...c.documents, 'Booking confirmation.pdf'],
-          dateHistory: [...c.dateHistory, hist(c.carrier ?? 'Transporteur', 'Booking confirmé')],
+          documents: [...new Set([...c.documents, 'Booking confirmation.pdf'])],
+          booking: { reminders: [], ...(c.booking ?? {}), confirmedAt: nowStamp(), vessel: a.vessel || c.booking?.vessel, cutoff: a.cutoff ?? c.booking?.cutoff },
+          dateHistory: [
+            ...c.dateHistory,
+            hist(c.forwarder ?? 'Transitaire', `Booking confirmé${a.bookingNo ? ` ${a.bookingNo}` : ''}${a.vessel ? ` · ${a.vessel}` : ''}${a.etd && a.etd !== c.etdPlanned ? ` · ETD ${a.etd}` : ''}`),
+          ],
         })),
       );
     case 'ship':
@@ -563,7 +590,11 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
     case 'addContainerDoc':
       return { target: ctn(a.containerId), text: `Document déposé : ${a.doc}` };
     case 'requestBooking':
-      return { target: ctn(a.containerId), text: 'Booking demandé au transitaire' };
+      return { target: ctn(a.containerId), text: `Booking demandé à ${a.forwarder ?? s.containers.find((c) => c.id === a.containerId)?.forwarder ?? 'transitaire'}` };
+    case 'remindBooking':
+      return { target: ctn(a.containerId), text: 'Relance booking' };
+    case 'cancelBooking':
+      return { target: ctn(a.containerId), text: 'Demande de booking annulée' };
     case 'confirmBooking':
       return { target: ctn(a.containerId), text: 'Booking confirmé' };
     case 'ship':

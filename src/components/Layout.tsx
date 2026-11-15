@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { BarChart3, Box, Boxes, Euro, History, Layers, Palette, Search, Settings, Truck } from 'lucide-react';
+import { BarChart3, CalendarCheck, Box, Boxes, Euro, History, Layers, Palette, Search, Settings, Truck } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import SearchPalette from './SearchPalette';
 import { currentUser, useStore } from '../data/store';
@@ -15,6 +15,7 @@ const NAV: { to: string; label: string; icon: typeof Layers; module: Module }[] 
   { to: '/proformas', label: 'Proformas', icon: Layers, module: 'proformas' },
   { to: '/developpement', label: 'Développement', icon: Box, module: 'developpement' },
   { to: '/conteneurs', label: 'Conteneurs', icon: ContainerGlyph as unknown as typeof Layers, module: 'conteneurs' },
+  { to: '/booking', label: 'Booking', icon: CalendarCheck, module: 'booking' },
   { to: '/performance', label: 'Performance', icon: BarChart3, module: 'home' },
 ];
 const NAV_MORE: typeof NAV = [
@@ -39,6 +40,7 @@ function moduleOf(path: string): Module {
     finance: 'finance',
     parametres: 'parametres',
     journal: 'journal',
+    booking: 'booking',
   };
   return map[seg] ?? 'home';
 }

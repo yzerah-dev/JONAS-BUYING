@@ -22,6 +22,7 @@ const SupplierDetail = lazy(() => import('./pages/SupplierDetail'));
 const Finance = lazy(() => import('./pages/Finance'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Journal = lazy(() => import('./pages/Journal'));
+const Booking = lazy(() => import('./pages/Booking'));
 const portal = <K extends keyof typeof import('./portal/PortalPages')>(name: K) =>
   lazy(() => import('./portal/PortalPages').then((m) => ({ default: m[name] as () => ReactNode })));
 const PortalHome = portal('PortalHome');
@@ -54,6 +55,7 @@ export default function App() {
             <Route path="finance" element={page(<Finance />)} />
             <Route path="parametres" element={page(<Settings />)} />
             <Route path="journal" element={page(<Journal />)} />
+            <Route path="booking" element={page(<Booking />)} />
           </Route>
           <Route path="portail" element={<PortalLayout />}>
             <Route index element={page(<PortalHome />)} />

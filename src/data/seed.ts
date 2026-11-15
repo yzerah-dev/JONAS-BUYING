@@ -499,6 +499,35 @@ export const containers: Container[] = containerPlan.flatMap(([pfId, cov, st]) =
   }
 }
 
+// Suivi des bookings : demandes envoyées aux transitaires, relances, confirmations
+{
+  const VESSELS: Record<string, string[]> = {
+    MSC: ['MSC ARINA', 'MSC TESSA', 'MSC GÜLSÜN'],
+    'CMA CGM': ['CMA CGM JACQUES SAADE', 'CMA CGM TROCADERO'],
+    Maersk: ['MAERSK HANGZHOU', 'MAERSK EMDEN'],
+    COSCO: ['COSCO SHIPPING UNIVERSE', 'COSCO PRIDE'],
+    'Hapag-Lloyd': ['BERLIN EXPRESS', 'HAMBURG EXPRESS'],
+  };
+  const clamp = (d: string) => (d < '2026-11-14' ? d : '2026-11-14');
+  containers.forEach((c, i) => {
+    if (c.status === 'a_booker') return;
+    const requested = clamp(addDays(c.etdPlanned, -24));
+    c.booking = { requestedAt: `${requested}T${9 + (i % 6)}:30`, requestedBy: 'Logistique', etdWanted: c.etdPlanned, reminders: [] };
+    if (c.status === 'booking_demande') {
+      // Une demande ancienne déjà relancée, une récente
+      if (i % 2 === 0) {
+        c.booking.requestedAt = '2026-11-06T10:15';
+        c.booking.reminders = ['2026-11-10T09:05'];
+      } else c.booking.requestedAt = '2026-11-12T16:40';
+      return;
+    }
+    const list = VESSELS[c.carrier ?? 'MSC'] ?? ['MSC ARINA'];
+    c.booking.confirmedAt = `${clamp(addDays(c.etdPlanned, -18))}T11:20`;
+    c.booking.vessel = list[i % list.length];
+    c.booking.cutoff = addDays(c.etdPlanned, -3);
+  });
+}
+
 // Contrôles de réception des conteneurs arrivés (un avec écart, pour la démo)
 containers
   .filter((x) => x.status === 'arrive')
