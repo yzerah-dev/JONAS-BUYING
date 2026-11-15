@@ -41,7 +41,7 @@ export const DEFAULT_SETTINGS: Settings = {
   fx: { EUR: 1, USD: 0.93, CNY: 0.128 },
 };
 
-export const STORAGE_KEY = 'jonas-buying-state-v8';
+export const STORAGE_KEY = 'jonas-buying-state-v9';
 
 export const currentUser = (s: State): User => s.users.find((u) => u.id === s.currentUserId) ?? s.users[0];
 
@@ -95,6 +95,19 @@ export type Action =
   | { type: 'deallocate'; containerId: string; proformaId: string; productId: string }
   | { type: 'createContainer'; supplierId: string; etd: ISODate; eta: ISODate }
   | { type: 'autoLoad'; proformaId: string }
+  | { type: 'requestPfBooking'; proformaId: string; containers: number; dateWanted: ISODate; note?: string }
+  | { type: 'remindPfBooking'; proformaId: string }
+  | { type: 'cancelPfBooking'; proformaId: string }
+  | {
+      type: 'answerPfBooking';
+      proformaId: string;
+      loadingDate: ISODate;
+      etd: ISODate;
+      eta: ISODate;
+      carrier?: string;
+      bookingNo?: string;
+      note?: string;
+    }
   | { type: 'validatePlan'; containerId: string }
   | { type: 'acceptPlan'; containerId: string }
   | { type: 'proposeLoadingDate'; containerId: string; date: ISODate }
@@ -170,8 +183,6 @@ const ACTION_PERM: Partial<Record<Action['type'], Perm>> = {
   requestDieCut: 'pack.design',
   uploadArtwork: 'pack.design',
   forwardPack: 'pack.design',
-  createContainer: 'logistics.plan',
-  autoLoad: 'logistics.plan',
   requestPlan: 'logistics.plan',
   proposeLoadingDate: 'logistics.booking',
   confirmBooking: 'logistics.booking',
@@ -239,6 +250,30 @@ export function isAllowed(s: State, a: Action): boolean {
       return can(u, 'logistics.plan');
     case 'proposePlan':
       return isSupplier(u) ? supplierOwnsOpenContainer(s, u, a.containerId) : false;
+    case 'createContainer':
+      return isSupplier(u) ? a.supplierId === u.supplierId : can(u, 'logistics.plan');
+    case 'autoLoad': {
+      const pf = s.proformas.find((x) => x.id === a.proformaId);
+      if (!pf) return false;
+      if (isSupplier(u)) return pf.supplierId === u.supplierId && bookingOpen(pf);
+      return can(u, 'logistics.plan');
+    }
+    case 'requestPfBooking': {
+      const pf = s.proformas.find((x) => x.id === a.proformaId);
+      return can(u, 'logistics.booking') && !!pf && canRequestBooking(pf) && a.containers > 0;
+    }
+    case 'remindPfBooking':
+    case 'cancelPfBooking': {
+      const pf = s.proformas.find((x) => x.id === a.proformaId);
+      return can(u, 'logistics.booking') && !!pf && bookingOpen(pf);
+    }
+    case 'answerPfBooking': {
+      const pf = s.proformas.find((x) => x.id === a.proformaId);
+      if (!pf || !bookingOpen(pf)) return false;
+      if (!(isSupplier(u) ? pf.supplierId === u.supplierId : u.role === 'pilote')) return false;
+      // Il faut un plan : au moins un container chargé pour cette proforma
+      return s.containers.some((c) => c.allocations.some((x) => x.proformaId === pf.id) && ['a_booker', 'booking_demande'].includes(c.status));
+    }
     case 'acceptPlan': {
       // Le fournisseur valide tel quel le plan envoyé par JONAS
       const c = s.containers.find((x) => x.id === a.containerId);
@@ -269,6 +304,13 @@ export function isAllowed(s: State, a: Action): boolean {
     }
   }
 }
+
+/** Demande de booking envoyée, pas encore répondue par le fournisseur */
+export const bookingOpen = (pf: Proforma) => !!pf.booking && !pf.booking.answeredAt;
+/** Proforma signée, pas encore partie, sans demande en cours ni réponse */
+export const canRequestBooking = (pf: Proforma) => !pf.booking && ['en_dev', 'en_production'].includes(pf.status);
+/** Containers d'une proforma (au moins une ligne chargée) */
+export const pfContainers = (s: State, pfId: string) => s.containers.filter((c) => c.allocations.some((x) => x.proformaId === pfId));
 
 function applyAction(s: State, a: Action): State {
   if (!isAllowed(s, a)) {
@@ -416,13 +458,13 @@ function applyAction(s: State, a: Action): State {
         let remaining = line.qty - allocatedQty(s, pf.id, p.id);
         while (remaining > 0) {
           let c = containers.find(
-            (x) => x.supplierId === pf.supplierId && x.status === 'a_booker' && !x.planValidated && CONTAINER_CAPACITY[x.type] - used(x) >= p.cbmCarton,
+            (x) => x.supplierId === pf.supplierId && ['a_booker', 'booking_demande'].includes(x.status) && !x.planValidated && CONTAINER_CAPACITY[x.type] - used(x) >= p.cbmCarton,
           );
           if (!c) {
             c = {
               id: `PLAN-${String(seq++).padStart(3, '0')}`,
               type: '40HC',
-              status: 'a_booker',
+              status: bookingOpen(pf) ? 'booking_demande' : 'a_booker',
               supplierId: pf.supplierId,
               portFrom: supplier.port,
               portTo: 'Le Havre',
@@ -449,6 +491,78 @@ function applyAction(s: State, a: Action): State {
       }
       containers = containers.map((c) => (touched.has(c.id) ? { ...c, dateHistory: [...c.dateHistory, hist(me, `Chargement automatique ${pf.id}`)] } : c));
       return syncProformaStatuses({ ...s, containers });
+    }
+    case 'requestPfBooking': {
+      const next = mapPF(s, a.proformaId, (pf) => ({
+        ...pf,
+        booking: { requestedAt: nowStamp(), requestedBy: me, containers: a.containers, dateWanted: a.dateWanted, note: a.note, reminders: [] },
+        history: [...pf.history, hist(me, `Demande de booking envoyée au fournisseur : ${a.containers} × 40HC, chargement souhaité ${a.dateWanted}`)],
+      }));
+      return {
+        ...next,
+        containers: next.containers.map((c) =>
+          c.status === 'a_booker' && c.allocations.some((x) => x.proformaId === a.proformaId)
+            ? { ...c, status: 'booking_demande', dateHistory: [...c.dateHistory, hist(me, 'Booking demandé au fournisseur')] }
+            : c,
+        ),
+      };
+    }
+    case 'remindPfBooking':
+      return mapPF(s, a.proformaId, (pf) => ({
+        ...pf,
+        booking: { ...pf.booking!, reminders: [...pf.booking!.reminders, nowStamp()] },
+        history: [...pf.history, hist(me, 'Relance booking envoyée au fournisseur')],
+      }));
+    case 'cancelPfBooking': {
+      const next = mapPF(s, a.proformaId, (pf) => ({ ...pf, booking: undefined, history: [...pf.history, hist(me, 'Demande de booking annulée')] }));
+      return {
+        ...next,
+        containers: next.containers.map((c) =>
+          c.status === 'booking_demande' && c.allocations.some((x) => x.proformaId === a.proformaId) ? { ...c, status: 'a_booker' } : c,
+        ),
+      };
+    }
+    case 'answerPfBooking': {
+      const at = nowStamp();
+      const next = mapPF(s, a.proformaId, (pf) => ({
+        ...pf,
+        etd: a.etd,
+        eta: a.eta,
+        booking: {
+          ...pf.booking!,
+          answeredAt: at,
+          answeredBy: me,
+          loadingDate: a.loadingDate,
+          etd: a.etd,
+          eta: a.eta,
+          carrier: a.carrier,
+          bookingNo: a.bookingNo,
+          supplierNote: a.note,
+        },
+        history: [...pf.history, hist(me, `Booking effectué : chargement ${a.loadingDate}, départ ${a.etd}, arrivée ${a.eta}`)],
+      }));
+      return syncProformaStatuses({
+        ...next,
+        containers: next.containers.map((c) =>
+          ['a_booker', 'booking_demande'].includes(c.status) && c.allocations.some((x) => x.proformaId === a.proformaId)
+            ? {
+                ...c,
+                status: 'booke',
+                etdPlanned: a.etd,
+                etaPlanned: a.eta,
+                carrier: a.carrier ?? c.carrier,
+                bookingNo: a.bookingNo || c.bookingNo,
+                planValidated: true,
+                planValidatedBy: 'fournisseur',
+                planRequested: false,
+                planProposed: false,
+                loading: { date: a.loadingDate, status: 'validated', validatedAt: at },
+                booking: { reminders: [], ...(c.booking ?? {}), confirmedAt: at },
+                dateHistory: [...c.dateHistory, hist(me, `Booké par le fournisseur · chargement ${a.loadingDate} · ETD ${a.etd} · ETA ${a.eta}`)],
+              }
+            : c,
+        ),
+      });
     }
     case 'createContainer': {
       const supplier = s.suppliers.find((x) => x.id === a.supplierId)!;
@@ -692,7 +806,15 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
     case 'createContainer':
       return { text: 'Conteneur créé' };
     case 'autoLoad':
-      return { text: `Chargement préparé automatiquement pour ${a.proformaId}` };
+      return { text: `Plan de chargement préparé pour ${a.proformaId}` };
+    case 'requestPfBooking':
+      return { text: `${a.proformaId} : booking demandé au fournisseur (${a.containers} × 40HC, ${a.dateWanted})` };
+    case 'remindPfBooking':
+      return { text: `${a.proformaId} : relance booking` };
+    case 'cancelPfBooking':
+      return { text: `${a.proformaId} : demande de booking annulée` };
+    case 'answerPfBooking':
+      return { text: `${a.proformaId} : booké par le fournisseur (départ ${a.etd})` };
     case 'validatePlan':
       return { target: ctn(a.containerId), text: 'Plan de chargement validé' };
     case 'requestPlan':

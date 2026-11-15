@@ -155,6 +155,29 @@ export interface Proforma {
   balanceDue: ISODate;
   documents: string[];
   history: HistoryEntry[];
+  /** Demande de booking envoyée au fournisseur, et sa réponse (plan + dates réelles) */
+  booking?: BookingRequest;
+}
+
+/**
+ * Booking d'une proforma, en deux temps :
+ * JONAS demande (nombre de containers, date souhaitée) → le fournisseur répond avec le plan de chargement et les dates réelles.
+ */
+export interface BookingRequest {
+  requestedAt: string;
+  requestedBy: string;
+  containers: number;
+  dateWanted: ISODate;
+  note?: string;
+  reminders: string[];
+  answeredAt?: string;
+  answeredBy?: string;
+  loadingDate?: ISODate;
+  etd?: ISODate;
+  eta?: ISODate;
+  carrier?: string;
+  bookingNo?: string;
+  supplierNote?: string;
 }
 
 export type ContainerStatus = 'a_booker' | 'booking_demande' | 'booke' | 'en_transit' | 'arrive';

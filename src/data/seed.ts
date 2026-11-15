@@ -578,35 +578,40 @@ export const users: User[] = [
   })),
 ];
 
-// Booking en deux circuits parallèles :
-//  1. date de chargement proposée par JONAS → validée (ou changée) par le fournisseur → demande du container à la compagnie
-//  2. plan de chargement envoyé par JONAS → validé tel quel ou modifié par le fournisseur (→ revu par JONAS)
+// Booking par proforma : JONAS demande (nb de containers, date souhaitée), le fournisseur répond
+// avec le plan de chargement et les dates réelles.
 {
-  containers.forEach((c) => {
-    if (c.status === 'a_booker') return;
-    const date = addDays(c.etdPlanned, -6);
-    c.loading = { date, status: 'validated', proposedBy: 'Logistique', proposedAt: `${addDays(date, -20)}T10:00`, validatedAt: `${addDays(date, -18)}T08:40` };
-    c.planValidatedBy = 'fournisseur';
-  });
-  const open = containers.filter((x) => x.status === 'a_booker');
-  // K-Beauty (Seoul) : date validée par le fournisseur (qui l'a décalée), plan envoyé en attente de sa réponse
-  const seoul = open.find((x) => x.supplierId === 'seoul');
-  if (seoul) {
-    seoul.planRequested = true;
-    seoul.loading = {
-      date: addDays(seoul.etdPlanned, -5),
-      initialDate: addDays(seoul.etdPlanned, -8),
-      status: 'validated',
-      proposedBy: 'Logistique',
-      proposedAt: '2026-11-09T09:20',
-      validatedAt: '2026-11-12T03:15',
+  for (const pf of proformas) {
+    const cs = containers.filter((c) => c.allocations.some((x) => x.proformaId === pf.id));
+    if (!cs.length) continue;
+    const st = cs[0].status;
+    if (st === 'a_booker') continue;
+    const reqDay = addDays(pf.etd, -26) < '2026-11-14' ? addDays(pf.etd, -26) : '2026-11-06';
+    pf.booking = { requestedAt: `${reqDay}T09:30`, requestedBy: 'Logistique', containers: cs.length, dateWanted: addDays(pf.etd, -5), reminders: [] };
+    if (st === 'booking_demande') {
+      pf.booking.requestedAt = '2026-11-06T10:15';
+      pf.booking.reminders = ['2026-11-10T09:05'];
+      continue;
+    }
+    const answered = addDays(reqDay, 3);
+    const loadingDate = addDays(cs[0].etdPlanned, -5);
+    pf.booking = {
+      ...pf.booking,
+      answeredAt: `${answered < '2026-11-14' ? answered : '2026-11-13'}T04:20`,
+      answeredBy: suppliers.find((x) => x.id === pf.supplierId)!.contact.name,
+      loadingDate,
+      etd: cs[0].etdPlanned,
+      eta: cs[0].etaPlanned,
+      carrier: cs[0].carrier,
+      bookingNo: cs[0].bookingNo,
     };
-    seoul.dateHistory.push({ date: '2026-11-12', user: 'Ms. Park', text: `Date de chargement changée par le fournisseur : ${seoul.loading.initialDate} → ${seoul.loading.date}` });
+    for (const c of cs) {
+      c.loading = { date: loadingDate, status: 'validated', validatedAt: pf.booking.answeredAt };
+      c.planValidatedBy = 'fournisseur';
+    }
   }
-  // Mobilier jardin (Horizon) : une date proposée en attente du fournisseur, un conteneur encore à lancer
-  const horizon = open.filter((x) => x.supplierId === 'horizon');
-  if (horizon[0]) {
-    horizon[0].loading = { date: addDays(horizon[0].etdPlanned, -6), status: 'proposed', proposedBy: 'Logistique', proposedAt: '2026-11-10T14:05' };
-    horizon[0].planRequested = true;
-  }
+  // K-Beauty (Seoul) : demande envoyée il y a 2 jours, en attente de la réponse du fournisseur
+  const seoul = proformas.find((p) => p.id === 'PF-2026-0143')!;
+  seoul.booking = { requestedAt: '2026-11-12T15:40', requestedBy: 'Logistique', containers: 1, dateWanted: addDays(seoul.etd, -5), note: 'Merci de grouper avec les coffrets restants si possible', reminders: [] };
+  for (const c of containers.filter((x) => x.allocations.some((a) => a.proformaId === seoul.id))) c.status = 'booking_demande';
 }

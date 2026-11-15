@@ -5,75 +5,25 @@ test.describe('Proformas et logistique', () => {
     await resetApp(page);
   });
 
-  test('plan de chargement : glisser une ligne dans un conteneur puis booker', async ({ page }) => {
+  test('plan de chargement : glisser une ligne dans un conteneur', async ({ page }) => {
     await go(page, 'proformas/PF-2026-0143');
     await page.getByRole('button', { name: 'Suivi & Logistique' }).click();
-
     const row = page.locator('tr[draggable="true"]').first();
     await row.dragTo(page.locator('.ccard').first());
     await expect(toast(page)).toHaveText(/pcs .+ → PLAN-\d+/);
     await expect(page.locator('.summary-bar').first()).toContainText('Reste à consolider : 0 pcs');
-
-    await page.getByRole('button', { name: 'Demander le container' }).first().click();
-    await page.getByRole('button', { name: 'Envoyer la demande' }).click();
-    await expect(toast(page)).toContainText('Demande de container envoyée');
-    await page.getByRole('button', { name: /Confirmer le booking/ }).click();
-    await expect(page.getByRole('button', { name: /Confirmer le booking/ })).toHaveCount(0);
   });
 
-  test('logistique valide le plan proposé et demande le booking', async ({ page }) => {
-    // Le fournisseur propose d'abord un plan
-    await loginAs(page, 'Ms. Park');
-    await go(page, 'portail/chargement');
-    await page.locator('tr[draggable="true"]').first().dragTo(page.locator('.ccard').first());
-    await page.getByRole('button', { name: 'Envoyer mes modifications à JONAS' }).click();
-
-    await loginAs(page, 'Logistique');
-    await go(page, 'proformas/PF-2026-0143');
-    await page.getByRole('button', { name: 'Suivi & Logistique' }).click();
-    await page.getByRole('button', { name: /Valider les modifications/ }).click();
-    await page.getByRole('button', { name: 'Demander le container' }).click();
-    await page.getByRole('button', { name: 'Envoyer la demande' }).click();
-    await expect(toast(page)).toContainText('Demande de container envoyée');
-  });
-
-  test('demander le booking depuis la proforma', async ({ page }) => {
-    await loginAs(page, 'Logistique');
-    // Proforma prête (date de chargement validée par le fournisseur)
-    await go(page, 'proformas/PF-2026-0143');
-    await page.getByRole('button', { name: /Demander le booking/ }).click();
-    const dlg = page.getByRole('dialog', { name: 'Booking PF-2026-0143' });
-    await expect(dlg).toContainText('Validée');
-    await dlg.getByRole('button', { name: 'Demander le container' }).click();
-    await page.locator('#bk-fwd').selectOption('Logfret');
-    await page.getByRole('button', { name: 'Envoyer la demande' }).click();
-    await expect(toast(page)).toContainText('Demande de container envoyée à Logfret');
-    await expect(page.locator('.page-head .pf-book-n')).toHaveCount(0);
-
-    // Proforma dont la date n'est pas encore validée : on propose la date depuis la proforma
-    await go(page, 'proformas/PF-2026-0148');
-    await page.getByRole('button', { name: /Demander le booking/ }).click();
-    const dlg2 = page.getByRole('dialog', { name: 'Booking PF-2026-0148' });
-    await expect(dlg2.locator('.pb-ctn')).toHaveCount(2);
-    for (const b of await dlg2.getByRole('button', { name: 'Demander le container' }).all()) await expect(b).toBeDisabled();
-    await dlg2.getByRole('button', { name: 'Proposer une date' }).click();
-    await page.getByRole('button', { name: 'Envoyer au fournisseur' }).click();
-    await expect(toast(page)).toContainText('Date de chargement proposée à Horizon Home');
-  });
-
-  test('booking depuis une proforma sans conteneur : préparer le chargement', async ({ page }) => {
+  test('demande de booking depuis la proforma', async ({ page }) => {
     await loginAs(page, 'Logistique');
     await go(page, 'proformas/PF-2026-0151');
-    await page.getByRole('button', { name: /Demander le booking/ }).click();
-    const dlg = page.getByRole('dialog', { name: 'Booking PF-2026-0151' });
-    await expect(dlg.locator('.pb-steps')).toBeVisible();
-    await dlg.getByRole('button', { name: 'Préparer le chargement' }).click();
-    await expect(toast(page)).toContainText('préparé');
-    await expect(dlg.locator('.pb-ctn').first()).toBeVisible();
-    await expect(dlg.locator('.pb-start')).toHaveCount(0);
-    await dlg.getByRole('button', { name: 'Proposer une date' }).first().click();
+    await page.getByRole('button', { name: 'Demande de booking' }).click();
+    await page.locator('#bk-n').fill('2');
+    await page.locator('#bk-date').fill('2026-12-03');
     await page.getByRole('button', { name: 'Envoyer au fournisseur' }).click();
-    await expect(toast(page)).toContainText('Date de chargement proposée');
+    await expect(toast(page)).toContainText('Demande de booking envoyée à Nova Beauty');
+    await expect(page.locator('.page-head')).toContainText('Booking demandé · 2 × 40HC · attente fournisseur');
+    await expect(page.getByRole('button', { name: 'Demande de booking' })).toHaveCount(0);
   });
 
   test('signature des proformas à signer', async ({ page }) => {

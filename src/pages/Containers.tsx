@@ -258,34 +258,11 @@ export default function Containers() {
                         actions={
                           <>
                               {s === 'a_booker' && canBook && (
-                                <button
-                                  className="btn primary sm"
-                                  disabled={!c.allocations.length || !auth.allowed({ type: 'requestBooking', containerId: c.id })}
-                                  title={c.loading?.status === 'validated' ? 'Demander le container via le transitaire' : 'Date de chargement à valider par le fournisseur'}
-                                  onClick={() => {
-                                    dispatch({ type: 'requestBooking', containerId: c.id });
-                                    toast(`Demande de container envoyée à ${c.forwarder ?? 'Logfret'}`);
-                                  }}
-                                >
-                                  <Check size={12} /> Demander
-                                </button>
+                                <Link className="btn sm" to="/booking" onClick={(e) => e.stopPropagation()}>
+                                  Demande de booking
+                                </Link>
                               )}
-                              {s === 'booking_demande' && canBook && (
-                                <div className="row" style={{ gap: 4 }}>
-                                  <button
-                                    className="btn sm"
-                                    onClick={() => {
-                                      dispatch({ type: 'remindBooking', containerId: c.id });
-                                      toast(`Relance envoyée à ${c.forwarder ?? 'transitaire'}`);
-                                    }}
-                                  >
-                                    Relancer
-                                  </button>
-                                  <button className="btn primary sm" onClick={() => dispatch({ type: 'confirmBooking', containerId: c.id })}>
-                                    Confirmer
-                                  </button>
-                                </div>
-                              )}
+                              {s === 'booking_demande' && <Pill color="violet">Attente fournisseur</Pill>}
                               {s === 'booke' && canBook && (
                                 <button className="btn sm" onClick={() => dispatch({ type: 'ship', containerId: c.id })}>
                                   <Ship size={12} /> Parti

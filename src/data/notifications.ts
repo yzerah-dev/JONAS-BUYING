@@ -1,6 +1,6 @@
 // Notifications calculées à partir de l'état : chacun ne voit que ce qui le concerne.
 import type { State } from './store';
-import { containerEta, containerEtd, currentUser, packDone, packLate, payments } from './store';
+import { bookingOpen, canRequestBooking, containerEta, containerEtd, currentUser, packDone, packLate, payments } from './store';
 import { can, canSee } from './permissions';
 import { VALIDATION_LABELS, VALIDATION_STEPS } from './types';
 import { TODAY, addDays, diffDays, eur, fshort } from '../lib/format';
@@ -54,18 +54,15 @@ export function notificationsFor(s: State): Notice[] {
 
   // Logistique
   if (can(u, 'logistics.booking') || can(u, 'logistics.plan')) {
-    const toBook = s.containers.filter((c) => c.status === 'a_booker' && diffDays(c.etdPlanned, TODAY) < 21);
-    if (toBook.length) add({ id: `book-${toBook.map((c) => c.id).join(',')}`, level: 'orange', title: `${toBook.length} conteneur(s) à booker (départ < 3 sem.)`, to: '/booking' });
-    const waiting = s.containers.filter((c) => c.status === 'booking_demande');
-    const noAnswer = waiting.filter((c) => c.booking?.requestedAt && diffDays(TODAY, c.booking.requestedAt.slice(0, 10)) > 3);
-    if (noAnswer.length)
-      add({ id: `bkl-${noAnswer.map((c) => c.id).join(',')}`, level: 'red', title: `${noAnswer.length} demande(s) de booking sans réponse depuis +3 j`, detail: 'À relancer auprès du transitaire', to: '/booking' });
-    else if (waiting.length) add({ id: `bkw-${waiting.map((c) => c.id).join(',')}`, level: 'info', title: `${waiting.length} booking(s) en attente de confirmation`, to: '/booking' });
-    const ready = s.containers.filter((c) => c.status === 'a_booker' && c.loading?.status === 'validated');
-    if (ready.length)
-      add({ id: `ready-${ready.map((c) => c.id + c.loading!.date).join(',')}`, level: 'orange', title: `${ready.length} date(s) de chargement validée(s) par le fournisseur`, detail: 'Container à demander à la compagnie', to: '/booking' });
-    const proposed = s.containers.filter((c) => c.planProposed);
-    if (proposed.length) add({ id: `plan-${proposed.map((c) => c.id).join(',')}`, level: 'orange', title: `${proposed.length} plan(s) de chargement modifié(s) par le fournisseur`, detail: 'Modifications à valider', to: '/booking' });
+    const toAsk = s.proformas.filter((p) => canRequestBooking(p) && diffDays(p.etd, TODAY) < 21);
+    if (toAsk.length) add({ id: `ask-${toAsk.map((p) => p.id).join(',')}`, level: 'orange', title: `${toAsk.length} proforma(s) à booker (départ < 3 sem.)`, detail: toAsk.map((p) => p.id).join(', '), to: '/booking' });
+    const open = s.proformas.filter(bookingOpen);
+    const late = open.filter((p) => diffDays(TODAY, p.booking!.requestedAt.slice(0, 10)) > 3);
+    if (late.length)
+      add({ id: `bkl-${late.map((p) => p.id).join(',')}`, level: 'red', title: `${late.length} demande(s) de booking sans réponse du fournisseur depuis +3 j`, detail: late.map((p) => p.id).join(', '), to: '/booking' });
+    const answered = s.proformas.filter((p) => p.booking?.answeredAt && diffDays(TODAY, p.booking.answeredAt.slice(0, 10)) <= 2);
+    for (const p of answered)
+      add({ id: `bka-${p.id}-${p.booking!.answeredAt}`, level: 'info', title: `${p.id} booké par le fournisseur`, detail: `Chargement ${fshort(p.booking!.loadingDate)} · départ ${fshort(p.booking!.etd)}`, to: '/booking' });
     const revised = s.containers.filter((c) => c.etaRevised && c.status !== 'arrive');
     for (const c of revised)
       add({ id: `eta-${c.id}-${c.etaRevised}`, level: 'red', title: `ETA révisée : ${c.number ?? c.id}`, detail: `${fshort(c.etaPlanned)} → ${fshort(c.etaRevised)}`, to: `/conteneurs?c=${c.id}` });

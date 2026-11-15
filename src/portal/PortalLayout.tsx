@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Navigate, NavLink, Outlet } from 'react-router-dom';
-import { Bell, Boxes, Container as Ctn, Euro, FileText, Home, Package, Truck } from 'lucide-react';
+import { Bell, Boxes, CalendarCheck, Container as Ctn, Euro, FileText, Home, Package, Truck } from 'lucide-react';
 import { isSupplier } from '../data/permissions';
 import { useTableLabels } from '../components/useTableLabels';
 import { Toaster } from '../components/ui';
@@ -19,7 +19,7 @@ export default function PortalLayout() {
 }
 
 function PortalShell() {
-  const { user, supplier, packsToValidate, dieCutsRequested, plansRequested, docsMissing } = usePortal();
+  const { user, supplier, packsToValidate, dieCutsRequested, bookingsToDo, docsMissing } = usePortal();
   const { t, td, lang } = useT();
   const mainRef = useRef<HTMLElement>(null);
   useTableLabels(mainRef);
@@ -33,14 +33,15 @@ function PortalShell() {
     n.remove();
   }, [lang]);
   if (!isSupplier(user) || !supplier) return <Navigate to="/" replace />;
-  const todo = packsToValidate.length + dieCutsRequested.length + plansRequested.length + docsMissing.length;
+  const todo = packsToValidate.length + dieCutsRequested.length + bookingsToDo.length + docsMissing.length;
 
   const NAV = [
     { to: '/portail', label: t('nav.home'), icon: Home, end: true },
     { to: '/portail/produits', label: t('nav.products'), icon: Boxes },
     { to: '/portail/proformas', label: t('nav.proformas'), icon: FileText },
     { to: '/portail/packs', label: t('nav.packs'), icon: Package, badge: packsToValidate.length + dieCutsRequested.length },
-    { to: '/portail/chargement', label: t('nav.loading'), icon: Truck, badge: plansRequested.length },
+    { to: '/portail/booking', label: t('nav.booking'), icon: CalendarCheck, badge: bookingsToDo.length },
+    { to: '/portail/chargement', label: t('nav.loading'), icon: Truck },
     { to: '/portail/conteneurs', label: t('nav.containers'), icon: Ctn, badge: docsMissing.length },
     { to: '/portail/finance', label: t('nav.finance'), icon: Euro },
   ];

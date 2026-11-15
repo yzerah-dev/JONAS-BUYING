@@ -8,102 +8,61 @@ test.describe('Booking', () => {
     await expect(page.locator('.bk-kpis')).toBeVisible({ timeout: 15000 });
   });
 
-  test('demande, relance, confirmation d’un booking', async ({ page }) => {
-    const toRequest = page.locator('.bk-stage.bk-orange');
+  test('JONAS demande le booking, le fournisseur répond avec le plan et les dates réelles', async ({ page }) => {
+    await loginAs(page, 'Logistique');
+    await go(page, 'booking');
+    const toAsk = page.locator('.bk-stage.bk-orange');
     const waiting = page.locator('.bk-stage.bk-violet');
-    const confirmed = page.locator('.bk-stage.bk-green');
-    const [r0, w0, c0] = [await count(toRequest), await count(waiting), await count(confirmed)];
+    const booked = page.locator('.bk-stage.bk-green');
 
-    // Demande au transitaire choisi
-    await toRequest.locator('.bk-actions').getByRole('button', { name: 'Demander le container' }).first().click();
-    await page.locator('#bk-fwd').selectOption('Kuehne + Nagel');
-    await page.getByRole('button', { name: 'Envoyer la demande' }).click();
-    await expect(toast(page)).toContainText('Kuehne + Nagel');
-    expect(await count(toRequest)).toBe(r0 - 1);
-    expect(await count(waiting)).toBe(w0 + 1);
+    // 1. Demande : nombre de containers et date souhaitée
+    await toAsk.locator('.bk-row', { hasText: 'PF-2026-0148' }).getByRole('button', { name: 'Demande de booking' }).click();
+    await page.locator('#bk-n').fill('2');
+    await page.locator('#bk-date').fill('2026-11-26');
+    await page.getByRole('button', { name: 'Envoyer au fournisseur' }).click();
+    await expect(toast(page)).toContainText('Demande de booking envoyée à Horizon Home');
+    await expect(waiting.locator('.bk-row', { hasText: 'PF-2026-0148' })).toContainText('2 × 40HC');
 
-    // Relance : compteur de relances incrémenté
-    const row = waiting.locator('.bk-row').first();
-    const before = await row.locator('.bk-info span').innerText();
+    // 2. Le fournisseur reçoit l'alerte et répond : plan de chargement + dates réelles
+    await loginAs(page, 'Wang Lei');
+    await expect(page.locator('main')).toContainText('booking(s) à effectuer');
+    await go(page, 'portail/booking');
+    const form = page.getByRole('form', { name: 'Effectuez le booking de PF-2026-0148' });
+    await expect(form).toContainText('2 × 40HC');
+    await form.getByRole('button', { name: 'Préparer le plan' }).click();
+    await expect(form.locator('.pill.orange')).toHaveCount(0);
+    await page.locator('#pb-load-PF20260148').fill('2026-11-27');
+    await page.locator('#pb-etd-PF20260148').fill('2026-12-02');
+    await page.locator('#pb-eta-PF20260148').fill('2026-12-30');
+    await page.locator('#pb-car-PF20260148').selectOption('MSC');
+    await page.locator('#pb-no-PF20260148').fill('MSC-55821');
+    await form.getByRole('button', { name: 'Envoyer à JONAS' }).click();
+    await expect(toast(page)).toContainText('Booking envoyé à JONAS');
+    await expect(page.locator('.pb-answer')).toHaveCount(0);
+
+    // 3. Côté JONAS : proforma bookée avec les dates réelles
+    await loginAs(page, 'Logistique');
+    await go(page, 'booking');
+    const row = booked.locator('.bk-row', { hasText: 'PF-2026-0148' });
+    await expect(row).toContainText('Chargement 27 nov.');
+    await expect(row).toContainText('MSC-55821');
+    await go(page, 'proformas/PF-2026-0148');
+    await expect(page.locator('.page-head')).toContainText('Booké');
+  });
+
+  test('relancer puis annuler une demande', async ({ page }) => {
+    await loginAs(page, 'Logistique');
+    await go(page, 'booking');
+    const toAsk = page.locator('.bk-stage.bk-orange');
+    const r0 = await count(toAsk);
+    const row = page.locator('.bk-stage.bk-violet .bk-row', { hasText: 'PF-2026-0145' });
+    await expect(row.locator('.bk-info b')).toHaveClass(/red/);
     await row.getByRole('button', { name: 'Relancer' }).click();
     await expect(toast(page)).toContainText('Relance envoyée');
-    await expect(row.locator('.bk-info span')).not.toHaveText(before);
-
-    // Confirmation : n° obligatoire, puis passage en « confirmés »
-    await row.getByRole('button', { name: 'Confirmer' }).click();
-    const dialog = page.locator('.bk-dialog');
-    await dialog.getByRole('button', { name: 'Confirmer le booking' }).click();
-    await expect(toast(page)).toContainText('n° de booking');
-    await page.locator('#bk-no').fill('BK-77001');
-    await page.locator('#bk-vessel').fill('MSC TESSA');
-    await dialog.getByRole('button', { name: 'Confirmer le booking' }).click();
-    await expect(confirmed.locator('.bk-row', { hasText: 'BK-77001' })).toContainText('MSC TESSA');
-    expect(await count(confirmed)).toBe(c0 + 1);
-  });
-
-  test('deux circuits : date validée par le fournisseur, plan validé tel quel', async ({ page }) => {
-    await loginAs(page, 'Logistique');
-    await go(page, 'booking');
-    const row = page.locator('.bk-stage.bk-orange .bk-row', { hasText: 'Horizon' }).filter({ hasText: 'À proposer au fournisseur' }).first();
-    const id = (await row.locator('.bk-num strong').innerText()).trim();
-    const rowById = page.locator('.bk-stage.bk-orange .bk-row', { hasText: id });
-    const request = rowById.getByRole('button', { name: 'Demander le container' });
-
-    // 1. JONAS propose une date de chargement : la demande de container reste bloquée
-    await rowById.getByRole('button', { name: 'Proposer une date' }).click();
-    await page.locator('#bk-load').fill('2026-11-24');
-    await page.getByRole('button', { name: 'Envoyer au fournisseur' }).click();
-    await expect(toast(page)).toContainText('Date de chargement proposée');
-    await expect(rowById).toContainText('attente fournisseur');
-    await expect(request).toBeDisabled();
-    // 2. JONAS envoie le plan de chargement
-    await rowById.getByRole('button', { name: 'Envoyer le plan' }).click();
-    await expect(rowById.locator('.bk-track').nth(1)).toContainText('Envoyé · attente fournisseur');
-
-    // Le fournisseur change la date et valide le plan tel quel
-    await loginAs(page, 'Wang Lei');
-    await go(page, 'portail/chargement');
-    const ld = page.locator('.ld-row', { hasText: id });
-    await ld.getByRole('button', { name: 'Proposer une autre date' }).click();
-    await ld.locator('input[type="date"]').fill('2026-11-26');
-    await ld.getByRole('button', { name: 'Envoyer' }).click();
-    await expect(toast(page)).toContainText('Nouvelle date envoyée');
-    await expect(page.locator('.ld-row', { hasText: id })).toHaveCount(0);
-    await page.locator('.ccard', { hasText: id }).click();
-    await page.getByRole('button', { name: 'Valider le plan tel quel' }).click();
-    await expect(toast(page)).toContainText('Plan de chargement validé');
-
-    // Retour logistique : date validée (changée), plan accepté, container demandable
-    await loginAs(page, 'Logistique');
-    await go(page, 'booking');
-    await expect(rowById.locator('.bk-track').first()).toContainText('Changée par le fournisseur');
-    await expect(rowById.locator('.bk-track').nth(1)).toContainText('Accepté tel quel');
-    await expect(request).toBeEnabled();
-    await request.click();
-    await expect(page.locator('.bk-ok')).toContainText('26/11');
-  });
-
-  test('plan modifié par le fournisseur : JONAS valide les modifications', async ({ page }) => {
-    await loginAs(page, 'Ms. Park');
-    await go(page, 'portail/chargement');
-    await page.locator('tr[draggable="true"]').first().dragTo(page.locator('.ccard').first());
-    await expect(page.getByRole('button', { name: 'Valider le plan tel quel' })).toHaveCount(0);
-    await page.getByRole('button', { name: 'Envoyer mes modifications à JONAS' }).click();
-
-    await loginAs(page, 'Logistique');
-    await go(page, 'booking');
-    const row = page.locator('.bk-stage.bk-orange .bk-row', { hasText: 'Modifié par le fournisseur' }).first();
-    await row.getByRole('button', { name: 'Valider les modifications' }).click();
-    await expect(toast(page)).toContainText('Modifications du fournisseur validées');
-    await expect(page.locator('.bk-stage.bk-orange .bk-row', { hasText: 'Modifié par le fournisseur' })).toHaveCount(0);
-  });
-
-  test('annuler une demande la remet « à demander »', async ({ page }) => {
-    const toRequest = page.locator('.bk-stage.bk-orange');
-    const r0 = await count(toRequest);
-    await page.locator('.bk-stage.bk-violet .bk-row').first().getByRole('button', { name: 'Annuler la demande' }).click();
+    await expect(row).toContainText('2 relance(s)');
+    await row.getByRole('button', { name: 'Annuler la demande' }).click();
     await expect(toast(page)).toContainText('annulée');
-    expect(await count(toRequest)).toBe(r0 + 1);
+    expect(await count(toAsk)).toBe(r0 + 1);
   });
 
   test('visible pour la logistique, pas pour la finance ni les designers', async ({ page }) => {
@@ -117,10 +76,14 @@ test.describe('Booking', () => {
     }
   });
 
-  test('téléphone : pas de débordement', async ({ page }) => {
+  test('téléphone : pas de débordement (JONAS et portail)', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await go(page, 'booking');
     await expect(page.locator('.bk-kpis')).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+    await loginAs(page, 'Ms. Park');
+    await go(page, 'portail/booking');
+    await expect(page.locator('.pb-answer')).toBeVisible();
     await expectNoHorizontalOverflow(page);
   });
 });

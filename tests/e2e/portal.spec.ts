@@ -9,7 +9,7 @@ test.describe('Portail fournisseur', () => {
     await loginAs(page, 'Mr. Chen');
     await expect(page).toHaveURL(/#\/portail$/);
     const nav = await sidebarItems(page);
-    expect(nav).toEqual(expect.arrayContaining(['Mes produits', 'Mes proformas', 'Plans de chargement']));
+    expect(nav).toEqual(expect.arrayContaining(['Mes produits', 'Mes proformas', 'Bookings', 'Plans de chargement']));
     expect(nav.join(' ')).toContain('Vous ne voyez que les données de Tide Living');
 
     // Isolation : pas de produits d'un autre fournisseur (AB-M026 = Jinfa)
@@ -31,8 +31,7 @@ test.describe('Portail fournisseur', () => {
     await go(page, 'portail/chargement');
     await page.locator('tr[draggable="true"]').first().dragTo(page.locator('.ccard').first());
     await expect(toast(page)).toContainText('→ PLAN-');
-    await page.getByRole('button', { name: 'Envoyer mes modifications à JONAS' }).click();
-    // Le booking reste à l'initiative de la logistique JONAS
-    await expect(page.getByRole('button', { name: 'Demander le container' })).toHaveCount(0);
+    // La demande de booking reste à l'initiative de JONAS
+    await expect(page.getByRole('button', { name: 'Demande de booking' })).toHaveCount(0);
   });
 });

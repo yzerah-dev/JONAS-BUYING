@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, Boxes, Calendar, Check, Container as Ctn, Download, Euro, FileText, Package, Scissors, Truck, Upload, X } from 'lucide-react';
+import { AlertTriangle, Boxes, Calendar, Check, Container as Ctn, Download, Euro, FileText, Package, Scissors, Send, Truck, Upload, X } from 'lucide-react';
 import {
   allocatedQty,
   byId,
@@ -11,12 +11,14 @@ import {
   containerQty,
   lineCbm,
   packDone,
+  pfContainers,
+  containerCapacity,
   payments,
   proformaTotals,
 } from '../data/store';
 import { BrandLogo, ContainerStatusPill, Kpi, PackPill, Pill, ProductThumb, ProformaStatusPill, Ring, Seg, ValidationCircuit } from '../components/ui';
 import { toast } from '../components/ui-shared';
-import type { Container } from '../data/types';
+import type { Proforma } from '../data/types';
 import { LogisticsTab } from '../pages/ProformaDetail';
 import { TODAY } from '../lib/format';
 import { useT } from '../i18n';
@@ -24,7 +26,7 @@ import { usePortal } from './usePortal';
 
 // ---------------------------------------------------------------------------
 export function PortalHome() {
-  const { state, supplier, user, products, proformas, containers, packsToValidate, dieCutsRequested, plansRequested, datesToConfirm, docsMissing } = usePortal();
+  const { state, supplier, user, products, proformas, containers, packsToValidate, dieCutsRequested, bookingsToDo, docsMissing } = usePortal();
   const pays = payments(state).filter((p) => p.supplierId === supplier!.id);
   const nextPay = pays.find((p) => !p.paid);
   const amount = proformas.reduce((s, p) => s + proformaTotals(state, p).amount, 0);
@@ -35,8 +37,7 @@ export function PortalHome() {
   const todo: { to: string; icon: React.ReactNode; text: string; n: number }[] = [
     { to: '/portail/packs', icon: <Package size={16} className="orange" />, text: tr('home.todo.packs'), n: packsToValidate.length },
     { to: '/portail/packs?vue=diecut', icon: <Scissors size={16} className="orange" />, text: tr('home.todo.diecuts'), n: dieCutsRequested.length },
-    { to: '/portail/chargement', icon: <Calendar size={16} className="orange" />, text: tr('home.todo.dates'), n: datesToConfirm.length },
-    { to: '/portail/chargement', icon: <Truck size={16} className="orange" />, text: tr('home.todo.plans'), n: plansRequested.length },
+    { to: '/portail/booking', icon: <Calendar size={16} className="orange" />, text: tr('home.todo.booking'), n: bookingsToDo.length },
     { to: '/portail/conteneurs', icon: <FileText size={16} className="red" />, text: tr('home.todo.docs'), n: docsMissing.length },
   ];
 
@@ -415,45 +416,30 @@ export function PortalPacks() {
 
 // ---------------------------------------------------------------------------
 export function PortalLoading() {
-  const { proformas, plansRequested, datesToConfirm } = usePortal();
+  const { proformas, bookingsToDo } = usePortal();
   const open = proformas.filter((p) => !['en_transit', 'arrive'].includes(p.status));
   const [params, setParams] = useSearchParams();
-  const requestedPf = plansRequested.flatMap((c) => containerProformas(c))[0];
-  // Proforma affichée par défaut figée à l'ouverture (ne saute pas après l'envoi du plan)
-  const [initialPf] = useState(requestedPf ?? open[0]?.id);
+  // Proforma affichée par défaut figée à l'ouverture
+  const [initialPf] = useState(bookingsToDo[0]?.id ?? open[0]?.id);
   const pfId = params.get('pf') ?? initialPf;
   const pf = open.find((p) => p.id === pfId);
-  const { t, fmt } = useT();
-  const { weekLabel } = fmt;
+  const { t } = useT();
   return (
     <>
       <div className="page-head">
         <h1>{t('loading.title')}</h1>
         <span className="page-sub">{t('loading.sub')}</span>
       </div>
-      {datesToConfirm.length > 0 && (
-        <div className="card pad mb ld-card">
-          <div className="card-title">
-            <Calendar size={18} className="orange" /> {t('loading.dates')}
-          </div>
-          <p className="small muted" style={{ marginTop: 0 }}>
-            {t('loading.datesSub')}
-          </p>
-          {datesToConfirm.map((c) => (
-            <LoadingDateRow key={c.id} c={c} />
-          ))}
-        </div>
-      )}
-      {plansRequested.length > 0 && (
-        <div className="card pad mb row wrap" style={{ borderColor: 'var(--orange)' }}>
+      {bookingsToDo.length > 0 && (
+        <Link to="/portail/booking" className="card pad mb row wrap" style={{ borderColor: 'var(--orange)' }}>
           <AlertTriangle className="orange" />
-          <b>{t('loading.requested')}</b>
-          {plansRequested.map((c) => (
-            <Pill key={c.id} color="orange">
-              {c.id} · {t('col.etd')} {weekLabel(c.etdPlanned)}
+          <b>{t('loading.bookingAlert')}</b>
+          {bookingsToDo.map((p) => (
+            <Pill key={p.id} color="orange">
+              {p.id} · {p.booking!.containers} × 40HC
             </Pill>
           ))}
-        </div>
+        </Link>
       )}
       <div className="row wrap mb">
         <span className="small muted">{t('loading.proforma')}</span>
@@ -565,7 +551,7 @@ export function PortalFinance() {
         <table className="tbl">
           <thead>
             <tr>
-              <th>{t('col.proforma')}</th>
+              <th>{t('pb.proforma')}</th>
               <th>{t('col.type')}</th>
               <th className="num">{t('col.amount')}</th>
               <th>{t('col.due')}</th>
@@ -589,59 +575,181 @@ export function PortalFinance() {
   );
 }
 
-/** Le fournisseur confirme la date de chargement proposée par JONAS, ou en donne une autre */
-function LoadingDateRow({ c }: { c: Container }) {
+
+// ---------------------------------------------------------------------------
+/** Demandes de booking : le fournisseur effectue le booking et répond avec le plan de chargement et les dates réelles. */
+export function PortalBooking() {
+  const { proformas, bookingsToDo } = usePortal();
+  const { t, fmt } = useT();
+  const { fshort } = fmt;
+  const done = proformas.filter((p) => p.booking?.answeredAt).sort((a, b) => b.booking!.answeredAt!.localeCompare(a.booking!.answeredAt!));
+  return (
+    <>
+      <div className="page-head">
+        <h1>{t('pb.title')}</h1>
+        <span className="page-sub">{t('pb.sub')}</span>
+      </div>
+      {bookingsToDo.length ? bookingsToDo.map((pf) => <BookingAnswer key={pf.id} pf={pf} />) : <div className="card empty mb">{t('pb.none')}</div>}
+      {done.length > 0 && (
+        <div className="card pad">
+          <div className="card-title">
+            <Check size={18} className="green" /> {t('pb.history')}
+          </div>
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th>{t('pb.proforma')}</th>
+                <th className="num">40HC</th>
+                <th>{t('pb.loading')}</th>
+                <th>{t('pb.etd')}</th>
+                <th>{t('pb.eta')}</th>
+                <th>{t('pb.bookingNo')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {done.map((p) => (
+                <tr key={p.id}>
+                  <td className="bold">{p.id}</td>
+                  <td className="num">{p.booking!.containers}</td>
+                  <td>{fshort(p.booking!.loadingDate)}</td>
+                  <td>{fshort(p.booking!.etd)}</td>
+                  <td>{fshort(p.booking!.eta)}</td>
+                  <td>{p.booking!.bookingNo ?? '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
+  );
+}
+
+const CARRIERS = ['MSC', 'CMA CGM', 'Maersk', 'COSCO', 'Hapag-Lloyd', 'ONE', 'Evergreen'];
+
+function BookingAnswer({ pf }: { pf: Proforma }) {
   const { state, dispatch } = usePortal();
-  const { t, td, fmt } = useT();
-  const { fdate, weekLabel, num } = fmt;
-  const [other, setOther] = useState(false);
-  const [date, setDate] = useState(c.loading!.date);
-  const main = [...c.allocations].sort((a, b) => b.qty - a.qty)[0];
-  const p = main ? byId(state.products, main.productId) : undefined;
-  const answer = (d: string) => {
-    dispatch({ type: 'answerLoadingDate', containerId: c.id, date: d });
-    toast(d === c.loading!.date ? t('loading.dateOk') : t('loading.dateChanged', { date: fdate(d) }));
+  const { t, fmt } = useT();
+  const { fdate, num, dec } = fmt;
+  const b = pf.booking!;
+  const cs = pfContainers(state, pf.id);
+  const remaining = pf.lines.reduce((sum, l) => sum + Math.max(0, l.qty - allocatedQty(state, pf.id, l.productId)), 0);
+  const [loading, setLoading] = useState(b.dateWanted);
+  const [etd, setEtd] = useState(pf.etd);
+  const [eta, setEta] = useState(pf.eta);
+  const [carrier, setCarrier] = useState('');
+  const [bookingNo, setBookingNo] = useState('');
+  const [note, setNote] = useState('');
+  const id = pf.id.replace(/\W/g, '');
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cs.length) return toast(t('pb.needPlan'));
+    dispatch({ type: 'answerPfBooking', proformaId: pf.id, loadingDate: loading, etd, eta, carrier: carrier || undefined, bookingNo: bookingNo.trim() || undefined, note: note.trim() || undefined });
+    toast(t('pb.sentToast'));
   };
   return (
-    <div className="ld-row">
-      <div className="ld-ctn">
-        {p && <ProductThumb product={p} size={40} />}
+    <form className="card pad mb pb-answer" onSubmit={submit} aria-label={t('pb.ask', { pf: pf.id })}>
+      <div className="pb-answer-head">
+        <span className="pb-alert">
+          <Calendar size={22} />
+        </span>
         <div>
-          <b>{c.id}</b>
+          <h2>{t('pb.ask', { pf: pf.id })}</h2>
+          <b className="orange">{t('pb.wanted', { n: b.containers, date: fdate(b.dateWanted) })}</b>
           <small>
-            {p ? td(p.name) : '—'} · {num(containerQty(c))} pcs · {containerProformas(c).join(', ')}
+            {pf.title} · {t('pb.sent', { date: fdate(b.requestedAt.slice(0, 10)) })}
+            {b.reminders.length ? ` · ${t('pb.reminders', { n: b.reminders.length })}` : ''}
           </small>
+          {b.note && <p className="pb-quote">« {b.note} »</p>}
         </div>
       </div>
-      <div className="ld-date">
-        <small>{t('loading.proposed')}</small>
-        <b>{fdate(c.loading!.date)}</b>
-        <span>
-          {t('col.etd')} {weekLabel(c.etdPlanned)}
-        </span>
-      </div>
-      <div className="ld-actions">
-        {other ? (
-          <>
-            <input className="input" type="date" aria-label={t('loading.otherDate')} value={date} onChange={(e) => setDate(e.target.value)} />
-            <button className="btn sm primary" disabled={!date} onClick={() => answer(date)}>
-              <Check size={14} /> {t('loading.send')}
-            </button>
-            <button className="btn sm ghost" onClick={() => setOther(false)} aria-label={t('loading.cancel')}>
-              <X size={14} />
-            </button>
-          </>
-        ) : (
-          <>
-            <button className="btn sm" onClick={() => setOther(true)}>
-              <Calendar size={14} /> {t('loading.other')}
-            </button>
-            <button className="btn sm primary" onClick={() => answer(c.loading!.date)}>
-              <Check size={14} /> {t('loading.confirm')}
-            </button>
-          </>
+
+      <h3 className="pb-sec">{t('pb.plan')}</h3>
+      {cs.length ? (
+        <div className="pb-plan">
+          {cs.map((c) => {
+            const fill = containerCbm(state, c) / containerCapacity(c);
+            return (
+              <div key={c.id} className="pb-c">
+                <b>{c.id}</b>
+                <span>
+                  {num(containerQty(c))} pcs · {dec(containerCbm(state, c), 1)} m³
+                </span>
+                <span className={`ct-bar ${fill > 1 ? 'over' : ''}`}>
+                  <span style={{ width: `${Math.min(100, fill * 100)}%` }} />
+                </span>
+                <small>{Math.round(fill * 100)} %</small>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="small muted">{t('pb.noPlan')}</p>
+      )}
+      <div className="row wrap" style={{ gap: 8 }}>
+        {remaining > 0 && <span className="pill orange">{t('pb.remaining', { qty: num(remaining) })}</span>}
+        {cs.length > 0 && cs.length !== b.containers && <span className="pill violet">{t('pb.mismatch', { x: cs.length, n: b.containers })}</span>}
+        <div className="grow" />
+        {remaining > 0 && (
+          <button
+            type="button"
+            className="btn"
+            onClick={() => {
+              dispatch({ type: 'autoLoad', proformaId: pf.id });
+              toast(t('pb.autoToast'));
+            }}
+          >
+            <Package size={16} /> {t('pb.autoPlan')}
+          </button>
         )}
+        <Link className="btn ghost" to={`/portail/chargement?pf=${pf.id}`}>
+          {t('pb.adjust')}
+        </Link>
       </div>
-    </div>
+
+      <h3 className="pb-sec">{t('pb.dates')}</h3>
+      <div className="pb-dates">
+        <label htmlFor={`pb-load-${id}`}>
+          {t('pb.loading')}
+          <input id={`pb-load-${id}`} className="input" type="date" required value={loading} onChange={(e) => setLoading(e.target.value)} />
+        </label>
+        <label htmlFor={`pb-etd-${id}`}>
+          {t('pb.etd')}
+          <input id={`pb-etd-${id}`} className="input" type="date" required value={etd} onChange={(e) => setEtd(e.target.value)} />
+        </label>
+        <label htmlFor={`pb-eta-${id}`}>
+          {t('pb.eta')}
+          <input id={`pb-eta-${id}`} className="input" type="date" required value={eta} onChange={(e) => setEta(e.target.value)} />
+        </label>
+        <label htmlFor={`pb-car-${id}`}>
+          <span>
+            {t('pb.carrier')} <em>({t('pb.optional')})</em>
+          </span>
+          <select id={`pb-car-${id}`} className="input" value={carrier} onChange={(e) => setCarrier(e.target.value)}>
+            <option value="">—</option>
+            {CARRIERS.map((x) => (
+              <option key={x}>{x}</option>
+            ))}
+          </select>
+        </label>
+        <label htmlFor={`pb-no-${id}`}>
+          <span>
+            {t('pb.bookingNo')} <em>({t('pb.optional')})</em>
+          </span>
+          <input id={`pb-no-${id}`} className="input" value={bookingNo} onChange={(e) => setBookingNo(e.target.value)} />
+        </label>
+        <label htmlFor={`pb-note-${id}`}>
+          <span>
+            {t('pb.note')} <em>({t('pb.optional')})</em>
+          </span>
+          <input id={`pb-note-${id}`} className="input" value={note} onChange={(e) => setNote(e.target.value)} />
+        </label>
+      </div>
+      <div className="row" style={{ justifyContent: 'flex-end', marginTop: 12 }}>
+        <button type="submit" className="btn primary" disabled={!cs.length} title={cs.length ? undefined : t('pb.needPlan')}>
+          <Send size={16} /> {t('pb.send')}
+        </button>
+      </div>
+    </form>
   );
 }

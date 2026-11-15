@@ -30,6 +30,7 @@ const PortalProducts = portal('PortalProducts');
 const PortalProformas = portal('PortalProformas');
 const PortalPacks = portal('PortalPacks');
 const PortalLoading = portal('PortalLoading');
+const PortalBooking = portal('PortalBooking');
 const PortalContainers = portal('PortalContainers');
 const PortalFinance = portal('PortalFinance');
 
@@ -62,6 +63,7 @@ export default function App() {
             <Route path="produits" element={page(<PortalProducts />)} />
             <Route path="proformas" element={page(<PortalProformas />)} />
             <Route path="packs" element={page(<PortalPacks />)} />
+            <Route path="booking" element={page(<PortalBooking />)} />
             <Route path="chargement" element={page(<PortalLoading />)} />
             <Route path="conteneurs" element={page(<PortalContainers />)} />
             <Route path="finance" element={page(<PortalFinance />)} />
