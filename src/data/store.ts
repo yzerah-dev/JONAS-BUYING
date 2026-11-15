@@ -46,6 +46,8 @@ export const DEFAULT_SETTINGS: Settings = {
   company: { name: 'JONAS INTERNATIONAL', address: '189 rue d\'Aubervilliers', city: '75018 Paris', vat: '' },
 };
 
+/** Version de l'adresse société par défaut : une hausse réapplique l'adresse par défaut aux navigateurs existants */
+const COMPANY_REV = 2;
 /** Champs vides de l'état enregistré : on garde la valeur par défaut */
 const withDefaults = (def: Company, saved?: Partial<Company>): Company => ({
   name: saved?.name || def.name,
@@ -78,7 +80,7 @@ export function load(): State {
     if (raw) {
       const st = JSON.parse(raw) as State;
       // Compatibilité : anciens états sans paramètres ni journal
-      return { ...st, settings: { ...DEFAULT_SETTINGS, ...(st.settings ?? {}), company: withDefaults(DEFAULT_SETTINGS.company, st.settings?.company) }, journal: st.journal ?? [] };
+      return { ...st, settings: { ...DEFAULT_SETTINGS, ...(st.settings ?? {}), company: COMPANY_REV > (st.settings?.companyRev ?? 0) ? { ...DEFAULT_SETTINGS.company, vat: st.settings?.company?.vat || DEFAULT_SETTINGS.company.vat } : withDefaults(DEFAULT_SETTINGS.company, st.settings?.company), companyRev: COMPANY_REV }, journal: st.journal ?? [] };
     }
   } catch {
     /* stockage indisponible */

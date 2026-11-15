@@ -389,6 +389,7 @@ export interface Settings {
   fx: Record<Currency, number>;
   /** Société JONAS : portée sur le tampon des proformas signées */
   company: Company;
+  companyRev?: number;
 }
 
 export interface Company {
