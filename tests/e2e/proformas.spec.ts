@@ -46,6 +46,19 @@ test.describe('Proformas et logistique', () => {
     await expect(banner).toContainText('Booking demandé');
   });
 
+  test('bouton de booking toujours visible : proforma à signer expliquée, acheteur autorisé', async ({ page }) => {
+    await go(page, 'proformas/PF-2026-0146');
+    await page.locator('.page-head').getByRole('button', { name: 'Demande de booking' }).click();
+    await expect(toast(page)).toContainText('Signez d’abord la proforma');
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+
+    await loginAs(page, 'David');
+    await go(page, 'proformas/PF-2026-0151');
+    await page.locator('.page-head').getByRole('button', { name: 'Demande de booking' }).click();
+    await page.getByRole('button', { name: 'Envoyer au fournisseur' }).click();
+    await expect(toast(page)).toContainText('Demande de booking envoyée');
+  });
+
   test('signature des proformas à signer', async ({ page }) => {
     await go(page, 'proformas');
     const chips = page.locator('.pf-chips');

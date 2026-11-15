@@ -40,7 +40,7 @@ import {
 import type { Container, Proforma, ProformaStatus } from '../data/types';
 import { BrandLogo, ContainerStatusPill, PackPill, Pill, ProductThumb, ProformaStatusPill, Progress, Ring, Seg, SupplierLogo, Tabs } from '../components/ui';
 import { toast } from '../components/ui-shared';
-import { BookingRequestDialog } from '../components/BookingDialog';
+import { BookingRequestButton } from '../components/BookingDialog';
 import { addDays, dec, eur, eur2, fdate, m3, num, weekLabel } from '../lib/format';
 import { useT, type I18n } from '../i18n/context';
 import type { Key } from '../i18n/dict';
@@ -55,12 +55,10 @@ export default function ProformaDetail() {
   const pf = state.proformas.find((p) => p.id === id);
   const [tab, setTab] = useState<Tab>('produits');
   const [mode, setMode] = useState<'galerie' | 'liste'>('galerie');
-  const [booking, setBooking] = useState<string | null>(null);
   if (!pf) return <div className="card empty">Proforma introuvable.</div>;
   const sup = byId(state.suppliers, pf.supplierId);
   const t = proformaTotals(state, pf);
   const showMoney = auth.can('finance.view');
-  const canAsk = auth.allowed({ type: 'requestPfBooking', proformaId: pf.id, containers: 1, dateWanted: pf.etd });
 
   return (
     <>
@@ -77,11 +75,7 @@ export default function ProformaDetail() {
         <button className="btn" onClick={() => toast('Lien de partage copié (démo)')}>
           <Share2 size={16} /> Partager
         </button>
-        {canAsk && (
-          <button className="btn primary" onClick={() => setBooking(pf.id)}>
-            <Ship size={16} /> Demande de booking
-          </button>
-        )}
+        <BookingRequestButton pf={pf} />
         {pf.booking && <BookingState pf={pf} />}
         {auth.can('proforma.sign') && (
           <button
@@ -161,7 +155,6 @@ export default function ProformaDetail() {
       {tab === 'details' && <DetailsTab pf={pf} state={state} />}
       {tab === 'documents' && <DocumentsTab pf={pf} />}
       {tab === 'logistique' && <LogisticsTab pf={pf} />}
-      {booking === pf.id && <BookingRequestDialog pf={pf} onClose={() => setBooking(null)} />}
       {tab === 'historique' && (
         <div className="card pad">
           {[...pf.history].reverse().map((h, i) => (
@@ -796,18 +789,15 @@ function BookingState({ pf }: { pf: Proforma }) {
 
 /** Onglet Suivi & Logistique : demande de booking et son état, au-dessus du plan de chargement */
 function BookingBanner({ pf }: { pf: Proforma }) {
-  const auth = useAuth();
-  const [open, setOpen] = useState(false);
-  const canAsk = auth.allowed({ type: 'requestPfBooking', proformaId: pf.id, containers: 1, dateWanted: pf.etd });
   const b = pf.booking;
-  if (!canAsk && !b) return null;
+  if (!b && ['booke', 'en_transit', 'arrive'].includes(pf.status)) return null;
   return (
     <div className={`card pad mb pf-bk-banner ${b?.answeredAt ? 'done' : b ? 'wait' : ''}`}>
       <Ship size={22} />
       <div className="grow">
         {!b && (
           <>
-            <b>Booking à demander</b>
+            <b>{pf.status === 'a_signer' ? 'Booking : proforma à signer d’abord' : 'Booking à demander'}</b>
             <span>Le fournisseur reçoit l’alerte et répond avec le plan de chargement et les dates réelles.</span>
           </>
         )}
@@ -835,12 +825,7 @@ function BookingBanner({ pf }: { pf: Proforma }) {
           </>
         )}
       </div>
-      {canAsk && (
-        <button className="btn primary" onClick={() => setOpen(true)}>
-          <Ship size={16} /> Demande de booking
-        </button>
-      )}
-      {open && <BookingRequestDialog pf={pf} onClose={() => setOpen(false)} />}
+      <BookingRequestButton pf={pf} />
     </div>
   );
 }

@@ -265,7 +265,8 @@ export function isAllowed(s: State, a: Action): boolean {
     }
     case 'requestPfBooking': {
       const pf = s.proformas.find((x) => x.id === a.proformaId);
-      return can(u, 'logistics.booking') && !!pf && canRequestBooking(pf) && a.containers > 0;
+      // Logistique et acheteurs peuvent demander le booking d'une proforma
+      return (can(u, 'logistics.booking') || can(u, 'logistics.plan')) && !!pf && canRequestBooking(pf) && a.containers > 0;
     }
     case 'remindPfBooking':
     case 'cancelPfBooking': {

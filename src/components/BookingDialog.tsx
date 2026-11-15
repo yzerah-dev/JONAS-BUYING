@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Send, X } from 'lucide-react';
-import { byId, proformaTotals, useStore } from '../data/store';
+import { Lock, Send, Ship, X } from 'lucide-react';
+import { byId, proformaTotals, useAuth, useStore } from '../data/store';
+import { ROLE_DEFS } from '../data/permissions';
 import type { Proforma } from '../data/types';
 import { estimateContainers, toast } from './ui-shared';
 import { addDays, dec, fdate, weekLabel } from '../lib/format';
@@ -69,5 +70,44 @@ export function BookingRequestDialog({ pf, onClose }: { pf: Proforma; onClose: (
         </footer>
       </form>
     </div>
+  );
+}
+
+/**
+ * Bouton « Demande de booking » : visible sur toute proforma pas encore bookée.
+ * S'il ne peut pas encore servir (proforma à signer, droits), il explique pourquoi au lieu de disparaître.
+ */
+export function BookingRequestButton({ pf, variant = 'btn' }: { pf: Proforma; variant?: 'btn' | 'chip' }) {
+  const { state } = useStore();
+  const auth = useAuth();
+  const [open, setOpen] = useState(false);
+  const me = state.users.find((u) => u.id === state.currentUserId);
+  if (!me || ROLE_DEFS[me.role].portal) return null;
+  if (pf.booking || ['booke', 'en_transit', 'arrive'].includes(pf.status)) return null;
+  const allowed = auth.allowed({ type: 'requestPfBooking', proformaId: pf.id, containers: 1, dateWanted: pf.etd });
+  const reason =
+    pf.status === 'a_signer'
+      ? 'Signez d’abord la proforma pour pouvoir demander le booking'
+      : 'Demande de booking réservée à la logistique et aux acheteurs';
+  const click = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (allowed) setOpen(true);
+    else toast(reason);
+  };
+  return (
+    <>
+      <button
+        className={variant === 'chip' ? `pf-bk-btn ${allowed ? '' : 'locked'}` : `btn ${allowed ? 'primary' : 'locked'}`}
+        title={allowed ? 'Envoyer la demande de booking au fournisseur' : reason}
+        onClick={click}
+      >
+        {allowed ? <Ship size={variant === 'chip' ? 11 : 16} /> : <Lock size={variant === 'chip' ? 11 : 16} />} Demande de booking
+      </button>
+      {open && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <BookingRequestDialog pf={pf} onClose={() => setOpen(false)} />
+        </div>
+      )}
+    </>
   );
 }
