@@ -8,8 +8,9 @@ import BookingReview, { LastRejection } from '../components/BookingReview';
 import { ProductThumb, SupplierLogo } from '../components/ui';
 import { toast } from '../components/ui-shared';
 import { CarrierBadge } from '../components/ContainerCard';
-import { TODAY, addDays, dec, diffDays, fdate, fshort, num, weekLabel } from '../lib/format';
-import { DOC_LABEL, REQUIRED_DOCS, STAGES, STAGE_DEF, fwdBookings, fwdStages, type FwdStage } from './fwd';
+import { TODAY, addDays, diffDays } from '../lib/format';
+import { useT } from '../i18n';
+import { DOC_KEY, REQUIRED_DOCS, STAGES, fwdBookings, fwdStages, type FwdStage } from './fwd';
 
 type Dialog = { mode: 'confirm' | 'eta' | 'delivery'; c: Container } | null;
 
@@ -20,9 +21,9 @@ export default function ForwarderHome() {
   const [q, setQ] = useState('');
   const [dialog, setDialog] = useState<Dialog>(null);
   const [booking, setBooking] = useState<Proforma | null>(null);
+  const { t } = useT();
   if (!STAGES.includes(etape as FwdStage)) return <Navigate to="/transitaire/a-booker" replace />;
   const stage = etape as FwdStage;
-  const def = STAGE_DEF[stage];
   const s = q.trim().toLowerCase();
   const list = fwdStages(state, user)[stage].filter((c) => {
     if (!s) return true;
@@ -41,23 +42,23 @@ export default function ForwarderHome() {
           <Icon size={34} strokeWidth={1.8} />
         </span>
         <div>
-          <h1>{def.title}</h1>
-          <span>{def.sub}</span>
+          <h1>{t(`fw.st.${stage}.title`)}</h1>
+          <span>{t(`fw.st.${stage}.sub`)}</span>
         </div>
         <span className="pf-count">
-          {stage === 'a-booker' ? `${count} demande${count > 1 ? 's' : ''}` : `${count} conteneur${count > 1 ? 's' : ''}`}
+          {stage === 'a-booker' ? t('fw.count.requests', { n: count }) : t('fw.count.containers', { n: count })}
         </span>
       </div>
 
       <div className="pf-toolbar">
         <label className="pf-search">
           <Search size={20} />
-          <input placeholder="N° conteneur, booking, navire, fournisseur, proforma…" value={q} onChange={(e) => setQ(e.target.value)} />
+          <input placeholder={t('fw.search')} value={q} onChange={(e) => setQ(e.target.value)} />
         </label>
       </div>
 
       <div className="card bk-body fw-list">
-        {count === 0 && <div className="empty small">{s ? 'Aucun résultat.' : def.empty}</div>}
+        {count === 0 && <div className="empty small">{s ? t('fw.noResult') : t(`fw.st.${stage}.empty`)}</div>}
         {stage === 'a-booker'
           ? toBook.map((pf) => <BookingRow key={pf.id} s={state} pf={pf} onBook={() => setBooking(pf)} />)
           : list.map((c) => <ShipRow key={c.id} s={state} c={c} onDialog={setDialog} />)}
@@ -72,6 +73,9 @@ export default function ForwarderHome() {
 /** Ligne d'un conteneur confirmé : dates, documents, douane, livraison et action suivante */
 function ShipRow({ s, c, onDialog }: { s: State; c: Container; onDialog: (d: Dialog) => void }) {
   const { dispatch } = useStore();
+  const { t, fmt } = useT();
+  const { fshort } = fmt;
+  const doc = (d: string) => t(DOC_KEY[d]);
   const eta = containerEta(c);
   const left = diffDays(eta, TODAY);
   const missing = REQUIRED_DOCS.filter((d) => !c.documents.includes(d));
@@ -80,48 +84,44 @@ function ShipRow({ s, c, onDialog }: { s: State; c: Container; onDialog: (d: Dia
     <Row s={s} c={c}>
       <div className="bk-info">
         <small>
-          <Ship size={12} /> {c.booking?.vessel ?? 'Navire à préciser'} · {c.bookingNo ?? '—'}
+          <Ship size={12} /> {c.booking?.vessel ?? t('fw.vesselTbd')} · {c.bookingNo ?? '—'}
         </small>
         {c.status === 'booke' ? (
-          <b>
-            Départ {fshort(containerEtd(c))} · cut-off {fshort(c.booking?.cutoff)}
-          </b>
+          <b>{t('fw.departCutoff', { etd: fshort(containerEtd(c)), cut: fshort(c.booking?.cutoff) })}</b>
         ) : atPort ? (
-          <b>
-            Au port de {c.portTo} depuis le {fshort(c.etaReal)}
-          </b>
+          <b>{t('fw.atPortSince', { port: c.portTo, date: fshort(c.etaReal) })}</b>
         ) : c.status === 'en_transit' ? (
           <b className={c.etaRevised ? 'red' : ''}>
-            Arrivée {c.portTo} {fshort(eta)} · {left >= 0 ? `J-${left}` : `retard ${-left} j`}
+            {t('fw.arrival', { port: c.portTo, date: fshort(eta) })} · {left >= 0 ? t('fw.daysLeft', { n: left }) : t('fw.late', { n: -left })}
           </b>
         ) : (
-          <b>Livré à {c.warehouse} le {fshort(c.receivedOn ?? c.deliveryDate)}</b>
+          <b>{t('fw.deliveredAt', { wh: c.warehouse, date: fshort(c.receivedOn ?? c.deliveryDate) })}</b>
         )}
         <span className="fw-tags">
           {c.status !== 'booke' &&
             REQUIRED_DOCS.map((d) =>
               c.documents.includes(d) ? (
                 <span key={d} className="fw-doc ok">
-                  <Check size={11} /> {DOC_LABEL[d]}
+                  <Check size={11} /> {doc(d)}
                 </span>
               ) : (
                 <button
                   key={d}
                   className="fw-doc missing"
-                  title={`Déposer : ${DOC_LABEL[d]}`}
+                  title={t('fw.uploadDoc', { doc: doc(d) })}
                   onClick={() => {
                     dispatch({ type: 'addContainerDoc', containerId: c.id, doc: d });
-                    toast(`${DOC_LABEL[d]} déposé`);
+                    toast(t('fw.docUploaded', { doc: doc(d) }));
                   }}
                 >
-                  <FileUp size={11} /> {DOC_LABEL[d]}
+                  <FileUp size={11} /> {doc(d)}
                 </button>
               ),
             )}
-          {c.customs && <span className={`fw-doc ${c.customs === 'dedouane' ? 'ok' : 'wait'}`}>{c.customs === 'dedouane' ? 'Dédouané' : 'Douane en cours'}</span>}
+          {c.customs && <span className={`fw-doc ${c.customs === 'dedouane' ? 'ok' : 'wait'}`}>{c.customs === 'dedouane' ? t('fw.cleared') : t('fw.customsOn')}</span>}
           {c.deliveryDate && (
             <span className="fw-doc ok">
-              <Warehouse size={11} /> Livraison {fshort(c.deliveryDate)}
+              <Warehouse size={11} /> {t('fw.delivery', { date: fshort(c.deliveryDate) })}
             </span>
           )}
         </span>
@@ -130,34 +130,34 @@ function ShipRow({ s, c, onDialog }: { s: State; c: Container; onDialog: (d: Dia
         {c.status === 'booke' && (
           <>
             <button className={`btn sm ${c.number ? 'ghost' : 'primary'}`} onClick={() => onDialog({ mode: 'confirm', c })}>
-              {c.number ? 'Modifier' : 'N° de conteneur'}
+              {c.number ? t('fw.edit') : t('fw.ctnNo')}
             </button>
             <button
               className={`btn sm ${c.number ? 'primary' : ''}`}
               disabled={!c.number}
-              title={c.number ? undefined : 'Indiquez d’abord le n° de conteneur'}
+              title={c.number ? undefined : t('fw.ctnFirst')}
               onClick={() => {
                 dispatch({ type: 'ship', containerId: c.id });
-                toast(`${c.number ?? c.id} parti : en mer`);
+                toast(t('fw.sailedToast', { c: c.number ?? c.id }));
               }}
             >
-              <Ship size={14} /> Départ effectué
+              <Ship size={14} /> {t('fw.sailed')}
             </button>
           </>
         )}
         {c.status === 'en_transit' && !atPort && (
           <>
             <button className="btn sm ghost" onClick={() => onDialog({ mode: 'eta', c })}>
-              Nouvelle ETA
+              {t('fw.newEta')}
             </button>
             <button
               className={`btn sm ${left <= 3 ? 'primary' : ''}`}
               onClick={() => {
                 dispatch({ type: 'portArrival', containerId: c.id });
-                toast(`${c.number ?? c.id} arrivé au port de ${c.portTo}`);
+                toast(t('fw.arrivedToast', { c: c.number ?? c.id, port: c.portTo }));
               }}
             >
-              <Anchor size={14} /> Arrivé au port
+              <Anchor size={14} /> {t('fw.arrived')}
             </button>
           </>
         )}
@@ -165,13 +165,13 @@ function ShipRow({ s, c, onDialog }: { s: State; c: Container; onDialog: (d: Dia
           <button
             className="btn sm primary"
             disabled={missing.length > 0}
-            title={missing.length ? `Documents manquants : ${missing.map((d) => DOC_LABEL[d]).join(', ')}` : undefined}
+            title={missing.length ? t('fw.missingDocs', { docs: missing.map(doc).join(', ') }) : undefined}
             onClick={() => {
               dispatch({ type: 'setCustoms', containerId: c.id, status: 'en_cours' });
-              toast('Dédouanement lancé');
+              toast(t('fw.customsStarted'));
             }}
           >
-            Lancer la douane
+            {t('fw.startCustoms')}
           </button>
         )}
         {atPort && c.customs === 'en_cours' && (
@@ -179,15 +179,15 @@ function ShipRow({ s, c, onDialog }: { s: State; c: Container; onDialog: (d: Dia
             className="btn sm primary"
             onClick={() => {
               dispatch({ type: 'setCustoms', containerId: c.id, status: 'dedouane' });
-              toast('Marchandise dédouanée');
+              toast(t('fw.clearedToast'));
             }}
           >
-            <Check size={14} /> Dédouané
+            <Check size={14} /> {t('fw.cleared')}
           </button>
         )}
         {atPort && c.customs === 'dedouane' && (
           <button className={`btn sm ${c.deliveryDate ? 'ghost' : 'primary'}`} onClick={() => onDialog({ mode: 'delivery', c })}>
-            <Truck size={14} /> {c.deliveryDate ? 'Modifier la livraison' : 'Planifier la livraison'}
+            <Truck size={14} /> {c.deliveryDate ? t('fw.editDelivery') : t('fw.planDelivery')}
           </button>
         )}
       </div>
@@ -203,6 +203,8 @@ function BookingRow({ s, pf, onBook }: { s: State; pf: Proforma; onBook: () => v
   const cbm = cs.reduce((t, c) => t + containerCbm(s, c), 0);
   const top = pf.lines[0] ? byId(s.products, pf.lines[0].productId) : undefined;
   const wait = diffDays(TODAY, b.ackAt!.slice(0, 10));
+  const { t, fmt } = useT();
+  const { dec, fdate, fshort, weekLabel } = fmt;
   return (
     <div className="bk-row">
       <div className="bk-ctn">
@@ -230,21 +232,15 @@ function BookingRow({ s, pf, onBook }: { s: State; pf: Proforma; onBook: () => v
       </div>
       <div className="bk-who">
         {b.proposal ? (
-          <span className="pill green">Proposition envoyée</span>
+          <span className="pill green">{t('fw.proposalSent')}</span>
         ) : (
-          <span className={`pill ${wait > 2 ? 'red' : 'orange'}`}>{wait === 0 ? 'Demandé aujourd’hui' : `Demandé il y a ${wait} j`}</span>
+          <span className={`pill ${wait > 2 ? 'red' : 'orange'}`}>{wait === 0 ? t('fw.askedToday') : t('fw.askedAgo', { n: wait })}</span>
         )}
       </div>
       <div className="bk-info">
-        <small>
-          Transmis par {b.ackBy ?? sup.shortName} le {fdate(b.ackAt!.slice(0, 10))}
-        </small>
-        <b>
-          Marchandise prête le {fshort(b.readyDate)} ({weekLabel(b.readyDate!)})
-        </b>
-        <span>
-          Chargement souhaité par JONAS {fshort(b.dateWanted)} · livraison {cs[0]?.warehouse ?? 'Péronne'}
-        </span>
+        <small>{t('fw.sentBy', { who: b.ackBy ?? sup.shortName, date: fdate(b.ackAt!.slice(0, 10)) })}</small>
+        <b>{t('fw.readyOn', { date: fshort(b.readyDate), week: weekLabel(b.readyDate!) })}</b>
+        <span>{t('fw.wanted', { date: fshort(b.dateWanted), wh: cs[0]?.warehouse ?? 'Péronne' })}</span>
         {b.ackNote && <span className="muted">« {b.ackNote} »</span>}
         <LastRejection pf={pf} />
       </div>
@@ -255,7 +251,7 @@ function BookingRow({ s, pf, onBook }: { s: State; pf: Proforma; onBook: () => v
       ) : (
         <div className="bk-actions">
           <button className="btn sm primary" onClick={onBook}>
-            <Check size={14} /> Faire la proposition
+            <Check size={14} /> {t('fw.makeProposal')}
           </button>
         </div>
       )}
@@ -265,17 +261,18 @@ function BookingRow({ s, pf, onBook }: { s: State; pf: Proforma; onBook: () => v
 
 function BookingDialog({ s, pf, onClose }: { s: State; pf: Proforma; onClose: () => void }) {
   const sup = byId(s.suppliers, pf.supplierId);
+  const { t } = useT();
   return (
     <div className="palette-back" onMouseDown={onClose}>
-      <div className="card rc-dialog bk-dialog" role="dialog" aria-label={`Proposition de booking ${pf.id}`} onMouseDown={(e) => e.stopPropagation()}>
+      <div className="card rc-dialog bk-dialog" role="dialog" aria-label={t('fw.proposalTitle', { pf: pf.id })} onMouseDown={(e) => e.stopPropagation()}>
         <header className="rc-head">
           <div>
-            <h2>Proposition de booking {pf.id}</h2>
+            <h2>{t('fw.proposalTitle', { pf: pf.id })}</h2>
             <span className="muted small">
               {sup.shortName} · {sup.port} → Le Havre · {pf.booking!.containers} × 40HC
             </span>
           </div>
-          <button type="button" className="icon-btn" onClick={onClose} aria-label="Fermer">
+          <button type="button" className="icon-btn" onClick={onClose} aria-label={t('fw.close')}>
             <X size={20} />
           </button>
         </header>
@@ -291,17 +288,18 @@ function Row({ s, c, children }: { s: State; c: Container; children: ReactNode }
   const sup = byId(s.suppliers, c.supplierId);
   const top = [...c.allocations].sort((a, b) => b.qty - a.qty)[0];
   const p = top ? byId(s.products, top.productId) : undefined;
+  const { t, fmt } = useT();
   return (
     <div className="bk-row">
       <div className="bk-ctn">
         {p && <ProductThumb product={p} size={44} />}
         <div>
           <span className="bk-num">
-            {c.number ? <strong>{c.number}</strong> : <strong className="wait">N° à venir</strong>}
+            {c.number ? <strong>{c.number}</strong> : <strong className="wait">{t('fw.noTbd')}</strong>}
             <span className="ct-type">{c.type}</span>
           </span>
           <small>
-            {containerProformas(c).join(', ')} · {num(containerQty(c))} pcs · {dec(containerCbm(s, c), 1)} m³
+            {containerProformas(c).join(', ')} · {fmt.num(containerQty(c))} pcs · {fmt.dec(containerCbm(s, c), 1)} m³
           </small>
         </div>
       </div>
@@ -327,27 +325,29 @@ const CARRIERS_PREFIX: Record<string, string> = { MSC: 'MSCU', 'CMA CGM': 'CMAU'
 function FwdDialog({ mode, c, onClose }: { mode: 'confirm' | 'eta' | 'delivery'; c: Container; onClose: () => void }) {
   const { state, dispatch } = useStore();
   const sup = byId(state.suppliers, c.supplierId);
+  const { t, fmt } = useT();
+  const { fdate, fshort } = fmt;
   const [number, setNumber] = useState(c.number ?? CARRIERS_PREFIX[c.carrier ?? ''] ?? '');
   const [seal, setSeal] = useState(c.seal ?? '');
   const [vessel, setVessel] = useState(c.booking?.vessel ?? '');
   const [cutoff, setCutoff] = useState(c.booking?.cutoff ?? addDays(c.etdPlanned, -3));
   const [etd, setEtd] = useState(c.etdPlanned);
   const [date, setDate] = useState(mode === 'eta' ? containerEta(c) : addDays(containerEta(c), 4));
-  const title = { confirm: 'Conteneur et plomb', eta: 'Nouvelle ETA', delivery: 'Planifier la livraison' }[mode];
+  const title = t(`fw.dlg.${mode}`);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (mode === 'confirm') {
-      if (!/^[A-Z]{4}\d{7}$/.test(number.trim().toUpperCase())) return toast('N° de conteneur attendu : 4 lettres + 7 chiffres (ex. MSCU1234567)');
-      if (!vessel.trim()) return toast('Indiquez le navire');
+      if (!/^[A-Z]{4}\d{7}$/.test(number.trim().toUpperCase())) return toast(t('fw.badNo'));
+      if (!vessel.trim()) return toast(t('fw.needVessel'));
       dispatch({ type: 'fwdConfirm', containerId: c.id, number: number.trim().toUpperCase(), seal: seal.trim() || undefined, vessel: vessel.trim().toUpperCase(), cutoff, etd });
-      toast(`Conteneur ${number.trim().toUpperCase()} enregistré`);
+      toast(t('fw.ctnSaved', { no: number.trim().toUpperCase() }));
     } else if (mode === 'eta') {
       dispatch({ type: 'reviseEta', containerId: c.id, eta: date });
-      toast(`ETA mise à jour : ${fdate(date)}`);
+      toast(t('fw.etaSaved', { date: fdate(date) }));
     } else {
       dispatch({ type: 'planDelivery', containerId: c.id, date });
-      toast(`Livraison planifiée le ${fdate(date)} à ${c.warehouse}`);
+      toast(t('fw.deliverySaved', { date: fdate(date), wh: c.warehouse }));
     }
     onClose();
   };
@@ -362,7 +362,7 @@ function FwdDialog({ mode, c, onClose }: { mode: 'confirm' | 'eta' | 'delivery';
               {c.number ?? c.id} · {sup.shortName} · {c.portFrom} → {c.portTo} · {containerProformas(c).join(', ')}
             </span>
           </div>
-          <button type="button" className="icon-btn" onClick={onClose} aria-label="Fermer">
+          <button type="button" className="icon-btn" onClick={onClose} aria-label={t('fw.close')}>
             <X size={20} />
           </button>
         </header>
@@ -370,37 +370,37 @@ function FwdDialog({ mode, c, onClose }: { mode: 'confirm' | 'eta' | 'delivery';
           {mode === 'confirm' ? (
             <>
               <label htmlFor="fw-num">
-                N° de conteneur
+                {t('fw.ctnNo')}
                 <input id="fw-num" className="input" autoFocus placeholder="MSCU1234567" value={number} onChange={(e) => setNumber(e.target.value)} />
               </label>
               <label htmlFor="fw-seal">
-                N° de plomb (facultatif)
+                {t('fw.seal')}
                 <input id="fw-seal" className="input" value={seal} onChange={(e) => setSeal(e.target.value)} />
               </label>
               <label htmlFor="fw-vessel">
-                Navire
+                {t('fw.vessel')}
                 <input id="fw-vessel" className="input" placeholder="Ex. MSC ARINA" value={vessel} onChange={(e) => setVessel(e.target.value)} />
               </label>
               <label htmlFor="fw-cut">
-                Cut-off terminal
+                {t('fw.cutoff')}
                 <input id="fw-cut" className="input" type="date" value={cutoff} onChange={(e) => setCutoff(e.target.value)} />
               </label>
               <label htmlFor="fw-etd">
-                Départ (ETD)
+                {t('fw.etd')}
                 <input id="fw-etd" className="input" type="date" value={etd} onChange={(e) => setEtd(e.target.value)} />
               </label>
               <p className="small muted">
-                Booking {c.carrier ?? ''} {c.bookingNo ? `· ${c.bookingNo}` : ''} · chargement {fshort(c.loading?.date)}
+                {t('fw.bookingLine', { carrier: c.carrier ?? '', no: c.bookingNo ?? '', date: fshort(c.loading?.date) })}
               </p>
             </>
           ) : (
             <>
               <label htmlFor="fw-date">
-                {mode === 'eta' ? `Nouvelle ETA à ${c.portTo}` : `Livraison à ${c.warehouse}`}
+                {mode === 'eta' ? t('fw.newEtaAt', { port: c.portTo }) : t('fw.deliveryAt', { wh: c.warehouse })}
                 <input id="fw-date" className="input" type="date" autoFocus value={date} onChange={(e) => setDate(e.target.value)} />
               </label>
               <p className="small muted">
-                {mode === 'eta' ? `ETA actuelle ${fdate(containerEta(c))} · JONAS est prévenu automatiquement.` : 'Rendez-vous transmis à l’entrepôt JONAS pour la réception.'}
+                {mode === 'eta' ? t('fw.etaNote', { date: fdate(containerEta(c)) }) : t('fw.deliveryNote')}
               </p>
             </>
           )}
@@ -408,10 +408,10 @@ function FwdDialog({ mode, c, onClose }: { mode: 'confirm' | 'eta' | 'delivery';
         <footer className="rc-foot">
           <span />
           <button type="button" className="btn" onClick={onClose}>
-            Annuler
+            {t('fw.cancel')}
           </button>
           <button type="submit" className="btn primary">
-            <Check size={16} /> Enregistrer
+            <Check size={16} /> {t('fw.save')}
           </button>
         </footer>
       </form>

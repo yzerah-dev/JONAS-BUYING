@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { I18nContext, makeI18n, readStoredLang, storeLang, useT } from './context';
-import { LANGS, type Lang } from './dict';
+import { LANGS, LANG_LABEL, type Lang } from './dict';
 
 /** Langue de l'interface, mémorisée par visiteur (localStorage). */
 export function I18nProvider({ children, defaultLang = 'en' }: { children: ReactNode; defaultLang?: Lang }) {
@@ -17,7 +17,7 @@ export function I18nProvider({ children, defaultLang = 'en' }: { children: React
   useEffect(() => {
     const html = document.documentElement;
     const prev = html.lang;
-    html.lang = lang;
+    html.lang = lang === 'zh' ? 'zh-CN' : lang;
     return () => {
       html.lang = prev;
     };
@@ -25,14 +25,14 @@ export function I18nProvider({ children, defaultLang = 'en' }: { children: React
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }
 
-/** Bascule compacte FR | EN */
+/** Bascule compacte FR | EN | 中文 */
 export function LangToggle() {
   const { lang, setLang, t } = useT();
   return (
     <div className="lang-toggle" role="group" aria-label={t('lang.label')}>
       {LANGS.map((l) => (
         <button key={l} type="button" className={l === lang ? 'active' : ''} aria-pressed={l === lang} onClick={() => setLang(l)}>
-          {l.toUpperCase()}
+          {LANG_LABEL[l]}
         </button>
       ))}
     </div>

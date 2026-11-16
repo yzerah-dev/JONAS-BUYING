@@ -3,18 +3,13 @@ import { bookingStage, containerEta, forwarderOwns, type State } from '../data/s
 import type { Container, Proforma, User } from '../data/types';
 
 export const REQUIRED_DOCS = ['BL.pdf', 'Invoice.pdf', 'Packing List.xlsx'];
-export const DOC_LABEL: Record<string, string> = { 'BL.pdf': 'BL', 'Invoice.pdf': 'Facture', 'Packing List.xlsx': 'Packing list' };
+/** Libellé (clé de traduction) des documents obligatoires */
+export const DOC_KEY: Record<string, 'fw.doc.BL' | 'fw.doc.invoice' | 'fw.doc.packing'> = { 'BL.pdf': 'fw.doc.BL', 'Invoice.pdf': 'fw.doc.invoice', 'Packing List.xlsx': 'fw.doc.packing' };
 
 export type FwdStage = 'a-booker' | 'pret' | 'en-mer' | 'au-port' | 'livres';
 
-export const STAGE_DEF: Record<FwdStage, { title: string; sub: string; empty: string }> = {
-  'a-booker': { title: 'Bookings à faire', sub: 'JONAS vous a choisi : faites votre proposition (compagnie, n°, navire, dates). Le fournisseur et JONAS l’acceptent.', empty: 'Aucun booking à faire.' },
-  pret: { title: 'Prêts au départ', sub: 'Booking fait : indiquez le n° de conteneur et le plomb, puis déclarez le départ.', empty: 'Aucun conteneur en attente de départ.' },
-  'en-mer': { title: 'En mer', sub: 'Suivi de l’ETA et des documents jusqu’à l’arrivée au port.', empty: 'Aucun conteneur en mer.' },
-  'au-port': { title: 'Au port', sub: 'Arrivés au port : dédouanement et livraison à l’entrepôt JONAS.', empty: 'Aucun conteneur au port.' },
-  livres: { title: 'Livrés', sub: 'Réceptionnés à l’entrepôt JONAS.', empty: 'Aucun conteneur livré.' },
-};
-export const STAGES = Object.keys(STAGE_DEF) as FwdStage[];
+/** Étapes du portail (titres, sous-titres et textes vides : clés fw.st.<étape>.* du dictionnaire) */
+export const STAGES: FwdStage[] = ['a-booker', 'pret', 'en-mer', 'au-port', 'livres'];
 
 const missingDocs = (c: Container) => REQUIRED_DOCS.some((d) => !c.documents.includes(d));
 

@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react';
-import { DATA_EN, en, fr, type Key, type Lang } from './dict';
+import { DATA_EN, LANGS, en, fr, type Key, type Lang } from './dict';
+import { DATA_ZH, zh } from './zh';
 import { FMT, type Fmt } from './format';
 
 export type Vars = Record<string, string | number>;
@@ -16,7 +17,8 @@ export interface I18n {
 }
 
 export const LANG_STORAGE_KEY = 'jonas-buying-lang';
-const DICTS: Record<Lang, Record<Key, string>> = { fr, en };
+const DICTS: Record<Lang, Record<Key, string>> = { fr, en, zh };
+const DATA: Record<Lang, Record<string, string>> = { fr: {}, en: DATA_EN, zh: DATA_ZH };
 
 export function makeI18n(lang: Lang, setLang: (l: Lang) => void): I18n {
   const dict = DICTS[lang];
@@ -27,7 +29,7 @@ export function makeI18n(lang: Lang, setLang: (l: Lang) => void): I18n {
       const s = dict[key] ?? fr[key] ?? key;
       return vars ? s.replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? String(vars[k]) : m)) : s;
     },
-    td: (value) => (lang === 'en' ? DATA_EN[value] ?? value : value),
+    td: (value) => DATA[lang][value] ?? value,
     fmt: FMT[lang],
   };
 }
@@ -44,7 +46,7 @@ export function useT(): I18n {
 export function readStoredLang(): Lang | null {
   try {
     const v = localStorage.getItem(LANG_STORAGE_KEY);
-    return v === 'fr' || v === 'en' ? v : null;
+    return LANGS.includes(v as Lang) ? (v as Lang) : null;
   } catch {
     return null;
   }

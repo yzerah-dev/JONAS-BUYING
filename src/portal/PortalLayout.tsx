@@ -9,10 +9,14 @@ import { I18nProvider, LangToggle, useT } from '../i18n';
 import '../i18n/i18n.css';
 import { usePortal } from './usePortal';
 
-/** Le portail fournisseur est bilingue (anglais par défaut) ; le reste de l'application reste en français. */
+/**
+ * Le portail fournisseur est en français, anglais et chinois : chinois par défaut pour un fournisseur en Chine,
+ * anglais sinon (le choix du visiteur est mémorisé). Le reste de l'application reste en français.
+ */
 export default function PortalLayout() {
+  const { supplier } = usePortal();
   return (
-    <I18nProvider defaultLang="en">
+    <I18nProvider defaultLang={supplier?.country === 'Chine' ? 'zh' : 'en'}>
       <PortalShell />
     </I18nProvider>
   );

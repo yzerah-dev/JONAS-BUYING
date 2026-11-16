@@ -15,11 +15,12 @@ const STATUS_COLOR: Record<ProformaDoc['status'], string> = { a_signer: 'orange'
 /** Télécharge le PDF d'une version (signée : avec signature et tampon ; annulée : avec bandeau) */
 function useDownload() {
   const { state } = useStore();
+  const { t } = useT();
   return async (pf: Proforma, v: ProformaDoc) => {
     const blob = await versionPdf(pf, v, { supplier: byId(state.suppliers, pf.supplierId), products: state.products, company: state.settings.company });
     const name = versionFileName(pf, v);
     const r = await saveBlob(blob, name);
-    if (r === 'saved' || r === 'zipped') toast(`${name} téléchargé`);
+    if (r === 'saved' || r === 'zipped') toast(t('pv.downloaded', { file: name }));
   };
 }
 

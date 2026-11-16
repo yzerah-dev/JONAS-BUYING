@@ -41,4 +41,28 @@ export const FMT_EN: Fmt = {
   weekLabel: (d) => `W${String(isoWeek(d).week).padStart(2, '0')}`,
 };
 
-export const FMT: Record<Lang, Fmt> = { fr: FMT_FR, en: FMT_EN };
+const eurZh = new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
+const eur2Zh = new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2 });
+const numZh = new Intl.NumberFormat('zh-CN');
+const decZh = (n: number, d = 1) => new Intl.NumberFormat('zh-CN', { minimumFractionDigits: d, maximumFractionDigits: d }).format(n);
+const fshortZh = (d?: ISODate) => {
+  if (!d) return '—';
+  const x = parse(d);
+  return `${x.getUTCMonth() + 1}月${x.getUTCDate()}日`;
+};
+
+export const FMT_ZH: Fmt = {
+  /** « 2026年11月14日 » */
+  fdate: (d) => (d ? `${parse(d).getUTCFullYear()}年${fshortZh(d)}` : '—'),
+  /** « 11月14日 » */
+  fshort: fshortZh,
+  eur: (n) => eurZh.format(n),
+  eur2: (n) => eur2Zh.format(n),
+  num: (n) => numZh.format(Math.round(n)),
+  dec: decZh,
+  m3: (n) => `${decZh(n, 1)} m³`,
+  /** « 第46周 » */
+  weekLabel: (d) => `第${isoWeek(d).week}周`,
+};
+
+export const FMT: Record<Lang, Fmt> = { fr: FMT_FR, en: FMT_EN, zh: FMT_ZH };
