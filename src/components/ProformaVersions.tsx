@@ -46,6 +46,17 @@ export default function ProformaVersions({ pf }: { pf: Proforma }) {
   const canRefuse = auth.allowed({ type: 'refuseProformaVersion', id: pf.id, reason: 'x' });
   const canUpload = auth.allowed({ type: 'uploadProforma', id: pf.id, fileId: '', name: '', size: 0, mime: '', reason: signed ? 'x' : undefined });
 
+  if (pf.split && pf.split.part > 1)
+    return (
+      <div className="card pad pv-card">
+        <div className="card-title">
+          <FileText size={18} /> {t('pv.title')}
+        </div>
+        <p className="small muted" style={{ margin: 0 }}>
+          {t('sp.proformaOf', { id: pf.split.root })}
+        </p>
+      </div>
+    );
   return (
     <div className="card pad pv-card">
       <div className="card-title">

@@ -56,7 +56,7 @@ const withDefaults = (def: Company, saved?: Partial<Company>): Company => ({
   vat: saved?.vat || def.vat,
 });
 
-export const STORAGE_KEY = 'jonas-buying-state-v13';
+export const STORAGE_KEY = 'jonas-buying-state-v14';
 
 export const currentUser = (s: State): User => s.users.find((u) => u.id === s.currentUserId) ?? s.users[0];
 
@@ -97,6 +97,9 @@ export type Action =
   | { type: 'proposePlan'; containerId: string }
   | { type: 'addContainerDoc'; containerId: string; doc: string }
   | { type: 'signProforma'; id: string; etdWanted: ISODate }
+  | { type: 'requestSplit'; id: string; lines: { productId: string; qtyNow: number }[]; etdLater: ISODate; reason: string }
+  | { type: 'acceptSplit'; id: string }
+  | { type: 'refuseSplit'; id: string; reason?: string }
   | { type: 'uploadProforma'; id: string; fileId: string; name: string; size: number; mime: string; reason?: string }
   | { type: 'refuseProformaVersion'; id: string; reason: string }
   | { type: 'setProformaStatus'; id: string; status: ProformaStatus }
@@ -303,11 +306,37 @@ export function isAllowed(s: State, a: Action): boolean {
       if (!(isSupplier(u) ? pf.supplierId === u.supplierId : u.role === 'pilote')) return false;
       return s.containers.some((c) => c.allocations.some((x) => x.proformaId === pf.id) && ['a_booker', 'booking_demande'].includes(c.status));
     }
+    case 'requestSplit': {
+      // Expédition partielle : le fournisseur (problème usine) ou JONAS (priorité) la demande, l'autre l'accepte
+      const pf = s.proformas.find((x) => x.id === a.id);
+      if (!pf || pf.splitRequest || !['en_dev', 'en_production', 'booke'].includes(pf.status)) return false;
+      if (!(isSupplier(u) ? pf.supplierId === u.supplierId : canAskBooking(u) || can(u, 'proforma.sign'))) return false;
+      if (!a.reason.trim() || !a.etdLater) return false;
+      const ok = pf.lines.every((l) => {
+        const now = a.lines.find((x) => x.productId === l.productId)?.qtyNow ?? l.qty;
+        return now >= shippedQty(s, pf.id, l.productId) && now <= l.qty;
+      });
+      const now = pf.lines.reduce((t, l) => t + (a.lines.find((x) => x.productId === l.productId)?.qtyNow ?? l.qty), 0);
+      const all = pf.lines.reduce((t, l) => t + l.qty, 0);
+      return ok && now > 0 && now < all;
+    }
+    case 'acceptSplit':
+    case 'refuseSplit': {
+      const pf = s.proformas.find((x) => x.id === a.id);
+      const r = pf?.splitRequest;
+      if (!pf || !r) return false;
+      const supplierSide = isSupplier(u) && pf.supplierId === u.supplierId;
+      const jonasSide = !isSupplier(u) && !isForwarder(u) && (canAskBooking(u) || can(u, 'proforma.sign'));
+      if (!supplierSide && !jonasSide) return false;
+      // Accepter : l'autre partie (le pilote peut tout) ; refuser / annuler : les deux
+      if (a.type === 'refuseSplit') return true;
+      return u.role === 'pilote' || (r.side === 'fournisseur' ? jonasSide : supplierSide);
+    }
     case 'uploadProforma': {
       // Le fournisseur dépose sa proforma ; une fois signée, une nouvelle version = demande de modification (motif obligatoire)
       const pf = s.proformas.find((x) => x.id === a.id);
       if (!pf || !(isSupplier(u) ? pf.supplierId === u.supplierId : u.role === 'pilote')) return false;
-      if (['en_transit', 'arrive'].includes(pf.status)) return false;
+      if (['en_transit', 'arrive'].includes(pf.status) || (pf.split && pf.split.part > 1)) return false;
       return !signedVersion(pf) || !!a.reason?.trim();
     }
     case 'signProforma':
@@ -394,6 +423,98 @@ export function isAllowed(s: State, a: Action): boolean {
 
 /** Conteneur suivi par ce transitaire : le sien, une fois booké par le fournisseur */
 export const forwarderOwns = (u: User, c: Container) => isForwarder(u) && c.forwarder === u.forwarder && ['booke', 'en_transit', 'arrive'].includes(c.status);
+
+/** Quantité déjà partie (conteneurs en transit ou arrivés) d'une ligne de proforma */
+export function shippedQty(s: State, proformaId: string, productId: string) {
+  return s.containers
+    .filter((c) => ['en_transit', 'arrive'].includes(c.status))
+    .reduce((sum, c) => sum + c.allocations.filter((a) => a.proformaId === proformaId && a.productId === productId).reduce((x, a) => x + a.qty, 0), 0);
+}
+/** Toutes les expéditions d'une proforma (dossier d'origine + reliquats), dans l'ordre */
+export function shipmentsOf(s: State, pf: Proforma): Proforma[] {
+  const root = pf.split?.root ?? pf.id;
+  return s.proformas.filter((p) => p.id === root || p.split?.root === root).sort((a, b) => (a.split?.part ?? 1) - (b.split?.part ?? 1));
+}
+/** « Exp. 2/3 » si la proforma part en plusieurs fois, sinon rien */
+export function shipmentLabel(s: State, pf: Proforma) {
+  const n = shipmentsOf(s, pf).length;
+  return n > 1 ? `Exp. ${pf.split?.part ?? 1}/${n}` : '';
+}
+
+/**
+ * Sépare une proforma : les quantités « maintenant » restent dans ce dossier, le reliquat devient
+ * une nouvelle expédition (PF-…-n) avec sa date, son acompte et son solde au prorata.
+ * Les quantités en trop dans les conteneurs pas encore partis sont retirées (elles repartiront avec le reliquat).
+ */
+function applySplit(s: State, pfId: string, me: string): State {
+  const pf = s.proformas.find((x) => x.id === pfId)!;
+  const r = pf.splitRequest!;
+  const root = pf.split?.root ?? pf.id;
+  const family = shipmentsOf(s, pf);
+  const part = family.reduce((m, p) => Math.max(m, p.split?.part ?? 1), 1) + 1;
+  const childId = `${root}-${part}`;
+  const nowOf = (productId: string, qty: number) => r.lines.find((x) => x.productId === productId)?.qtyNow ?? qty;
+  const nowLines = pf.lines
+    .map((l) => ({ ...l, qty: nowOf(l.productId, l.qty), cbm: l.cbm !== undefined ? (l.cbm * nowOf(l.productId, l.qty)) / l.qty : undefined }))
+    .filter((l) => l.qty > 0);
+  const laterLines = pf.lines
+    .map((l) => ({ ...l, qty: l.qty - nowOf(l.productId, l.qty), cbm: l.cbm !== undefined ? (l.cbm * (l.qty - nowOf(l.productId, l.qty))) / l.qty : undefined }))
+    .filter((l) => l.qty > 0);
+  const amt = (lines: typeof pf.lines) => lines.reduce((t, l) => t + l.qty * l.price, 0);
+  const share = amt(laterLines) / amt(pf.lines);
+  const deposit = proformaTotals(s, pf).deposit;
+  const round = (n: number) => Math.round(n * 100) / 100;
+  const shift = diffDays(r.etdLater, pf.etd);
+  const qtyNow = nowLines.reduce((t, l) => t + l.qty, 0);
+  const qtyLater = laterLines.reduce((t, l) => t + l.qty, 0);
+  const who = r.side === 'fournisseur' ? 'du fournisseur' : 'de JONAS';
+  const child: Proforma = {
+    ...pf,
+    id: childId,
+    lines: laterLines,
+    status: pf.status === 'en_dev' ? 'en_dev' : 'en_production',
+    etd: r.etdLater,
+    eta: addDays(pf.eta, shift),
+    balanceDue: addDays(pf.balanceDue, Math.max(0, shift)),
+    depositAmount: round(deposit * share),
+    balancePaid: false,
+    booking: undefined,
+    versions: undefined,
+    splitRequest: undefined,
+    split: { root, part },
+    documents: pf.documents.filter((d) => d.startsWith('Conditions')),
+    history: [{ date: TODAY, user: me, text: `Reliquat de ${pf.id} (${qtyLater} pcs), départ prévu ${r.etdLater} · demande ${who} : ${r.reason}` }],
+  };
+  const parent: Proforma = {
+    ...pf,
+    lines: nowLines,
+    depositAmount: round(deposit * (1 - share)),
+    splitRequest: undefined,
+    split: { root, part: pf.split?.part ?? 1 },
+    history: [...pf.history, { date: TODAY, user: me, text: `Expédition partielle acceptée : ${qtyNow} pcs partent, reliquat ${qtyLater} pcs → ${childId} (${r.etdLater}) · ${r.reason}` }],
+  };
+  // Conteneurs pas encore partis : on retire ce qui dépasse les quantités « maintenant »
+  const containers = s.containers.map((c) => ({ ...c, allocations: [...c.allocations] }));
+  for (const l of nowLines.concat(laterLines.filter((x) => !nowLines.some((n) => n.productId === x.productId)).map((x) => ({ ...x, qty: 0 })))) {
+    let excess = containers.reduce((t, c) => t + c.allocations.filter((x) => x.proformaId === pf.id && x.productId === l.productId).reduce((u, x) => u + x.qty, 0), 0) - l.qty;
+    for (const c of [...containers].reverse()) {
+      if (excess <= 0) break;
+      if (['en_transit', 'arrive'].includes(c.status)) continue;
+      c.allocations = c.allocations
+        .map((x) => {
+          if (excess <= 0 || x.proformaId !== pf.id || x.productId !== l.productId) return x;
+          const cut = Math.min(excess, x.qty);
+          excess -= cut;
+          return { ...x, qty: x.qty - cut };
+        })
+        .filter((x) => x.qty > 0);
+    }
+  }
+  const idx = s.proformas.findIndex((x) => x.id === pf.id);
+  const proformas = [...s.proformas];
+  proformas.splice(idx, 1, parent, child);
+  return syncProformaStatuses({ ...s, proformas, containers });
+}
 
 /** Version de proforma déposée, en attente de signature */
 export const pendingVersion = (pf: Proforma) => pf.versions?.find((v) => v.status === 'a_signer');
@@ -488,6 +609,22 @@ function applyAction(s: State, a: Action): State {
         ...c,
         documents: c.documents.includes(a.doc) ? c.documents : [...c.documents, a.doc],
         dateHistory: [...c.dateHistory, hist(me, `Document déposé : ${a.doc}`)],
+      }));
+    case 'requestSplit': {
+      const u = currentUser(s);
+      return mapPF(s, a.id, (pf) => ({
+        ...pf,
+        splitRequest: { at: nowStamp(), by: me, side: isSupplier(u) ? 'fournisseur' : 'jonas', reason: a.reason.trim(), lines: a.lines, etdLater: a.etdLater },
+        history: [...pf.history, hist(me, `Demande d'expédition partielle : ${a.reason.trim()} · reliquat prévu le ${a.etdLater}`)],
+      }));
+    }
+    case 'acceptSplit':
+      return applySplit(s, a.id, me);
+    case 'refuseSplit':
+      return mapPF(s, a.id, (pf) => ({
+        ...pf,
+        splitRequest: undefined,
+        history: [...pf.history, hist(me, `Demande d'expédition partielle ${a.reason ? `refusée : ${a.reason}` : 'annulée'}`)],
       }));
     case 'uploadProforma':
       return mapPF(s, a.id, (pf) => {
@@ -1069,6 +1206,12 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
       return null;
     case 'signProforma':
       return { target: a.id, text: `Proforma signée et tamponnée (expédition demandée ${a.etdWanted})` };
+    case 'requestSplit':
+      return { target: a.id, text: `Demande d'expédition partielle : ${a.reason}` };
+    case 'acceptSplit':
+      return { target: a.id, text: 'Expédition partielle acceptée : reliquat créé' };
+    case 'refuseSplit':
+      return { target: a.id, text: a.reason ? `Expédition partielle refusée : ${a.reason}` : 'Demande d’expédition partielle annulée' };
     case 'uploadProforma':
       return { target: a.id, text: a.reason ? `Demande de modification déposée : ${a.reason}` : `Proforma déposée (${a.name})` };
     case 'refuseProformaVersion':

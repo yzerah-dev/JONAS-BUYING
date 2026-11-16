@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Anchor, Ban, BadgeCheck, BellRing, Boxes, CalendarCheck, CalendarClock, CalendarPlus, ChevronDown, ChevronUp, Search, Send, Ship } from 'lucide-react';
-import { bookingStage, byId, canRequestBooking, pfContainers, proformaTotals, useAuth, useStore, type State } from '../data/store';
+import { bookingStage, byId, shipmentLabel, canRequestBooking, pfContainers, proformaTotals, useAuth, useStore, type State } from '../data/store';
 import type { Proforma } from '../data/types';
 import { ProductThumb, ProformaStatusPill, SupplierLogo } from '../components/ui';
 import { estimateContainers, toast } from '../components/ui-shared';
@@ -308,6 +308,7 @@ function Row({ s, pf, children, carrier }: { s: State; pf: Proforma; children: R
             <Link to={`/proformas/${pf.id}`}>
               <strong>{pf.id}</strong>
             </Link>
+            {shipmentLabel(s, pf) && <span className="ct-type">{shipmentLabel(s, pf)}</span>}
           </span>
           <small>
             {pf.title ?? (p ? p.name : '')} · {pf.lines.length} réf.

@@ -715,6 +715,19 @@ export const users: User[] = [
   nova.versions = [...nova.versions!, doc(nova, 2, '2026-11-13', { reason: 'Quantité CP-B112 portée à 60 000 pcs, prix unitaire ajusté' })];
 }
 
+// Northbay : problème usine sur l'étagère bambou, demande d'expédition partielle à accepter par JONAS
+{
+  const nb = proformas.find((p) => p.id === 'PF-2026-0145')!;
+  nb.splitRequest = {
+    at: '2026-11-13T04:10',
+    by: 'Ms. Zhao Min',
+    side: 'fournisseur',
+    reason: 'Problème de séchage sur l’étagère bambou : production terminée 3 semaines plus tard',
+    lines: nb.lines.map((l) => ({ productId: l.productId, qtyNow: l.productId === 'JO-R310' ? Math.round(l.qty * 0.4) : l.qty })),
+    etdLater: addDays(nb.etd, 21),
+  };
+}
+
 // Suivi transitaire : bookings confirmés, dédouanement et livraisons des conteneurs déjà partis
 {
   for (const c of containers) {

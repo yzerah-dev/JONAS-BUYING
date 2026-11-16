@@ -160,6 +160,14 @@ export interface Proforma {
    * v2+ : demande de modification du fournisseur, signée par la Direction ; elle annule la version signée précédente.
    */
   versions?: ProformaDoc[];
+  /**
+   * Expéditions : une proforma peut partir en plusieurs fois (problème usine, priorité JONAS).
+   * Chaque expédition est un dossier (Exp. 1 = la proforma d'origine, Exp. 2 = PF-…-2, etc.)
+   * avec ses lignes, ses conteneurs, son booking et son paiement au prorata.
+   */
+  split?: { root: string; part: number };
+  /** Demande d'expédition partielle, à accepter par l'autre partie (fournisseur ou JONAS) */
+  splitRequest?: SplitRequest;
   history: HistoryEntry[];
   /** Demande de booking envoyée au fournisseur, et sa réponse (plan + dates réelles) */
   booking?: BookingRequest;
@@ -204,6 +212,18 @@ export interface BookingRequest {
   vessel?: string;
   cutoff?: ISODate;
   supplierNote?: string;
+}
+
+export interface SplitRequest {
+  at: string;
+  by: string;
+  /** Qui demande : le fournisseur (problème usine) ou JONAS (priorité) ; l'autre partie accepte */
+  side: 'fournisseur' | 'jonas';
+  reason: string;
+  /** Quantités qui partent maintenant, par produit (le reste = reliquat) */
+  lines: { productId: string; qtyNow: number }[];
+  /** Date d'expédition prévue du reliquat */
+  etdLater: ISODate;
 }
 
 export type ProformaDocStatus = 'a_signer' | 'signee' | 'annulee' | 'refusee' | 'remplacee';

@@ -13,6 +13,7 @@ import {
   packDone,
   pfContainers,
   pendingVersion,
+  shipmentsOf,
   signedVersion,
   containerCapacity,
   defaultForwarder,
@@ -24,6 +25,7 @@ import { toast } from '../components/ui-shared';
 import type { Proforma } from '../data/types';
 import BookingEntry from '../components/BookingEntry';
 import ProformaVersions from '../components/ProformaVersions';
+import ShipmentsPanel from '../components/Shipments';
 import BookingReview, { LastRejection } from '../components/BookingReview';
 import { LogisticsTab } from '../pages/ProformaDetail';
 import { TODAY } from '../lib/format';
@@ -32,7 +34,7 @@ import { usePortal } from './usePortal';
 
 // ---------------------------------------------------------------------------
 export function PortalHome() {
-  const { state, supplier, user, products, proformas, containers, packsToValidate, dieCutsRequested, bookingsToDo, bookingsToAccept, proformasToUpload, docsMissing } = usePortal();
+  const { state, supplier, user, products, proformas, containers, packsToValidate, dieCutsRequested, bookingsToDo, bookingsToAccept, proformasToUpload, splitsToAccept, docsMissing } = usePortal();
   const pays = payments(state).filter((p) => p.supplierId === supplier!.id);
   const nextPay = pays.find((p) => !p.paid);
   const amount = proformas.reduce((s, p) => s + proformaTotals(state, p).amount, 0);
@@ -42,6 +44,7 @@ export function PortalHome() {
 
   const todo: { to: string; icon: React.ReactNode; text: string; n: number }[] = [
     { to: proformasToUpload[0] ? `/portail/proformas?pf=${proformasToUpload[0].id}` : '/portail/proformas', icon: <FileText size={16} className="orange" />, text: tr('home.todo.pfUpload'), n: proformasToUpload.length },
+    { to: splitsToAccept[0] ? `/portail/proformas?pf=${splitsToAccept[0].id}` : '/portail/proformas', icon: <Truck size={16} className="orange" />, text: tr('home.todo.split'), n: splitsToAccept.length },
     { to: '/portail/packs', icon: <Package size={16} className="orange" />, text: tr('home.todo.packs'), n: packsToValidate.length },
     { to: '/portail/packs?vue=diecut', icon: <Scissors size={16} className="orange" />, text: tr('home.todo.diecuts'), n: dieCutsRequested.length },
     { to: '/portail/booking', icon: <Calendar size={16} className="orange" />, text: tr('home.todo.booking'), n: bookingsToDo.length + bookingsToAccept.length },
@@ -222,6 +225,8 @@ export function PortalProformas() {
                   </div>
                 </div>
                 <ProformaStatusPill status={pf.status} />
+                {shipmentsOf(state, pf).length > 1 && <Pill color="violet">{tr('sp.part', { n: pf.split?.part ?? 1, total: shipmentsOf(state, pf).length })}</Pill>}
+                {pf.splitRequest && <Pill color="orange">{tr('sp.split')}</Pill>}
                 {pf.status === 'a_signer' && !pendingVersion(pf) && <Pill color="orange">{tr('pv.toUpload')}</Pill>}
                 {pendingVersion(pf) && <Pill color="violet">{signedVersion(pf) ? tr('pv.pendingRevision', { n: pendingVersion(pf)!.version }) : tr('pv.st.a_signer')}</Pill>}
                 <div className="grow" />
@@ -254,6 +259,9 @@ export function PortalProformas() {
                 <div style={{ padding: 16 }}>
                   <div className="mb">
                     <ProformaVersions pf={pf} />
+                  </div>
+                  <div className="mb">
+                    <ShipmentsPanel pf={pf} />
                   </div>
                   <div className="tbl-wrap">
                     <table className="tbl">

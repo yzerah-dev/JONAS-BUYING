@@ -63,6 +63,13 @@ export function notificationsFor(s: State): Notice[] {
       add({ id: `pfsign-${first.map((p) => p.id + pendingVersion(p)!.version).join(',')}`, level: 'orange', title: `${first.length} proforma(s) déposée(s) à signer`, detail: first.map((p) => p.id).join(', '), to: '/proformas?statut=a_signer' });
   }
 
+  // Expéditions partielles demandées par les fournisseurs (problème usine) : à accepter par JONAS
+  if (can(u, 'logistics.booking') || can(u, 'logistics.plan') || can(u, 'proforma.sign')) {
+    const req = s.proformas.filter((p) => p.splitRequest?.side === 'fournisseur');
+    if (req.length)
+      add({ id: `split-${req.map((p) => p.id + p.splitRequest!.at).join(',')}`, level: 'orange', title: `${req.length} demande(s) d’expédition partielle du fournisseur`, detail: req.map((p) => `${p.id} : ${p.splitRequest!.reason}`).join(' · '), to: `/proformas/${req[0].id}` });
+  }
+
   // Logistique
   if (can(u, 'logistics.booking') || can(u, 'logistics.plan')) {
     const toAsk = s.proformas.filter((p) => canRequestBooking(p) && diffDays(p.etd, TODAY) < 21);

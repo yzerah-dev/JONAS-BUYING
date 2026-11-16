@@ -34,6 +34,7 @@ import {
   containerQty,
   lineCbm,
   pendingRevision,
+  shipmentLabel,
   pendingVersion,
   proformaTotals,
   useAuth,
@@ -46,6 +47,7 @@ import { toast } from '../components/ui-shared';
 import { BookingRequestButton } from '../components/BookingDialog';
 import BookingReview, { LastRejection } from '../components/BookingReview';
 import ProformaVersions, { SignDialog } from '../components/ProformaVersions';
+import ShipmentsPanel from '../components/Shipments';
 import { addDays, dec, eur, eur2, fdate, m3, num, weekLabel } from '../lib/format';
 import { useT, type I18n } from '../i18n/context';
 import type { Key } from '../i18n/dict';
@@ -72,6 +74,7 @@ export default function ProformaDetail() {
           <ArrowLeft size={20} />
         </button>
         <h1>Proforma {pf.id}</h1>
+        {shipmentLabel(state, pf) && <span className="pill violet">{shipmentLabel(state, pf)}</span>}
         <ProformaStatusPill status={pf.status} />
         <div className="grow" />
         <button className="btn" onClick={() => toast('Export PDF généré (démo)')}>
@@ -119,6 +122,10 @@ export default function ProformaDetail() {
             {showMoney && <Info icon={<Euro size={18} />} label="Montant total" value={eur2(t.amount)} />}
           </div>
         </div>
+      </div>
+
+      <div className="mt">
+        <ShipmentsPanel pf={pf} />
       </div>
 
       <div className="row wrap">

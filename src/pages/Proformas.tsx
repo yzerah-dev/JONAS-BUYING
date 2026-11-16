@@ -14,7 +14,7 @@ import {
   Search,
   SlidersHorizontal,
 } from 'lucide-react';
-import { byId, pendingRevision, pendingVersion, proformaTotals, useAuth, useStore, PROFORMA_STATUS_LABEL, type State } from '../data/store';
+import { byId, shipmentLabel, pendingRevision, pendingVersion, proformaTotals, useAuth, useStore, PROFORMA_STATUS_LABEL, type State } from '../data/store';
 import { PROFORMA_STATUSES, type Proforma, type ProformaStatus } from '../data/types';
 import { ContainerGlyph, ProformaStatusPill, SupplierMark } from '../components/ui';
 import { PROFORMA_ICON, toast } from '../components/ui-shared';
@@ -285,7 +285,8 @@ function useRowData(p: Proforma, state: State) {
   const sup = byId(state.suppliers, p.supplierId);
   const title = p.title ?? byId(state.products, p.lines[0].productId).name;
   const packsDone = t.packsOk === t.packsTotal;
-  return { t, sup, title, packsDone };
+  const part = shipmentLabel(state, p);
+  return { t, sup, title: part ? `${title} · ${part}` : title, packsDone };
 }
 
 function StatusCell({ p, onSign }: { p: Proforma; onSign?: (id: string) => void }) {
