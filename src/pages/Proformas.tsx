@@ -13,8 +13,9 @@ import {
   PenLine,
   Search,
   SlidersHorizontal,
+  Split,
 } from 'lucide-react';
-import { byId, shipmentLabel, pendingRevision, pendingVersion, proformaTotals, useAuth, useStore, PROFORMA_STATUS_LABEL, type State } from '../data/store';
+import { byId, isReliquat, openReliquats, shipmentLabel, pendingRevision, pendingVersion, proformaTotals, useAuth, useStore, PROFORMA_STATUS_LABEL, type State } from '../data/store';
 import { PROFORMA_STATUSES, type Proforma, type ProformaStatus } from '../data/types';
 import { ContainerGlyph, ProformaStatusPill, SupplierMark } from '../components/ui';
 import { PROFORMA_ICON, toast } from '../components/ui-shared';
@@ -32,6 +33,7 @@ export default function Proformas() {
   const showMoney = auth.can('finance.view');
   const [params, setParams] = useSearchParams();
   const status = (params.get('statut') as ProformaStatus | null) ?? 'all';
+  const onlyReliquats = params.get('reliquats') === '1';
   const [view, setView] = useState<View>('semaine');
   const [q, setQ] = useState('');
   const [supplier, setSupplier] = useState('all');
@@ -42,6 +44,7 @@ export default function Proformas() {
     const s = q.trim().toLowerCase();
     return state.proformas
       .filter((p) => status === 'all' || p.status === status)
+      .filter((p) => !onlyReliquats || (isReliquat(p) && p.status !== 'arrive'))
       .filter((p) => supplier === 'all' || p.supplierId === supplier)
       .filter((p) => {
         if (!s) return true;
@@ -53,7 +56,7 @@ export default function Proformas() {
         return `${p.id} ${p.poNumber} ${sup.name} ${refs.join(' ')}`.toLowerCase().includes(s);
       })
       .sort((a, b) => a.etd.localeCompare(b.etd));
-  }, [state, status, supplier, q]);
+  }, [state, status, supplier, q, onlyReliquats]);
 
   const groups = useMemo(() => {
     if (view === 'liste') return [{ key: 'all', title: 'Toutes les proformas', sub: `${filtered.length} proformas`, items: filtered, kind: 'liste' as const }];
@@ -74,10 +77,12 @@ export default function Proformas() {
 
   const toSign = state.proformas.filter((p) => p.status === 'a_signer');
   const setStatus = (s: string) => {
+    params.delete('reliquats');
     if (s === 'all') params.delete('statut');
     else params.set('statut', s);
     setParams(params);
   };
+  const reliquatsOpen = openReliquats(state).length;
   const [signing, setSigning] = useState<string | null>(null);
   const sign = (id: string) => {
     const pf = state.proformas.find((p) => p.id === id)!;
@@ -129,17 +134,28 @@ export default function Proformas() {
       </div>
 
       <div className="pf-chips">
-        <button className={`pf-chip ${status === 'all' ? 'active' : ''}`} onClick={() => setStatus('all')}>
+        <button className={`pf-chip ${status === 'all' && !onlyReliquats ? 'active' : ''}`} onClick={() => setStatus('all')}>
           <Layers size={19} /> Toutes <b>{state.proformas.length}</b>
         </button>
         {PROFORMA_STATUSES.map((s) => {
           const Icon = PROFORMA_ICON[s].icon;
           return (
-            <button key={s} className={`pf-chip ${status === s ? 'active' : ''}`} onClick={() => setStatus(s)}>
+            <button key={s} className={`pf-chip ${status === s && !onlyReliquats ? 'active' : ''}`} onClick={() => setStatus(s)}>
               <Icon size={19} style={{ color: status === s ? undefined : PROFORMA_ICON[s].color }} /> {PROFORMA_STATUS_LABEL[s]} <b>{state.proformas.filter((p) => p.status === s).length}</b>
             </button>
           );
         })}
+        <button
+          className={`pf-chip ${onlyReliquats ? 'active' : ''}`}
+          onClick={() => {
+            params.delete('statut');
+            if (onlyReliquats) params.delete('reliquats');
+            else params.set('reliquats', '1');
+            setParams(params);
+          }}
+        >
+          <Split size={19} style={{ color: onlyReliquats ? undefined : 'var(--violet)' }} /> Reliquats <b>{reliquatsOpen}</b>
+        </button>
       </div>
 
       <div className="pf-views">

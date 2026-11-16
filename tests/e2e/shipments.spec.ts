@@ -41,7 +41,7 @@ test.describe('Expéditions partielles', () => {
     const e2 = after.find((p) => p.id === 'PF-2026-0152-2')!;
     expect(e1.lines[0].qty).toBe(3000);
     expect(e2.lines[0].qty).toBe(qty - 3000);
-    expect(e2.split).toEqual({ root: 'PF-2026-0152', part: 2 });
+    expect(e2.split).toMatchObject({ root: 'PF-2026-0152', part: 2, reason: 'Panne de la machine de moulage' });
     // Acompte de 12 000 € réparti au prorata des quantités
     expect(Math.round(e1.depositAmount! + e2.depositAmount!)).toBe(12000);
     expect(Math.round(e2.depositAmount!)).toBe(Math.round((12000 * (qty - 3000)) / qty));
@@ -80,5 +80,46 @@ test.describe('Expéditions partielles', () => {
     await panel.getByRole('button', { name: 'Refuser' }).click();
     await expect(toast(page)).toContainText('Demande refusée');
     await expect(panel.locator('.sp-request')).toHaveCount(0);
+  });
+});
+
+test.describe('Suivi des reliquats', () => {
+  test.beforeEach(async ({ page }) => {
+    await resetApp(page);
+  });
+
+  test('onglet Reliquats de la page Booking : retard, motif, tri', async ({ page }) => {
+    await loginAs(page, 'Logistique');
+    await go(page, 'booking');
+    await page.getByRole('button', { name: /Reliquats \(2\)/ }).click();
+    const rows = page.locator('.rl-row');
+    await expect(rows).toHaveCount(2);
+    // Tri par retard : Yiwu (28 j) avant Jinfa (14 j)
+    await expect(rows.nth(0)).toContainText('PF-2026-0136-2');
+    await expect(rows.nth(0)).toContainText('retard 28 j');
+    await expect(rows.nth(0)).toContainText('Rupture de tissu imprimé');
+    await expect(rows.nth(1)).toContainText('retard 14 j');
+    await page.getByRole('button', { name: 'Date', exact: true }).click();
+    await expect(rows.nth(0)).toContainText('PF-2026-0139-2');
+    await page.getByPlaceholder(/Reliquat, proforma d’origine/).fill('Jinfa');
+    await expect(rows).toHaveCount(1);
+  });
+
+  test('un reliquat accepté apparaît dans le suivi et dans le filtre de la liste', async ({ page }) => {
+    await loginAs(page, 'Logistique');
+    await go(page, 'proformas/PF-2026-0145');
+    await page.locator('.sp-card').getByRole('button', { name: 'Accepter' }).click();
+    await go(page, 'booking?vue=reliquats');
+    const row = page.locator('.rl-row', { hasText: 'PF-2026-0145-2' });
+    await expect(row).toContainText('retard 21 j');
+    await expect(row).toContainText('Problème de séchage');
+
+    await go(page, 'proformas');
+    await page.locator('.pf-chips').getByRole('button', { name: /Reliquats/ }).click();
+    await expect(page).toHaveURL(/reliquats=1/);
+    await page.getByRole('button', { name: 'Vue liste' }).click();
+    const main = page.locator('main');
+    for (const id of ['PF-2026-0136-2', 'PF-2026-0139-2', 'PF-2026-0145-2']) await expect(main).toContainText(id);
+    await expect(main).not.toContainText('PF-2026-0148');
   });
 });

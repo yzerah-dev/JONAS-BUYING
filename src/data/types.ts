@@ -165,7 +165,13 @@ export interface Proforma {
    * Chaque expédition est un dossier (Exp. 1 = la proforma d'origine, Exp. 2 = PF-…-2, etc.)
    * avec ses lignes, ses conteneurs, son booking et son paiement au prorata.
    */
-  split?: { root: string; part: number };
+  split?: {
+    root: string;
+    part: number;
+    /** Reliquat : date d'expédition prévue avant la séparation (pour mesurer le retard) et motif */
+    etdInitial?: ISODate;
+    reason?: string;
+  };
   /** Demande d'expédition partielle, à accepter par l'autre partie (fournisseur ou JONAS) */
   splitRequest?: SplitRequest;
   history: HistoryEntry[];

@@ -1,9 +1,10 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
-import { Anchor, Ban, BadgeCheck, BellRing, Boxes, CalendarCheck, CalendarClock, CalendarPlus, ChevronDown, ChevronUp, Search, Send, Ship } from 'lucide-react';
-import { bookingStage, byId, shipmentLabel, canRequestBooking, pfContainers, proformaTotals, useAuth, useStore, type State } from '../data/store';
+import { Link, useSearchParams } from 'react-router-dom';
+import Reliquats from './Reliquats';
+import { Anchor, Ban, BadgeCheck, BellRing, Boxes, CalendarCheck, CalendarClock, CalendarPlus, ChevronDown, ChevronUp, Search, Send, Ship, Split } from 'lucide-react';
+import { bookingStage, byId, openReliquats, shipmentLabel, canRequestBooking, pfContainers, proformaTotals, useAuth, useStore, type State } from '../data/store';
 import type { Proforma } from '../data/types';
-import { ProductThumb, ProformaStatusPill, SupplierLogo } from '../components/ui';
+import { ProductThumb, ProformaStatusPill, Seg, SupplierLogo } from '../components/ui';
 import { estimateContainers, toast } from '../components/ui-shared';
 import { CarrierBadge } from '../components/ContainerCard';
 import { BookingRequestDialog } from '../components/BookingDialog';
@@ -16,7 +17,32 @@ const WAIT_ALERT = 3;
 /** Jours d'attente à l'étape en cours : depuis la demande (fournisseur) ou depuis la prise en compte (transitaire) */
 const waitDays = (pf: Proforma) => (pf.booking ? diffDays(TODAY, (pf.booking.ackAt ?? pf.booking.requestedAt).slice(0, 10)) : 0);
 
+/** Page Booking : les bookings par étape, et le suivi des reliquats (expéditions partielles) */
 export default function Booking() {
+  const { state } = useStore();
+  const [params, setParams] = useSearchParams();
+  const vue = params.get('vue') === 'reliquats' ? 'reliquats' : 'bookings';
+  const n = openReliquats(state).length;
+  return (
+    <div className="pf-page">
+      <div className="row wrap bk-top">
+        <h1 className="pf-title">Booking</h1>
+        <div className="grow" />
+        <Seg
+          value={vue}
+          onChange={(v) => setParams(v === 'reliquats' ? { vue: 'reliquats' } : {})}
+          options={[
+            { id: 'bookings', label: 'Bookings', icon: <CalendarCheck size={16} /> },
+            { id: 'reliquats', label: `Reliquats (${n})`, icon: <Split size={16} /> },
+          ]}
+        />
+      </div>
+      {vue === 'reliquats' ? <Reliquats /> : <BookingStages />}
+    </div>
+  );
+}
+
+function BookingStages() {
   const { state, dispatch } = useStore();
   const auth = useAuth();
   const canBook = auth.can('logistics.booking');
@@ -79,9 +105,7 @@ export default function Booking() {
   const late = waiting.filter((pf) => waitDays(pf) > WAIT_ALERT).length;
 
   return (
-    <div className="pf-page">
-      <h1 className="pf-title">Booking</h1>
-
+    <>
       <div className="bk-kpis">
         <div className="kpi-box">
           <small>À demander</small>
@@ -213,7 +237,7 @@ export default function Booking() {
       )}
 
       {asking && <BookingRequestDialog pf={asking} onClose={() => setAsking(null)} />}
-    </div>
+    </>
   );
 }
 

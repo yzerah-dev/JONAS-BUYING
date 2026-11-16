@@ -1441,3 +1441,5 @@ button.fw-doc.missing:hover { background: var(--red); color: #fff; }
   .sp-row { grid-template-columns: auto minmax(0, 1fr); }
   .sp-qty { width: 84px; }
 }
+.bk-top { align-items: center; gap: 12px; }
+.bk-top .pf-title { margin-bottom: 0; }

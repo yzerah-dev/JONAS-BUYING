@@ -56,7 +56,7 @@ const withDefaults = (def: Company, saved?: Partial<Company>): Company => ({
   vat: saved?.vat || def.vat,
 });
 
-export const STORAGE_KEY = 'jonas-buying-state-v14';
+export const STORAGE_KEY = 'jonas-buying-state-v15';
 
 export const currentUser = (s: State): User => s.users.find((u) => u.id === s.currentUserId) ?? s.users[0];
 
@@ -435,6 +435,12 @@ export function shipmentsOf(s: State, pf: Proforma): Proforma[] {
   const root = pf.split?.root ?? pf.id;
   return s.proformas.filter((p) => p.id === root || p.split?.root === root).sort((a, b) => (a.split?.part ?? 1) - (b.split?.part ?? 1));
 }
+/** Reliquat : expédition créée par une expédition partielle (Exp. 2, 3…) */
+export const isReliquat = (pf: Proforma) => !!pf.split && pf.split.part > 1;
+/** Reliquats pas encore arrivés */
+export const openReliquats = (s: State) => s.proformas.filter((p) => isReliquat(p) && p.status !== 'arrive');
+/** Retard d'un reliquat : nouvelle date d'expédition − date prévue avant la séparation (jours) */
+export const reliquatDelay = (pf: Proforma) => (pf.split?.etdInitial ? diffDays(pf.etd, pf.split.etdInitial) : 0);
 /** « Exp. 2/3 » si la proforma part en plusieurs fois, sinon rien */
 export function shipmentLabel(s: State, pf: Proforma) {
   const n = shipmentsOf(s, pf).length;
@@ -481,7 +487,7 @@ function applySplit(s: State, pfId: string, me: string): State {
     booking: undefined,
     versions: undefined,
     splitRequest: undefined,
-    split: { root, part },
+    split: { root, part, etdInitial: pf.etd, reason: r.reason },
     documents: pf.documents.filter((d) => d.startsWith('Conditions')),
     history: [{ date: TODAY, user: me, text: `Reliquat de ${pf.id} (${qtyLater} pcs), départ prévu ${r.etdLater} · demande ${who} : ${r.reason}` }],
   };
@@ -490,7 +496,7 @@ function applySplit(s: State, pfId: string, me: string): State {
     lines: nowLines,
     depositAmount: round(deposit * (1 - share)),
     splitRequest: undefined,
-    split: { root, part: pf.split?.part ?? 1 },
+    split: { ...pf.split, root, part: pf.split?.part ?? 1 },
     history: [...pf.history, { date: TODAY, user: me, text: `Expédition partielle acceptée : ${qtyNow} pcs partent, reliquat ${qtyLater} pcs → ${childId} (${r.etdLater}) · ${r.reason}` }],
   };
   // Conteneurs pas encore partis : on retire ce qui dépasse les quantités « maintenant »

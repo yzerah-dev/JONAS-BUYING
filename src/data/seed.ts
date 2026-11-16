@@ -715,6 +715,43 @@ export const users: User[] = [
   nova.versions = [...nova.versions!, doc(nova, 2, '2026-11-13', { reason: 'Quantité CP-B112 portée à 60 000 pcs, prix unitaire ajusté' })];
 }
 
+// Reliquats déjà créés : une partie est en mer, le reste attend la fin de production
+{
+  const reliquat = (id: string, share: number, days: number, reason: string, by: string) => {
+    const pf = proformas.find((p) => p.id === id)!;
+    const lines = pf.lines.map((l) => {
+      const qty = Math.round((l.qty * share) / 12) * 12;
+      return { ...l, qty, cbm: l.cbm !== undefined ? (l.cbm * qty) / l.qty : undefined };
+    });
+    const amount = lines.reduce((s, l) => s + l.qty * l.price, 0);
+    const total = pf.lines.reduce((s, l) => s + l.qty * l.price, 0) + amount;
+    const deposit = (pf.depositAmount ?? 0) * (1 + amount / (total - amount));
+    pf.depositAmount = Math.round(deposit * ((total - amount) / total) * 100) / 100;
+    pf.split = { root: pf.id, part: 1 };
+    pf.history.push({ date: addDays(pf.etd, -20), user: by, text: `Expédition partielle acceptée : reliquat → ${pf.id}-2 · ${reason}` });
+    const child: Proforma = {
+      ...pf,
+      id: `${pf.id}-2`,
+      lines,
+      status: 'en_production',
+      etd: addDays(pf.etd, days),
+      eta: addDays(pf.eta, days),
+      balanceDue: addDays(pf.balanceDue, days),
+      depositAmount: Math.round(deposit * (amount / total) * 100) / 100,
+      balancePaid: false,
+      booking: undefined,
+      versions: undefined,
+      splitRequest: undefined,
+      split: { root: pf.id, part: 2, etdInitial: pf.etd, reason },
+      documents: ['Conditions d’achat.pdf'],
+      history: [{ date: addDays(pf.etd, -20), user: by, text: `Reliquat de ${pf.id} · ${reason}` }],
+    };
+    proformas.splice(proformas.indexOf(pf) + 1, 0, child);
+  };
+  reliquat('PF-2026-0136', 0.25, 28, 'Rupture de tissu imprimé chez le sous-traitant', 'Logistique');
+  reliquat('PF-2026-0139', 0.3, 14, 'Semelles en retard : contrôle qualité refusé', 'Logistique');
+}
+
 // Northbay : problème usine sur l'étagère bambou, demande d'expédition partielle à accepter par JONAS
 {
   const nb = proformas.find((p) => p.id === 'PF-2026-0145')!;
