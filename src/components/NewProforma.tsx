@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Plus, Send, Trash2, Upload, X } from 'lucide-react';
+import { Plus, Send, Trash2, X } from 'lucide-react';
 import { currentUser, nextProformaId, supplierTerms, useAuth, useStore } from '../data/store';
 import { isSupplier } from '../data/permissions';
 import { newFileId, putBlob } from '../lib/files';
 import { TODAY, addDays } from '../lib/format';
 import { useT } from '../i18n';
 import { toast } from './ui-shared';
+import FileDrop from './FileDrop';
 
 const OK_TYPES = ['application/pdf', 'image/png', 'image/jpeg'];
 type Line = { productId: string; qty: string; price: string };
@@ -166,22 +167,17 @@ function NewProformaDialog({ onClose, onCreated }: { onClose: () => void; onCrea
             </div>
           </div>
 
-          <label className="bk-wide">
-            {supplierSide ? t('np.file') : t('np.fileOpt')}
-            <span className="btn pv-file np-file">
-              <Upload size={16} /> {file ? file.name : t('pv.chooseFile')}
-              <input
-                type="file"
-                aria-label={supplierSide ? t('np.file') : t('np.fileOpt')}
-                accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
-                onChange={(e) => {
-                  const f = e.target.files?.[0] ?? null;
-                  if (f && !OK_TYPES.includes(f.type)) return toast(t('pv.badType'));
-                  setFile(f);
-                }}
-              />
-            </span>
-          </label>
+          <div className="bk-wide np-filebox">
+            <span className="small bold">{supplierSide ? t('np.file') : t('np.fileOpt')}</span>
+            <FileDrop
+              ariaLabel={supplierSide ? t('np.file') : t('np.fileOpt')}
+              current={file?.name}
+              onFile={(f) => {
+                if (!OK_TYPES.includes(f.type)) return toast(t('pv.badType'));
+                setFile(f);
+              }}
+            />
+          </div>
         </div>
         <footer className="rc-foot">
           <span />

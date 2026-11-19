@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { Ban, Download, FilePen, FileText, PenLine, Stamp, Upload, X } from 'lucide-react';
 import { byId, currentUser, pendingVersion, signedVersion, useAuth, useStore } from '../data/store';
 import { ROLE_DEFS } from '../data/permissions';
@@ -8,6 +8,7 @@ import { versionFileName, versionPdf } from '../lib/proformaPdf';
 import { addDays, diffDays, fdate, weekLabel, TODAY } from '../lib/format';
 import { useT } from '../i18n';
 import { toast } from './ui-shared';
+import FileDrop from './FileDrop';
 
 const OK_TYPES = ['application/pdf', 'image/png', 'image/jpeg'];
 const STATUS_COLOR: Record<ProformaDoc['status'], string> = { a_signer: 'orange', signee: 'green', annulee: 'red', refusee: 'red', remplacee: 'grey' };
@@ -45,6 +46,17 @@ export default function ProformaVersions({ pf }: { pf: Proforma }) {
   const canSign = auth.allowed({ type: 'signProforma', id: pf.id, etdWanted: pf.etd });
   const canRefuse = auth.allowed({ type: 'refuseProformaVersion', id: pf.id, reason: 'x' });
   const canUpload = auth.allowed({ type: 'uploadProforma', id: pf.id, fileId: '', name: '', size: 0, mime: '', reason: signed ? 'x' : undefined });
+  const [uploadOpen, setUploadOpen] = useState(!signed && !pending);
+  // Glisser un fichier au-dessus de la carte ouvre la zone de dépôt
+  const dragProps = canUpload
+    ? {
+        onDragEnter: (e: React.DragEvent) => {
+          if (e.dataTransfer.types.includes('Files')) setUploadOpen(true);
+        },
+        onDragOver: (e: React.DragEvent) => e.preventDefault(),
+        onDrop: (e: React.DragEvent) => e.preventDefault(),
+      }
+    : {};
 
   if (pf.split && pf.split.part > 1)
     return (
@@ -58,7 +70,7 @@ export default function ProformaVersions({ pf }: { pf: Proforma }) {
       </div>
     );
   return (
-    <div className="card pad pv-card">
+    <div className="card pad pv-card" {...dragProps}>
       <div className="card-title">
         <FileText size={18} /> {t('pv.title')}
       </div>
@@ -137,17 +149,15 @@ export default function ProformaVersions({ pf }: { pf: Proforma }) {
         ))}
       </div>
 
-      {canUpload && <UploadBox pf={pf} revision={!!signed} hasPending={!!pending} />}
+      {canUpload && <UploadBox pf={pf} revision={!!signed} hasPending={!!pending} open={uploadOpen} setOpen={setUploadOpen} />}
       {signing && pending && <SignDialog pf={pf} doc={pending} onClose={() => setSigning(false)} />}
     </div>
   );
 }
 
-function UploadBox({ pf, revision, hasPending }: { pf: Proforma; revision: boolean; hasPending: boolean }) {
+function UploadBox({ pf, revision, hasPending, open, setOpen }: { pf: Proforma; revision: boolean; hasPending: boolean; open: boolean; setOpen: (o: boolean) => void }) {
   const { dispatch } = useStore();
   const { t } = useT();
-  const input = useRef<HTMLInputElement>(null);
-  const [open, setOpen] = useState(!revision && !hasPending);
   const [reason, setReason] = useState('');
   const pick = async (file?: File) => {
     if (!file) return;
@@ -160,7 +170,6 @@ function UploadBox({ pf, revision, hasPending }: { pf: Proforma; revision: boole
     toast(t('pv.uploadedToast', { n }));
     setReason('');
     setOpen(false);
-    if (input.current) input.current.value = '';
   };
   if (!open)
     return (
@@ -181,23 +190,14 @@ function UploadBox({ pf, revision, hasPending }: { pf: Proforma; revision: boole
           </label>
         </>
       )}
-      <div className="row wrap" style={{ gap: 8, justifyContent: 'flex-end' }}>
-        {(revision || hasPending) && (
+      <FileDrop onFile={pick} ariaLabel={revision ? t('pv.revise') : t('pv.upload')} />
+      {(revision || hasPending) && (
+        <div className="row" style={{ justifyContent: 'flex-end' }}>
           <button type="button" className="btn sm" onClick={() => setOpen(false)}>
             <X size={14} /> {t('pv.cancel')}
           </button>
-        )}
-        <label className="btn primary pv-file">
-          <Upload size={16} /> {revision ? t('pv.revise') : t('pv.chooseFile')}
-          <input
-            ref={input}
-            type="file"
-            accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
-            aria-label={revision ? t('pv.revise') : t('pv.upload')}
-            onChange={(e) => pick(e.target.files?.[0])}
-          />
-        </label>
-      </div>
+        </div>
+      )}
     </div>
   );
 }

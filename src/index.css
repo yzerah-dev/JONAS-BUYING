@@ -1474,3 +1474,12 @@ button.fw-doc.missing:hover { background: var(--red); color: #fff; }
 .terms-grid label { display: grid; gap: 4px; font-size: 13px; font-weight: 600; }
 .np-terms { margin: 0; padding: 8px 12px; border-radius: 10px; background: var(--grey-soft); font-size: 13px; font-weight: 600; }
 @media (max-width: 720px) { .terms-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* Zone de dépôt (glisser-déposer) */
+.drop-zone { position: relative; display: grid; justify-items: center; gap: 4px; padding: 18px 14px; border: 2px dashed var(--line); border-radius: 14px; background: var(--grey-soft); color: var(--muted); text-align: center; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+.drop-zone b { color: var(--ink); font-size: 14px; overflow-wrap: anywhere; }
+.drop-zone small { font-size: 12px; }
+.drop-zone:hover, .drop-zone.over { border-color: var(--green); background: var(--green-softer); color: var(--green); }
+.drop-zone.has-file { border-style: solid; border-color: var(--green); }
+.drop-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+.np-filebox { display: grid; gap: 6px; }

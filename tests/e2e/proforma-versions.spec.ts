@@ -127,3 +127,22 @@ test.describe('Proforma déposée par le fournisseur', () => {
     await expect(page.locator('.pv-row.signee')).toContainText('v1');
   });
 });
+
+test('glisser-déposer la proforma sur la zone de dépôt', async ({ page }) => {
+  await resetApp(page);
+  await loginAs(page, 'Li Qiang');
+  await go(page, 'portail/proformas?pf=PF-2026-0150');
+  const bytes = [...(await supplierPdf('PROFORMA DROP'))];
+  // Fichier lâché sur la zone (événement drop avec DataTransfer, comme depuis l'explorateur)
+  const dt = await page.evaluateHandle((b) => {
+    const d = new DataTransfer();
+    d.items.add(new File([new Uint8Array(b)], 'PI-glisse.pdf', { type: 'application/pdf' }));
+    return d;
+  }, bytes);
+  const zone = page.locator('.pv-card .drop-zone');
+  await zone.dispatchEvent('dragover', { dataTransfer: dt });
+  await expect(zone).toHaveClass(/over/);
+  await zone.dispatchEvent('drop', { dataTransfer: dt });
+  await expect(toast(page)).toContainText('Proforma v1 déposée');
+  await expect(page.locator('.pv-row')).toContainText('PI-glisse.pdf');
+});

@@ -417,6 +417,8 @@ export const zh: Record<Key, string> = {
   'np.needFile': '请附上您的形式发票',
   'np.noProducts': '该供应商暂无已上架产品。',
   'np.terms': '币种 {cur} · 定金 {dep}% · 开船后 {days} 天付尾款 — 供应商付款条件',
+  'pv.drop': '将形式发票拖放到此处（PDF、JPG、PNG）',
+  'pv.dropHere': '松开即可上传',
   'be.title': '订舱',
   'be.carrier': '船公司',
   'be.no': '订舱号',
