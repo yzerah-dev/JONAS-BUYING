@@ -4,6 +4,7 @@ import { LayoutGrid, List, Search } from 'lucide-react';
 import { byId, packState, productQuantities, useStore } from '../data/store';
 import { BrandLogo, PackPill, Pill, ProductThumb, Seg } from '../components/ui';
 import { eur2, num, weekLabel } from '../lib/format';
+import Combobox from '../components/Combobox';
 
 export default function Products() {
   const { state } = useStore();
@@ -73,14 +74,14 @@ export default function Products() {
             <option key={r}>{r}</option>
           ))}
         </select>
-        <select className="input" value={f.supplier} onChange={set('supplier')}>
-          <option value="all">Fournisseur</option>
-          {state.suppliers.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.shortName}
-            </option>
-          ))}
-        </select>
+        <div className="combo-filter">
+          <Combobox
+            value={f.supplier}
+            onChange={(v) => setF({ ...f, supplier: v })}
+            placeholder="Fournisseur…"
+            options={[{ id: 'all', label: 'Tous les fournisseurs' }, ...state.suppliers.map((s) => ({ id: s.id, label: s.shortName, sub: `${s.flag} ${s.city}`, keywords: s.name }))]}
+          />
+        </div>
         <select className="input" value={f.pack} onChange={set('pack')}>
           <option value="all">État de pack</option>
           <option value="ok">OK</option>

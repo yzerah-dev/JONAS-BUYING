@@ -23,6 +23,7 @@ import ContainerCard from '../components/ContainerCard';
 import { ContainerStatusPill, Pill, ProductThumb, Progress, Seg, SupplierLogo } from '../components/ui';
 import { toast } from '../components/ui-shared';
 import { TODAY, addDays, dec, diffDays, eur, fshort, m3, monthKey, monthLabel, num, shiftMonth, weekKey, weekLabel, weekRange } from '../lib/format';
+import Combobox from '../components/Combobox';
 
 const GROUP_COLOR: Record<ContainerStatus, string> = {
   a_booker: 'orange',
@@ -123,14 +124,7 @@ export default function Containers() {
                 </div>
                 <label className="ctn-f-row" htmlFor="ctn-sup">
                   <span className="xs muted">Fournisseur</span>
-                  <select id="ctn-sup" className="input" value={supplierF} onChange={(e) => setSupplierF(e.target.value)}>
-                    <option value="all">Tous</option>
-                    {state.suppliers.map((x) => (
-                      <option key={x.id} value={x.id}>
-                        {x.shortName}
-                      </option>
-                    ))}
-                  </select>
+                  <Combobox id="ctn-sup" value={supplierF} onChange={setSupplierF} placeholder="Tapez un fournisseur…" options={[{ id: 'all', label: 'Tous' }, ...state.suppliers.map((s) => ({ id: s.id, label: s.shortName, sub: `${s.flag} ${s.city}`, keywords: `${s.name} ${s.shortName}` }))]} />
                 </label>
                 <label className="ctn-f-row" htmlFor="ctn-fwd">
                   <span className="xs muted">Transitaire</span>

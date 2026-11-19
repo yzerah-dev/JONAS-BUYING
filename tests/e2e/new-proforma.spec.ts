@@ -65,7 +65,9 @@ test.describe('Nouvelle proforma', () => {
     await go(page, 'proformas');
     await page.getByRole('button', { name: 'Nouvelle proforma' }).click();
     const dlg = page.getByRole('dialog');
-    await page.locator('#np-sup').selectOption('tide');
+    await page.locator('#np-sup').fill('tide');
+    await page.getByRole('option', { name: /Xiamen Tide Living/ }).click();
+    await expect(page.locator('#np-sup')).toHaveValue('Xiamen Tide Living');
     await page.locator('#np-title').fill('Sabots enfant');
     await dlg.getByLabel('Produit 1').selectOption({ index: 1 });
     await dlg.getByLabel('Quantité 1').fill('5000');

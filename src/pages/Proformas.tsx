@@ -24,6 +24,7 @@ import { pressable } from '../lib/a11y';
 import { BookingRequestButton } from '../components/BookingDialog';
 import { SignDialog } from '../components/ProformaVersions';
 import { NewProformaButton } from '../components/NewProforma';
+import Combobox from '../components/Combobox';
 
 type View = 'liste' | 'semaine' | 'fournisseur';
 
@@ -112,14 +113,7 @@ export default function Proformas() {
               <label className="xs muted" htmlFor="pf-sup">
                 Fournisseur
               </label>
-              <select id="pf-sup" className="input" value={supplier} onChange={(e) => setSupplier(e.target.value)}>
-                <option value="all">Tous les fournisseurs</option>
-                {state.suppliers.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
+              <Combobox id="pf-sup" value={supplier} onChange={setSupplier} placeholder="Tapez un fournisseur…" options={[{ id: 'all', label: 'Tous les fournisseurs' }, ...state.suppliers.map((s) => ({ id: s.id, label: s.name, sub: `${s.flag} ${s.city}`, keywords: `${s.name} ${s.shortName}` }))]} />
               {pastWeeks > 0 && (
                 <label className="row small" style={{ gap: 6 }}>
                   <input type="checkbox" checked={showPast} onChange={(e) => setShowPast(e.target.checked)} /> Afficher les semaines passées ({pastWeeks})

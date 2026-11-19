@@ -7,6 +7,7 @@ import { TODAY, addDays } from '../lib/format';
 import { useT } from '../i18n';
 import { toast } from './ui-shared';
 import FileDrop from './FileDrop';
+import Combobox from './Combobox';
 
 const OK_TYPES = ['application/pdf', 'image/png', 'image/jpeg'];
 type Line = { productId: string; qty: string; price: string };
@@ -86,23 +87,18 @@ function NewProformaDialog({ onClose, onCreated }: { onClose: () => void; onCrea
           {!supplierSide && (
             <label htmlFor="np-sup">
               {t('np.supplier')}
-              <select
+              <Combobox
                 id="np-sup"
-                className="input"
                 value={supplierId}
-                onChange={(e) => {
-                  setSupplierId(e.target.value);
+                placeholder="Tapez le nom du fournisseur…"
+                options={state.suppliers
+                  .filter((s) => s.active)
+                  .map((s) => ({ id: s.id, label: s.name, sub: `${s.flag} ${s.city} · ${s.country}`, keywords: s.shortName }))}
+                onChange={(v) => {
+                  setSupplierId(v);
                   setLines([{ productId: '', qty: '', price: '' }]);
                 }}
-              >
-                {state.suppliers
-                  .filter((s) => s.active)
-                  .map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-              </select>
+              />
             </label>
           )}
           <label htmlFor="np-title" className={supplierSide ? 'bk-wide' : ''}>
