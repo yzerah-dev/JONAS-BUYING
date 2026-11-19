@@ -9,6 +9,7 @@ import { useTableLabels } from './useTableLabels';
 import { ContainerGlyph, Toaster } from './ui';
 import UserSwitcher from './UserSwitcher';
 import { Forbidden } from './Guard';
+import Assistant from './Assistant';
 
 // Menu principal (maquette) puis modules complémentaires
 const NAV: { to: string; label: string; icon: typeof Layers; module: Module }[] = [
@@ -109,6 +110,7 @@ export default function Layout() {
       <main className="main" ref={mainRef}>
         {allowedHere ? <Outlet /> : <Forbidden />}
       </main>
+      <Assistant />
       <Toaster />
       {searchOpen && <SearchPalette onClose={() => setSearchOpen(false)} />}
     </div>

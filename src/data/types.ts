@@ -240,7 +240,7 @@ export interface PurchaseOrder {
   at: string;
   by: string;
   /** Articles saisis, importés d'un Excel ou d'un bon de commande (PDF TCI) */
-  source: 'saisie' | 'excel' | 'bc';
+  source: 'saisie' | 'excel' | 'bc' | 'ia';
   /** Fichier importé (Excel ou bon de commande), téléchargeable par le fournisseur */
   file?: { fileId: string; name: string; size: number; mime: string };
 }

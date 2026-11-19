@@ -1507,3 +1507,30 @@ button.fw-doc.missing:hover { background: var(--red); color: #fff; }
 .po-box.waiting { background: var(--violet-soft); }
 .po-box b { display: block; font-size: 14px; }
 .po-box small { color: var(--muted); font-size: 12px; }
+
+/* Assistant commandes (IA) */
+.as-fab { position: fixed; right: 22px; bottom: 22px; z-index: 70; display: inline-flex; align-items: center; gap: 8px; padding: 12px 18px; border: 0; border-radius: 999px; background: var(--grad); color: #fff; font: inherit; font-weight: 800; box-shadow: 0 6px 18px rgba(15, 132, 103, 0.35); cursor: pointer; }
+.as-panel { position: fixed; right: 18px; bottom: 18px; z-index: 80; width: min(460px, calc(100vw / var(--z) - 36px)); height: min(680px, calc(100vh / var(--z) - 36px)); display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+.as-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--line); color: var(--green); }
+.as-head b { display: block; color: var(--ink); }
+.as-head small { color: var(--muted); font-size: 12px; }
+.as-list { flex: 1; overflow-y: auto; padding: 12px; display: grid; gap: 10px; align-content: start; }
+.as-empty { display: grid; gap: 8px; }
+.as-example { text-align: left; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--grey-soft); font: inherit; font-size: 13px; cursor: pointer; }
+.as-example:hover { border-color: var(--green); }
+.as-msg { display: grid; gap: 6px; max-width: 100%; }
+.as-msg.user .as-text { justify-self: end; background: var(--green); color: #fff; border-radius: 14px 14px 4px 14px; }
+.as-msg.assistant .as-text { background: var(--grey-soft); border-radius: 14px 14px 14px 4px; }
+.as-text { padding: 9px 12px; font-size: 14px; white-space: pre-wrap; overflow-wrap: anywhere; max-width: 92%; }
+.as-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; font-size: 12px; color: var(--muted); }
+.as-steps li { display: flex; align-items: center; gap: 6px; }
+.as-draft { display: grid; gap: 8px; padding: 10px 12px; border: 2px solid var(--green-soft); border-radius: 14px; background: #fff; }
+.as-draft-head { display: flex; align-items: center; gap: 8px; color: var(--green); }
+.as-draft-head b { color: var(--ink); }
+.as-tbl td { font-size: 12px; padding: 4px 6px; }
+.as-input { display: flex; gap: 8px; padding: 10px; border-top: 1px solid var(--line); align-items: flex-end; }
+.as-input textarea { flex: 1; resize: none; border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; font: inherit; font-size: 14px; }
+@media (max-width: 820px) {
+  .as-fab { right: 14px; bottom: 14px; padding: 10px 14px; }
+  .as-panel { right: 8px; left: 8px; bottom: 8px; width: auto; height: calc(100dvh - 90px); }
+}

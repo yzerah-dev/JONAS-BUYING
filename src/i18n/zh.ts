@@ -471,6 +471,7 @@ export const zh: Record<Key, string> = {
   'po.srcLabel.saisie': '手动填写',
   'po.srcLabel.excel': 'Excel 导入',
   'po.srcLabel.bc': 'TCI 采购单',
+  'po.srcLabel.ia': 'AI 助手',
   'be.title': '订舱',
   'be.carrier': '船公司',
   'be.no': '订舱号',

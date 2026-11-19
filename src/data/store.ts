@@ -114,7 +114,7 @@ export type Action =
       eta: ISODate;
       lines: ImportLine[];
       /** Commande JONAS : origine des articles et fichier importé */
-      order?: { source: 'saisie' | 'excel' | 'bc'; file?: { fileId: string; name: string; size: number; mime: string } };
+      order?: { source: 'saisie' | 'excel' | 'bc' | 'ia'; file?: { fileId: string; name: string; size: number; mime: string } };
       /** Proforma déposée par le fournisseur (obligatoire côté fournisseur) */
       file?: { fileId: string; name: string; size: number; mime: string };
     }
@@ -822,7 +822,7 @@ function applyAction(s: State, a: Action): State {
             user: me,
             text: bySupplier
               ? 'Proforma créée et déposée par le fournisseur'
-              : `Commande JONAS passée (${a.order?.source === 'excel' ? 'import Excel' : a.order?.source === 'bc' ? 'bon de commande' : 'articles saisis'}) : en attente de la proforma du fournisseur`,
+              : `Commande JONAS passée (${a.order?.source === 'excel' ? 'import Excel' : a.order?.source === 'bc' ? 'bon de commande' : a.order?.source === 'ia' ? 'assistant IA' : 'articles saisis'}) : en attente de la proforma du fournisseur`,
           },
           ...(mat.created.length ? [{ date: TODAY, user: me, text: `${mat.created.length} produit(s) créé(s) depuis la proforma : ${mat.created.map((p) => p.ref).join(', ')}` }] : []),
         ],
