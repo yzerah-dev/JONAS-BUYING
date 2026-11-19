@@ -65,7 +65,7 @@ test.describe('Nouvelle proforma', () => {
   test('JONAS crée une proforma : le fournisseur la voit et dépose son document', async ({ page }) => {
     await loginAs(page, 'David');
     await go(page, 'proformas');
-    await page.getByRole('button', { name: 'Nouvelle proforma' }).click();
+    await page.getByRole('button', { name: 'Nouvelle commande' }).click();
     const dlg = page.getByRole('dialog');
     await page.locator('#np-sup').fill('tide');
     await page.getByRole('option', { name: /Xiamen Tide Living/ }).click();
@@ -75,8 +75,8 @@ test.describe('Nouvelle proforma', () => {
     await page.getByRole('option').nth(1).click();
     await dlg.getByLabel('Quantité 1').fill('5000');
     await dlg.getByLabel('Prix unitaire 1').fill('2');
-    await dlg.getByRole('button', { name: 'Créer la proforma' }).click();
-    await expect(toast(page)).toContainText('PF-2026-0154 créée');
+    await dlg.getByRole('button', { name: 'Passer la commande' }).click();
+    await expect(toast(page)).toContainText('Commande PF-2026-0154 passée');
     await expect(page).toHaveURL(/proformas\/PF-2026-0154$/);
     await expect(page.locator('.page-head')).toContainText('À signer');
 

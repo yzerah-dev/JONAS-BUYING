@@ -113,6 +113,8 @@ export type Action =
       etd: ISODate;
       eta: ISODate;
       lines: ImportLine[];
+      /** Commande JONAS : origine des articles et fichier importé */
+      order?: { source: 'saisie' | 'excel' | 'bc'; file?: { fileId: string; name: string; size: number; mime: string } };
       /** Proforma déposée par le fournisseur (obligatoire côté fournisseur) */
       file?: { fileId: string; name: string; size: number; mime: string };
     }
@@ -810,11 +812,18 @@ function applyAction(s: State, a: Action): State {
         balancePaid: false,
         balanceDue: addDays(a.etd, terms.balanceDays),
         documents: ['Conditions d’achat.pdf'],
+        order: bySupplier ? undefined : { at: nowStamp(), by: me, source: a.order?.source ?? 'saisie', file: a.order?.file },
         versions: a.file
           ? [{ version: 1, fileId: a.file.fileId, name: a.file.name, size: a.file.size, type: a.file.mime, uploadedAt: nowStamp(), uploadedBy: me, status: 'a_signer', lines: mat.lines }]
           : undefined,
         history: [
-          { date: TODAY, user: me, text: bySupplier ? 'Proforma créée et déposée par le fournisseur' : 'Proforma créée par JONAS' },
+          {
+            date: TODAY,
+            user: me,
+            text: bySupplier
+              ? 'Proforma créée et déposée par le fournisseur'
+              : `Commande JONAS passée (${a.order?.source === 'excel' ? 'import Excel' : a.order?.source === 'bc' ? 'bon de commande' : 'articles saisis'}) : en attente de la proforma du fournisseur`,
+          },
           ...(mat.created.length ? [{ date: TODAY, user: me, text: `${mat.created.length} produit(s) créé(s) depuis la proforma : ${mat.created.map((p) => p.ref).join(', ')}` }] : []),
         ],
       };

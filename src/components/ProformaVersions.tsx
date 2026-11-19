@@ -3,8 +3,8 @@ import { Ban, Download, FilePen, FileText, Loader2, PenLine, Stamp, Upload, X } 
 import { byId, currentUser, pendingVersion, signedVersion, useAuth, useStore } from '../data/store';
 import { ROLE_DEFS } from '../data/permissions';
 import type { Company, ImportLine, Proforma, ProformaDoc } from '../data/types';
-import { newFileId, putBlob, saveBlob, fsize } from '../lib/files';
-import { versionFileName, versionPdf } from '../lib/proformaPdf';
+import { getBlob, newFileId, putBlob, saveBlob, fsize } from '../lib/files';
+import { purchaseOrderPdf, versionFileName, versionPdf } from '../lib/proformaPdf';
 import { addDays, diffDays, fdate, weekLabel, TODAY } from '../lib/format';
 import { useT } from '../i18n';
 import { toast } from './ui-shared';
@@ -77,6 +77,7 @@ export default function ProformaVersions({ pf }: { pf: Proforma }) {
       <div className="card-title">
         <FileText size={18} /> {t('pv.title')}
       </div>
+      {pf.order && <OrderBox pf={pf} supplierSide={!!supplierSide} waiting={versions.length === 0} />}
       {pending && (
         <div className="pv-alert">
           <Stamp size={18} />
@@ -357,6 +358,37 @@ export function CompanyStamp({ company }: { company?: Company }) {
       {c.address && <small>{c.address}</small>}
       {c.city && <small>{c.city}</small>}
       {c.vat && <small className="bold">N° TVA intracom. : {c.vat}</small>}
+    </div>
+  );
+}
+
+/** Commande JONAS : origine des articles, bon de commande à télécharger par le fournisseur */
+function OrderBox({ pf, supplierSide, waiting }: { pf: Proforma; supplierSide: boolean; waiting: boolean }) {
+  const { state } = useStore();
+  const { t, fmt } = useT();
+  const o = pf.order!;
+  const ctx = () => ({ supplier: byId(state.suppliers, pf.supplierId), products: state.products, company: state.settings.company });
+  const save = async (blob: Blob | undefined, name: string) => {
+    if (!blob) return;
+    const r = await saveBlob(blob, name);
+    if (r === 'saved' || r === 'zipped') toast(t('pv.downloaded', { file: name }));
+  };
+  return (
+    <div className={`po-box ${waiting ? 'waiting' : ''}`}>
+      <div className="grow">
+        <b>
+          {t('po.card', { date: fmt.fdate(o.at.slice(0, 10)) })} · {t(`po.srcLabel.${o.source}`)}
+        </b>
+        <small>{waiting ? (supplierSide ? t('po.cardSup') : t('po.cardSub')) : `${pf.poNumber} · ${o.by}`}</small>
+      </div>
+      <button type="button" className="btn sm" onClick={async () => save(await purchaseOrderPdf(pf, ctx()), `${pf.poNumber}_bon-de-commande.pdf`)}>
+        <Download size={13} /> {t('po.download')}
+      </button>
+      {o.file && (
+        <button type="button" className="btn sm ghost" title={t('po.importedFile', { file: o.file.name })} onClick={async () => save(await getBlob(o.file!.fileId).catch(() => undefined), o.file!.name)}>
+          <Download size={13} /> {o.file.name}
+        </button>
+      )}
     </div>
   );
 }

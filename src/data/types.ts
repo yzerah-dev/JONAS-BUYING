@@ -174,6 +174,8 @@ export interface Proforma {
    * v2+ : demande de modification du fournisseur, signée par la Direction ; elle annule la version signée précédente.
    */
   versions?: ProformaDoc[];
+  /** Commande passée par JONAS, en attente de la proforma du fournisseur */
+  order?: PurchaseOrder;
   /**
    * Expéditions : une proforma peut partir en plusieurs fois (problème usine, priorité JONAS).
    * Chaque expédition est un dossier (Exp. 1 = la proforma d'origine, Exp. 2 = PF-…-2, etc.)
@@ -232,6 +234,15 @@ export interface BookingRequest {
   vessel?: string;
   cutoff?: ISODate;
   supplierNote?: string;
+}
+
+export interface PurchaseOrder {
+  at: string;
+  by: string;
+  /** Articles saisis, importés d'un Excel ou d'un bon de commande (PDF TCI) */
+  source: 'saisie' | 'excel' | 'bc';
+  /** Fichier importé (Excel ou bon de commande), téléchargeable par le fournisseur */
+  file?: { fileId: string; name: string; size: number; mime: string };
 }
 
 export interface SplitRequest {

@@ -143,7 +143,7 @@ test.describe('Proforma déposée : lignes lues, produits reconnus ou créés', 
     const n0 = (await state(page)).products.length;
     await loginAs(page, 'David');
     await go(page, 'proformas');
-    await page.getByRole('button', { name: 'Nouvelle proforma' }).click();
+    await page.getByRole('button', { name: 'Nouvelle commande' }).click();
     const dlg = page.getByRole('dialog');
     await page.locator('#np-sup').fill('tide');
     await page.getByRole('option', { name: /Tide/ }).click();

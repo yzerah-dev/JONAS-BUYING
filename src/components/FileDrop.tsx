@@ -5,7 +5,7 @@ import { useT } from '../i18n';
 const ACCEPT = '.pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg';
 
 /** Zone de dépôt : glisser-déposer un fichier, ou cliquer pour le choisir */
-export default function FileDrop({ onFile, label, ariaLabel, current }: { onFile: (f: File) => void; label?: string; ariaLabel: string; current?: string }) {
+export default function FileDrop({ onFile, label, ariaLabel, current, accept = ACCEPT, hint }: { onFile: (f: File) => void; label?: string; ariaLabel: string; current?: string; accept?: string; hint?: string }) {
   const { t } = useT();
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
@@ -28,11 +28,11 @@ export default function FileDrop({ onFile, label, ariaLabel, current }: { onFile
     >
       <FileUp size={26} />
       <b>{over ? t('pv.dropHere') : current ?? label ?? t('pv.drop')}</b>
-      <small>{t('pv.chooseFile')}</small>
+      <small>{hint ?? t('pv.chooseFile')}</small>
       <input
         ref={input}
         type="file"
-        accept={ACCEPT}
+        accept={accept}
         aria-label={ariaLabel}
         onChange={(e) => {
           const f = e.target.files?.[0];

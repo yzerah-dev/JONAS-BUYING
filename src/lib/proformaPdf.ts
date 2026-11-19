@@ -199,3 +199,50 @@ export function versionFileName(pf: Proforma, doc: ProformaDoc) {
   const suffix = { a_signer: 'a-signer', signee: 'signee', annulee: 'ANNULEE', refusee: 'refusee', remplacee: 'remplacee' }[doc.status];
   return `${pf.id}_v${doc.version}_${suffix}.pdf`;
 }
+
+/** Bon de commande JONAS (articles saisis) : à télécharger par le fournisseur pour établir sa proforma */
+export async function purchaseOrderPdf(pf: Proforma, ctx: PdfContext): Promise<Blob> {
+  const pdf = await PDFDocument.create();
+  const page = pdf.addPage([595, 842]);
+  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const c = ctx.company;
+  const txt = (t: string, x: number, y: number, size = 9, f: PDFFont = font, color = INK) => page.drawText(safe(t), { x, y, size, font: f, color });
+  txt(c.name || 'JONAS INTERNATIONAL', 40, 790, 16, bold, BLUE);
+  txt([c.address, c.city].filter(Boolean).join(' · '), 40, 774, 9, font, GREY);
+  if (c.vat) txt(`TVA / VAT : ${c.vat}`, 40, 762, 9, font, GREY);
+  txt('BON DE COMMANDE / PURCHASE ORDER', 300, 790, 13, bold);
+  txt(`No. ${pf.poNumber}  ·  ${pf.id}`, 300, 774, 10, bold);
+  txt(`Date : ${fr(pf.order?.at.slice(0, 10) ?? pf.date)}`, 300, 760, 9);
+  txt(`Fournisseur / Supplier : ${ctx.supplier.name}`, 40, 735, 10, bold);
+  txt(`${ctx.supplier.city}, ${ctx.supplier.country} · ${ctx.supplier.contact.name} · ${ctx.supplier.contact.email}`, 40, 721, 9, font, GREY);
+  txt(`Expédition demandée / Requested shipment : ${fr(pf.etd)} (S${d2(isoWeek(pf.etd))}) · FOB ${ctx.supplier.port} → Le Havre`, 40, 703, 9);
+  let y = 675;
+  const cols = [40, 115, 205, 380, 445, 505];
+  page.drawRectangle({ x: 36, y: y - 6, width: 523, height: 20, color: rgb(0.93, 0.95, 0.99) });
+  ['Réf. JONAS', 'EAN', 'Désignation / Description', 'Qté / Qty', 'PU / Price', 'Montant'].forEach((h, i) => txt(h, cols[i], y, 8.5, bold));
+  y -= 22;
+  let total = 0;
+  for (const l of pf.lines) {
+    const p = ctx.products.find((x) => x.id === l.productId);
+    const amount = l.qty * l.price;
+    total += amount;
+    txt(p?.ref ?? l.productId, cols[0], y, 8.5);
+    txt(p?.ean ?? '', cols[1], y, 8);
+    txt((p?.name ?? '').slice(0, 34), cols[2], y, 8.5);
+    txt(l.qty.toLocaleString('en-US'), cols[3], y, 8.5);
+    txt(l.price.toFixed(2), cols[4], y, 8.5);
+    txt(amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), cols[5], y, 8.5);
+    page.drawLine({ start: { x: 36, y: y - 6 }, end: { x: 559, y: y - 6 }, thickness: 0.4, color: rgb(0.85, 0.85, 0.88) });
+    y -= 18;
+    if (y < 120) break;
+  }
+  y -= 6;
+  txt(`TOTAL (${pf.currency ?? 'EUR'})`, cols[4] - 30, y, 10, bold);
+  txt(total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), cols[5], y, 10, bold);
+  y -= 26;
+  txt(`Paiement / Payment : ${pf.depositPct} % d’acompte / deposit · solde / balance ${fr(pf.balanceDue)}`, 40, y, 9);
+  txt('Merci de déposer votre proforma correspondante sur le portail JONAS. / Please upload your matching proforma on the JONAS portal.', 40, y - 16, 8.5, font, GREY);
+  const out = await pdf.save();
+  return new Blob([out as BlobPart], { type: 'application/pdf' });
+}

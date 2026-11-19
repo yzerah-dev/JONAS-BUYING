@@ -11,6 +11,8 @@ import Combobox from './Combobox';
 import LinesEditor from './LinesEditor';
 import { emptyLine, fromExtraction, toImport, type EditLine } from '../lib/editLines';
 import { extractProforma } from '../lib/proformaExtract';
+import { isSheet, readSheet } from '../lib/excelImport';
+import { Seg } from './ui';
 
 const OK_TYPES = ['application/pdf', 'image/png', 'image/jpeg'];
 
@@ -26,7 +28,7 @@ export function NewProformaButton({ onCreated, className = 'pf-btn' }: { onCreat
   return (
     <>
       <button className={className} onClick={() => setOpen(true)}>
-        <Plus size={19} /> {t('np.new')}
+        <Plus size={19} /> {sup ? t('np.new') : t('po.newOrder')}
       </button>
       {open && <NewProformaDialog onClose={() => setOpen(false)} onCreated={onCreated} />}
     </>
@@ -46,6 +48,9 @@ function NewProformaDialog({ onClose, onCreated }: { onClose: () => void; onCrea
   const [lines, setLines] = useState<EditLine[]>([emptyLine()]);
   const [file, setFile] = useState<File | null>(null);
   const [reading, setReading] = useState(false);
+  // Commande JONAS : articles saisis, importés d'un Excel, ou d'un bon de commande TCI (PDF)
+  const [source, setSource] = useState<'saisie' | 'excel' | 'bc'>('saisie');
+  const [orderFile, setOrderFile] = useState<File | null>(null);
   const products = state.products.filter((p) => p.supplierId === supplierId);
   const terms = supplierTerms(state, supplierId);
   const currency = terms.currency;
@@ -62,6 +67,19 @@ function NewProformaDialog({ onClose, onCreated }: { onClose: () => void; onCrea
     } else toast(t('ex.none'));
   };
 
+  const importOrder = async (f: File) => {
+    const ok = source === 'excel' ? isSheet(f) : f.type === 'application/pdf';
+    if (!ok) return toast(source === 'excel' ? t('po.excelHint') : t('pv.badType'));
+    setOrderFile(f);
+    setReading(true);
+    const read = source === 'excel' ? await readSheet(f).catch(() => []) : (await extractProforma(f, f.type).catch(() => ({ lines: [] }))).lines;
+    setReading(false);
+    if (read.length) {
+      setLines(fromExtraction(read, products, state.products));
+      toast(t('po.read', { n: read.length }));
+    } else toast(t('po.none'));
+  };
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return toast(t('np.needTitle'));
@@ -74,19 +92,28 @@ function NewProformaDialog({ onClose, onCreated }: { onClose: () => void; onCrea
       await putBlob(fileId, file);
       f = { fileId, name: file.name, size: file.size, mime: file.type };
     }
-    dispatch({ type: 'createProforma', id, supplierId, title, etd, eta, lines: ls, file: f });
-    toast(supplierSide ? t('np.createdSup', { id }) : t('np.createdJonas', { id }));
+    let order: { source: typeof source; file?: { fileId: string; name: string; size: number; mime: string } } | undefined;
+    if (!supplierSide) {
+      order = { source };
+      if (orderFile && source !== 'saisie') {
+        const fileId = newFileId(id, 1);
+        await putBlob(fileId, orderFile);
+        order.file = { fileId, name: orderFile.name, size: orderFile.size, mime: orderFile.type || 'application/octet-stream' };
+      }
+    }
+    dispatch({ type: 'createProforma', id, supplierId, title, etd, eta, lines: ls, file: f, order });
+    toast(supplierSide ? t('np.createdSup', { id }) : file ? t('np.createdJonas', { id }) : t('po.created', { id }));
     onClose();
     onCreated?.(id);
   };
 
   return (
     <div className="palette-back" onMouseDown={onClose}>
-      <form className="card rc-dialog bk-dialog np-dialog" role="dialog" aria-label={t('np.title', { id })} onMouseDown={(e) => e.stopPropagation()} onSubmit={submit}>
+      <form className="card rc-dialog bk-dialog np-dialog" role="dialog" aria-label={supplierSide ? t('np.title', { id }) : t('po.title', { id })} onMouseDown={(e) => e.stopPropagation()} onSubmit={submit}>
         <header className="rc-head">
           <div>
-            <h2>{t('np.title', { id })}</h2>
-            <span className="muted small">{supplierSide ? t('np.hintSup') : t('np.hintJonas')}</span>
+            <h2>{supplierSide ? t('np.title', { id }) : t('po.title', { id })}</h2>
+            <span className="muted small">{supplierSide ? t('np.hintSup') : t('po.hint')}</span>
           </div>
           <button type="button" className="icon-btn" onClick={onClose} aria-label={t('np.close')}>
             <X size={20} />
@@ -134,6 +161,34 @@ function NewProformaDialog({ onClose, onCreated }: { onClose: () => void; onCrea
           </label>
           <p className="bk-wide np-terms">{t('np.terms', { cur: terms.currency, dep: terms.depositPct, days: terms.balanceDays })}</p>
 
+          {!supplierSide && (
+            <div className="bk-wide np-filebox">
+              <span className="small bold">{t('po.source')}</span>
+              <Seg
+                value={source}
+                onChange={(v) => {
+                  setSource(v);
+                  setOrderFile(null);
+                }}
+                options={[
+                  { id: 'saisie', label: t('po.src.saisie') },
+                  { id: 'excel', label: t('po.src.excel') },
+                  { id: 'bc', label: t('po.src.bc') },
+                ]}
+              />
+              {source !== 'saisie' && (
+                <FileDrop
+                  ariaLabel={source === 'excel' ? t('po.src.excel') : t('po.src.bc')}
+                  label={source === 'excel' ? t('po.dropExcel') : t('po.dropBc')}
+                  hint={source === 'excel' ? t('po.excelHint') : undefined}
+                  accept={source === 'excel' ? '.xlsx,.xls,.csv' : '.pdf,application/pdf'}
+                  current={orderFile?.name}
+                  onFile={importOrder}
+                />
+              )}
+            </div>
+          )}
+
           <div className="bk-wide np-filebox">
             <span className="small bold">{supplierSide ? t('np.file') : t('np.fileOpt')}</span>
             <FileDrop ariaLabel={supplierSide ? t('np.file') : t('np.fileOpt')} current={file?.name} onFile={attach} />
@@ -154,7 +209,7 @@ function NewProformaDialog({ onClose, onCreated }: { onClose: () => void; onCrea
             {t('np.cancel')}
           </button>
           <button type="submit" className="btn primary">
-            {supplierSide ? <Send size={16} /> : <Plus size={16} />} {supplierSide ? t('np.send') : t('np.create')}
+            {supplierSide ? <Send size={16} /> : <Plus size={16} />} {supplierSide ? t('np.send') : file ? t('np.create') : t('po.create')}
           </button>
         </footer>
       </form>
