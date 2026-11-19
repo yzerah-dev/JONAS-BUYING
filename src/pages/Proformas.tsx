@@ -23,11 +23,13 @@ import { TODAY, dec, eur, weekKey, weekLabel, weekRange } from '../lib/format';
 import { pressable } from '../lib/a11y';
 import { BookingRequestButton } from '../components/BookingDialog';
 import { SignDialog } from '../components/ProformaVersions';
+import { NewProformaButton } from '../components/NewProforma';
 
 type View = 'liste' | 'semaine' | 'fournisseur';
 
 export default function Proformas() {
   const { state } = useStore();
+  const navigate = useNavigate();
   const auth = useAuth();
   const canSign = auth.can('proforma.sign');
   const showMoney = auth.can('finance.view');
@@ -126,6 +128,7 @@ export default function Proformas() {
             </div>
           )}
         </div>
+        <NewProformaButton onCreated={(id) => navigate(`/proformas/${id}`)} />
         {canSign && (
           <button className="pf-btn primary" onClick={() => setStatus('a_signer')}>
             <PenLine size={21} /> Signer ({toSign.length})

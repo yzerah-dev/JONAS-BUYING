@@ -26,6 +26,7 @@ import type { Proforma } from '../data/types';
 import BookingEntry from '../components/BookingEntry';
 import ProformaVersions from '../components/ProformaVersions';
 import ShipmentsPanel from '../components/Shipments';
+import { NewProformaButton } from '../components/NewProforma';
 import BookingReview, { LastRejection } from '../components/BookingReview';
 import { LogisticsTab } from '../pages/ProformaDetail';
 import { TODAY } from '../lib/format';
@@ -206,6 +207,8 @@ export function PortalProformas() {
     <>
       <div className="page-head">
         <h1>{tr('proformas.title', { n: proformas.length })}</h1>
+        <div className="grow" />
+        <NewProformaButton className="btn primary" onCreated={(id) => setParams({ pf: id })} />
       </div>
       {[...proformas]
         .sort((a, b) => b.etd.localeCompare(a.etd))

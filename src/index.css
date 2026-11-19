@@ -1459,3 +1459,14 @@ button.fw-doc.missing:hover { background: var(--red); color: #fff; }
 }
 .bk-top { align-items: center; gap: 12px; }
 .bk-top .pf-title { margin-bottom: 0; }
+
+/* Nouvelle proforma */
+.np-dialog { width: min(760px, 100%); }
+.np-lines { display: grid; gap: 8px; }
+.np-line { display: grid; grid-template-columns: minmax(0, 2.4fr) minmax(0, 1fr) minmax(0, 1fr) 90px auto; gap: 8px; align-items: center; }
+.np-amount { text-align: right; font-weight: 700; font-size: 13px; }
+.np-file { justify-content: flex-start; overflow: hidden; }
+@media (max-width: 640px) {
+  .np-line { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .np-line select { grid-column: 1 / -1; }
+}
