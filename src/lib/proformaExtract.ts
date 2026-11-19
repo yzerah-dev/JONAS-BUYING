@@ -194,7 +194,8 @@ export interface Match {
 
 export function matchProduct(l: ExtractedLine, products: Product[]): Match {
   if (l.ref) {
-    const p = products.find((x) => key(x.ref) === key(l.ref));
+    // Référence JONAS, ou référence du fournisseur déjà connue
+    const p = products.find((x) => key(x.ref) === key(l.ref) || (x.supplierRef && key(x.supplierRef) === key(l.ref)));
     if (p) return { product: p, by: 'ref' };
   }
   if (l.ean) {

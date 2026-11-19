@@ -50,8 +50,9 @@ export function toImport(lines: EditLine[]): ImportLine[] | null {
     else {
       const pcb = Math.round(toNum(l.pcb));
       const cbm = toNum(l.cbm);
-      if (!l.ref?.trim() || !l.name?.trim() || !(pcb > 0) || !(cbm > 0)) return null;
-      out.push({ newProduct: { ref: l.ref.trim().toUpperCase(), name: l.name.trim(), ean: l.ean, pcb, cbmCarton: cbm }, qty, price });
+      if (!l.name?.trim() || !(pcb > 0) || !(cbm > 0)) return null;
+      // La référence lue sur la proforma est celle du fournisseur ; la référence et l'EAN JONAS sont attribués à la création
+      out.push({ newProduct: { supplierRef: l.ref?.trim().toUpperCase() || undefined, name: l.name.trim(), pcb, cbmCarton: cbm }, qty, price });
     }
   }
   return out;

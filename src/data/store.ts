@@ -43,11 +43,14 @@ export interface State {
   journal: JournalEntry[];
 }
 
+/** Préfixe GS1 des EAN JONAS (celui des produits existants) */
+const DEFAULT_GS1 = '370157';
+
 export const DEFAULT_SETTINGS: Settings = {
   defaultCapacity: 40,
   capacity: {},
   fx: { EUR: 1, USD: 0.93, CNY: 0.128 },
-  company: { name: 'JONAS INTERNATIONAL', address: '189 rue d\'Aubervilliers', city: '75018 Paris', vat: '' },
+  company: { name: 'JONAS INTERNATIONAL', address: '189 rue d\'Aubervilliers', city: '75018 Paris', vat: '', gs1Prefix: DEFAULT_GS1 },
 };
 
 /** Version de l'adresse société par défaut : une hausse réapplique l'adresse par défaut aux navigateurs existants */
@@ -58,6 +61,7 @@ const withDefaults = (def: Company, saved?: Partial<Company>): Company => ({
   address: saved?.address || def.address,
   city: saved?.city || def.city,
   vat: saved?.vat || def.vat,
+  gs1Prefix: saved?.gs1Prefix || def.gs1Prefix,
 });
 
 export const STORAGE_KEY = 'jonas-buying-state-v16';
@@ -485,12 +489,53 @@ function importLinesOk(s: State, supplierId: string, lines: ImportLine[]) {
     if (!(l.qty > 0) || !(l.price >= 0)) return false;
     if (l.productId) return s.products.find((p) => p.id === l.productId)?.supplierId === supplierId;
     const n = l.newProduct;
-    if (!n || !n.ref.trim() || !n.name.trim() || !(n.pcb > 0) || !(n.cbmCarton > 0)) return false;
-    const k = refKey(n.ref);
-    if (seen.has(k) || s.products.some((p) => refKey(p.ref) === k)) return false;
-    seen.add(k);
+    if (!n || !n.name.trim() || !(n.pcb > 0) || !(n.cbmCarton > 0)) return false;
+    // Une référence fournisseur ne peut pas désigner deux produits de ce fournisseur
+    if (n.supplierRef?.trim()) {
+      const k = refKey(n.supplierRef);
+      if (seen.has(k) || s.products.some((p) => p.supplierId === supplierId && p.supplierRef && refKey(p.supplierRef) === k)) return false;
+      seen.add(k);
+    }
     return true;
   });
+}
+
+/** Chiffre de contrôle EAN-13 */
+export function eanCheck(d12: string) {
+  const sum = [...d12].reduce((t, c, i) => t + Number(c) * (i % 2 ? 3 : 1), 0);
+  return String((10 - (sum % 10)) % 10);
+}
+
+/**
+ * Prochaines références JONAS et codes-barres EAN-13 JONAS pour de nouveaux produits d'un fournisseur.
+ * Référence : même préfixe que les références habituelles du fournisseur (ex. CP-T → CP-T138).
+ * EAN : préfixe GS1 de la société + numéro d'article suivant + chiffre de contrôle.
+ */
+export function nextJonasCodes(s: State, supplierId: string, n: number): { ref: string; ean: string }[] {
+  const pat = /^([A-Z]+-[A-Z]*)(\d+)$/;
+  const count = new Map<string, number>();
+  for (const p of s.products.filter((x) => x.supplierId === supplierId)) {
+    const m = p.ref.match(pat);
+    if (m) count.set(m[1], (count.get(m[1]) ?? 0) + 1);
+  }
+  const prefix = [...count.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'JO-N';
+  const used = s.products.map((p) => p.ref.match(pat)).filter((m) => m && m[1] === prefix) as RegExpMatchArray[];
+  const width = Math.max(3, ...used.map((m) => m[2].length));
+  let next = used.reduce((mx, m) => Math.max(mx, Number(m[2])), 0) + 1;
+  const gs1 = (s.settings.company.gs1Prefix || DEFAULT_GS1).replace(/\D/g, '').slice(0, 11);
+  const itemLen = 12 - gs1.length;
+  let item = s.products
+    .filter((p) => p.ean.length === 13 && p.ean.startsWith(gs1))
+    .reduce((mx, p) => Math.max(mx, Number(p.ean.slice(gs1.length, 12))), 0) + 1;
+  const refs = new Set(s.products.map((p) => p.ref));
+  const out: { ref: string; ean: string }[] = [];
+  while (out.length < n) {
+    const ref = `${prefix}${String(next++).padStart(width, '0')}`;
+    if (refs.has(ref)) continue;
+    const d12 = gs1 + String(item++).padStart(itemLen, '0');
+    out.push({ ref, ean: d12 + eanCheck(d12) });
+  }
+  return out;
 }
 
 /**
@@ -505,15 +550,17 @@ function materializeLines(s: State, supplierId: string, lines: ImportLine[], etd
     return [...count.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? fallback;
   };
   const created: Product[] = [];
+  const codes = nextJonasCodes(s, supplierId, lines.filter((l) => !l.productId).length);
   const out: ProformaLine[] = lines.map((l) => {
     if (l.productId) return { productId: l.productId, qty: l.qty, price: l.price };
     const n = l.newProduct!;
-    const ref = n.ref.trim().toUpperCase();
+    const { ref, ean } = codes.shift()!;
     const deadline = addDays(etd, -35);
     const p: Product = {
       id: ref,
       ref,
-      ean: n.ean ?? '',
+      ean,
+      supplierRef: n.supplierRef?.trim().toUpperCase() || undefined,
       name: n.name.trim(),
       brandId: most('brandId', 'jonas'),
       supplierId,

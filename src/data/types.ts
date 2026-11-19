@@ -100,8 +100,12 @@ export const DEV_STAGES = [
 
 export interface Product {
   id: string;
+  /** Référence JONAS */
   ref: string;
+  /** Code-barres EAN-13 JONAS */
   ean: string;
+  /** Référence de l'article chez le fournisseur (lue sur sa proforma) */
+  supplierRef?: string;
   name: string;
   brandId: string;
   supplierId: string;
@@ -268,7 +272,8 @@ export interface ProformaDoc {
 /** Ligne de proforma à enregistrer : un produit existant, ou un produit à créer (lu sur la proforma) */
 export interface ImportLine {
   productId?: string;
-  newProduct?: { ref: string; name: string; ean?: string; pcb: number; cbmCarton: number };
+  /** Nouveau produit : la référence JONAS et l'EAN JONAS sont attribués à la création */
+  newProduct?: { supplierRef?: string; name: string; pcb: number; cbmCarton: number };
   qty: number;
   price: number;
 }
@@ -446,6 +451,8 @@ export interface Company {
   city: string;
   /** N° de TVA intracommunautaire */
   vat: string;
+  /** Préfixe entreprise GS1 des codes-barres EAN-13 JONAS */
+  gs1Prefix?: string;
 }
 
 /** Entrée du journal d'activité */

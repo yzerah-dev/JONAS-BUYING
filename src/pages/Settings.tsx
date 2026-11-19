@@ -297,6 +297,7 @@ function CompanyCard() {
     { k: 'address', label: 'Adresse', ph: 'N° et rue' },
     { k: 'city', label: 'Code postal et ville', ph: '75000 Paris' },
     { k: 'vat', label: 'N° de TVA intracommunautaire', ph: 'FR00 000000000' },
+    { k: 'gs1Prefix', label: 'Préfixe GS1 des codes-barres EAN JONAS', ph: '370157' },
   ];
   return (
     <div className="card pad mb">
@@ -309,7 +310,7 @@ function CompanyCard() {
           {fields.map((f) => (
             <label key={f.k} htmlFor={`co-${f.k}`}>
               {f.label}
-              <input id={`co-${f.k}`} className="input" disabled={!edit} placeholder={f.ph} value={c[f.k]} onChange={(e) => set(f.k, e.target.value)} />
+              <input id={`co-${f.k}`} className="input" disabled={!edit} placeholder={f.ph} value={c[f.k] ?? ''} onChange={(e) => set(f.k, e.target.value)} />
             </label>
           ))}
         </div>
@@ -323,7 +324,7 @@ function CompanyCard() {
             className="btn primary"
             disabled={!dirty}
             onClick={() => {
-              dispatch({ type: 'setCompany', company: { name: c.name.trim(), address: c.address.trim(), city: c.city.trim(), vat: c.vat.trim().toUpperCase() } });
+              dispatch({ type: 'setCompany', company: { name: c.name.trim(), address: c.address.trim(), city: c.city.trim(), vat: c.vat.trim().toUpperCase(), gs1Prefix: (c.gs1Prefix ?? '').replace(/\D/g, '') || undefined } });
               toast('Tampon de la société enregistré');
             }}
           >

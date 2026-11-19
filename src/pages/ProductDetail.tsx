@@ -79,6 +79,7 @@ export default function ProductDetail() {
           <h2 style={{ fontSize: 26, color: 'var(--green-dark)' }}>{p.name}</h2>
           <div className="muted">
             Réf. <b>{p.ref}</b> · EAN : {p.ean}
+            {p.supplierRef ? ` · Réf. fournisseur : ${p.supplierRef}` : ''}
           </div>
           <div className="row wrap">
             {p.developed ? <Pill color="green" icon={<Check size={13} />}>Développé</Pill> : <Pill color="violet">En développement</Pill>}
@@ -182,6 +183,12 @@ function InfoCard({ p, state }: { p: Product; state: State }) {
         <dd>{p.ref}</dd>
         <dt>EAN</dt>
         <dd>{p.ean}</dd>
+        {p.supplierRef && (
+          <>
+            <dt>Réf. fournisseur</dt>
+            <dd>{p.supplierRef}</dd>
+          </>
+        )}
         <dt>Désignation</dt>
         <dd>{p.name}</dd>
         <dt>Rayon</dt>

@@ -1,5 +1,5 @@
 import { Plus, Trash2 } from 'lucide-react';
-import { useStore } from '../data/store';
+import { nextJonasCodes, useStore } from '../data/store';
 import { emptyLine, toNum, type EditLine } from '../lib/editLines';
 import { useT } from '../i18n';
 import Combobox from './Combobox';
@@ -13,6 +13,9 @@ export default function LinesEditor({ supplierId, currency, lines, setLines }: {
     { id: 'new', label: t('ex.newProduct') },
     ...products.map((p) => ({ id: p.id, label: `${p.ref} · ${td(p.name)}`, keywords: p.ean })),
   ];
+  // Codes JONAS qui seront attribués aux nouveaux produits, dans l'ordre des lignes
+  const codes = nextJonasCodes(state, supplierId, lines.filter((l) => l.productId === 'new').length);
+  const codeOf = (i: number) => codes[lines.slice(0, i).filter((l) => l.productId === 'new').length];
   const set = (i: number, patch: Partial<EditLine>) => setLines(lines.map((l, j) => (j === i ? { ...l, ...patch } : l)));
   const total = lines.reduce((s, l) => s + (toNum(l.qty) || 0) * (toNum(l.price) || 0), 0);
   const badge = (l: EditLine) =>
@@ -48,6 +51,11 @@ export default function LinesEditor({ supplierId, currency, lines, setLines }: {
               <Trash2 size={16} />
             </button>
           </div>
+          {l.productId === 'new' && (
+            <div className="np-codes small">
+              {t('ex.jonasCodes', { ref: codeOf(i)?.ref ?? '', ean: codeOf(i)?.ean ?? '' })}
+            </div>
+          )}
           {l.productId === 'new' && (
             <div className="np-new">
               <input aria-label={`${t('ex.ref')} ${i + 1}`} className="input" placeholder={t('ex.ref')} value={l.ref ?? ''} onChange={(e) => set(i, { ref: e.target.value })} />

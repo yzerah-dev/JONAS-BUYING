@@ -19,7 +19,7 @@ export default function Products() {
     const s = q.trim().toLowerCase();
     return state.products
       .map((p) => ({ p, qty: productQuantities(state, p.id) }))
-      .filter(({ p }) => !s || `${p.ref} ${p.name} ${p.ean}`.toLowerCase().includes(s))
+      .filter(({ p }) => !s || `${p.ref} ${p.name} ${p.ean} ${p.supplierRef ?? ''}`.toLowerCase().includes(s))
       .filter(({ p }) => f.brand === 'all' || p.brandId === f.brand)
       .filter(({ p }) => f.rayon === 'all' || p.rayon === f.rayon)
       .filter(({ p }) => f.supplier === 'all' || p.supplierId === f.supplier)
