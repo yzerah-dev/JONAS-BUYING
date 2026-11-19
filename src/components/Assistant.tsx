@@ -4,7 +4,7 @@ import { Bot, Loader2, Package, Send, Sparkles, Square, Undo2, X } from 'lucide-
 import { PROFORMA_STATUS_LABEL, byId, currentUser, lastPricePaid, nextProformaId, productQuantities, supplierTerms, useAuth, useStore, type State } from '../data/store';
 import type { Proforma } from '../data/types';
 import { parseOrderCommand } from '../lib/orderCommand';
-import { TODAY, addDays, fdate, num } from '../lib/format';
+import { TODAY, addDays, fdate, isoWeek, num, weekLabel, weekStart } from '../lib/format';
 import { toast } from './ui-shared';
 
 // Claude (capacité « sample » de l'Artifact), pour les demandes formulées librement
@@ -35,12 +35,39 @@ const EXAMPLES = [
   'Dis-moi les produits de chez Horizon où il me reste moins de 1 000 pcs, et regarde s’il y a des commandes en cours',
 ];
 
-/** Date d'expédition dictée : « départ le 15/01/2027 », « pour le 2027-01-15 » ; sinon dans 10 semaines */
-function etdOf(text: string) {
-  const fr = text.match(/(\d{1,2})[/.](\d{1,2})[/.](\d{4})/);
-  if (fr) return `${fr[3]}-${fr[2].padStart(2, '0')}-${fr[1].padStart(2, '0')}`;
+/** Lundi de la semaine ISO n de l'année */
+function mondayOfWeek(year: number, week: number) {
+  return addDays(weekStart(`${year}-01-04`), (week - 1) * 7);
+}
+
+/**
+ * Date d'expédition dictée : « 15/01/2027 », « 15/01 », « 2027-01-15 », « S05 », « semaine 5 (2027) ».
+ * Une date sans année est la prochaine à venir. Aucune date : null (l'assistant la demande).
+ */
+function etdOf(text: string): string | null {
+  const full = text.match(/\b(\d{1,2})[/.](\d{1,2})[/.](\d{2,4})\b/);
+  if (full) {
+    const y = full[3].length === 2 ? `20${full[3]}` : full[3];
+    return `${y}-${full[2].padStart(2, '0')}-${full[1].padStart(2, '0')}`;
+  }
   const iso = text.match(/\b(\d{4}-\d{2}-\d{2})\b/);
-  return iso?.[1] ?? addDays(TODAY, 70);
+  if (iso) return iso[1];
+  const short = text.match(/\b(\d{1,2})[/.](\d{1,2})\b/);
+  if (short) {
+    const y = Number(TODAY.slice(0, 4));
+    const d = `${y}-${short[2].padStart(2, '0')}-${short[1].padStart(2, '0')}`;
+    return d >= TODAY ? d : `${y + 1}${d.slice(4)}`;
+  }
+  const wk = text.match(/\b(?:s|w|sem\.?|semaine)\s*(\d{1,2})\b(?:\s*(20\d{2}))?/i);
+  if (wk) {
+    const w = Number(wk[1]);
+    if (w >= 1 && w <= 53) {
+      const cur = isoWeek(TODAY);
+      const y = wk[2] ? Number(wk[2]) : w >= cur.week ? cur.year : cur.year + 1;
+      return mondayOfWeek(y, w);
+    }
+  }
+  return null;
 }
 
 /** Lignes regroupées par fournisseur, au dernier prix payé (dans la devise du fournisseur) */
@@ -124,6 +151,8 @@ export default function Assistant() {
   const [busy, setBusy] = useState(false);
   const [live, setLive] = useState('');
   const [cancelled, setCancelled] = useState<string[]>([]);
+  // Commande dictée sans date d'expédition : en attente de la date
+  const [pending, setPending] = useState<{ productId: string; qty: number }[] | null>(null);
   const abort = useRef<AbortController | null>(null);
   const list = useRef<HTMLDivElement>(null);
   const me = currentUser(state);
@@ -167,24 +196,45 @@ export default function Assistant() {
     setTurns(history);
     setInput('');
 
-    // 1. Commande dictée : quantités + références → commande directe
-    const items = parseOrderCommand(q, state.products);
-    if (items.length) {
-      const unknown = items.filter((i) => !i.product);
-      if (unknown.length)
-        return say(history, `Je ne trouve pas ${unknown.map((u) => u.ref).join(', ')} dans le catalogue JONAS (ni comme référence JONAS, ni comme référence fournisseur). Aucune commande passée : vérifiez la référence.`);
-      const ids = placeOrders(
-        items.map((i) => ({ productId: i.product!.id, qty: i.qty })),
-        etdOf(q),
-      );
+    const passOrders = (lines: { productId: string; qty: number }[], etd: string) => {
+      setPending(null);
+      const ids = placeOrders(lines, etd);
       toast(ids.length > 1 ? `${ids.length} commandes passées` : `Commande ${ids[0]} passée`);
       return say(
         history,
         ids.length > 1
           ? `C’est fait : ${ids.length} commandes passées (une par fournisseur), au dernier prix payé. Chaque fournisseur reçoit la demande de proforma.`
-          : `C’est fait : commande ${ids[0]} passée au dernier prix payé. Le fournisseur reçoit la demande de proforma.`,
+          : `C’est fait : commande ${ids[0]} passée au dernier prix payé, départ souhaité le ${fdate(etd)} (${weekLabel(etd)}). Le fournisseur reçoit la demande de proforma.`,
         ids,
       );
+    };
+    const askDate = 'Pour quelle date d’expédition ? (ex. « 15/01/2027 » ou « S05 »)';
+    const dateOk = (etd: string | null) => !!etd && etd >= TODAY;
+
+    // 1. Commande dictée : quantités + références → commande, avec la date d'expédition (demandée si absente)
+    const items = parseOrderCommand(q, state.products);
+    if (items.length) {
+      const unknown = items.filter((i) => !i.product);
+      if (unknown.length)
+        return say(history, `Je ne trouve pas ${unknown.map((u) => u.ref).join(', ')} dans le catalogue JONAS (ni comme référence JONAS, ni comme référence fournisseur). Aucune commande passée : vérifiez la référence.`);
+      const lines = items.map((i) => ({ productId: i.product!.id, qty: i.qty }));
+      const etd = etdOf(q);
+      if (!dateOk(etd)) {
+        setPending(lines);
+        const what = items.map((i) => `${num(i.qty)} × ${i.product!.ref}`).join(', ');
+        return say(history, etd ? `Cette date est passée. ${askDate}` : `Bien noté : ${what}. ${askDate}`);
+      }
+      return passOrders(lines, etd!);
+    }
+    // Réponse à la question de la date
+    if (pending) {
+      if (/^(non|annule|annuler|stop|laisse tomber)\b/i.test(q)) {
+        setPending(null);
+        return say(history, 'D’accord, aucune commande passée.');
+      }
+      const etd = etdOf(q);
+      if (dateOk(etd)) return passOrders(pending, etd!);
+      if (etd) return say(history, `Cette date est passée. ${askDate}`);
     }
 
     // 2. Demande formulée librement : Claude, avec le catalogue
@@ -246,7 +296,7 @@ export default function Assistant() {
       {
         name: 'place_order',
         description:
-          'Passe la commande JONAS que l’utilisateur a explicitement demandée : chaque article part chez SON fournisseur, au dernier prix payé, avec demande de proforma. lines : [{productId, qty}] ; etd = date d’expédition AAAA-MM-JJ si l’utilisateur l’a donnée. Renvoie les numéros de commande.',
+          'Passe la commande JONAS que l’utilisateur a explicitement demandée : chaque article part chez SON fournisseur, au dernier prix payé, avec demande de proforma. lines : [{productId, qty}] ; etd = date d’expédition AAAA-MM-JJ donnée par l’utilisateur (obligatoire : demande-la s’il ne l’a pas dite). Renvoie les numéros de commande.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -254,7 +304,7 @@ export default function Assistant() {
             etd: { type: 'string' },
             title: { type: 'string' },
           },
-          required: ['lines'],
+          required: ['lines', 'etd'],
         },
         execute: (i: Record<string, unknown>, ctx: { signal: AbortSignal }) => {
           if (ctx.signal.aborted) throw new Error('Arrêté');
@@ -266,7 +316,8 @@ export default function Assistant() {
             return { productId: p.id, qty };
           });
           if (!lines.length) throw new Error('Aucune ligne');
-          const etd = /^\d{4}-\d{2}-\d{2}$/.test(String(i.etd ?? '')) ? String(i.etd) : addDays(TODAY, 70);
+          const etd = String(i.etd ?? '');
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(etd) || etd < TODAY) throw new Error('Date d’expédition manquante ou passée : demande-la à l’utilisateur avant de passer la commande.');
           const ids = placeOrders(lines, etd, i.title ? String(i.title) : undefined);
           created.push(...ids);
           return { orders: ids };
@@ -277,7 +328,7 @@ export default function Assistant() {
 Tu réponds aux questions sur le stock et les commandes, et tu passes les commandes que l'utilisateur demande.
 - Stock bas d'un fournisseur : low_stock (seuil donné par l'utilisateur). Présente une liste courte : réf., désignation, stock, et commandes en cours (n°, quantité, départ) ou « aucune commande en cours ». Précise la date du stock.
 - Commandes en cours : open_orders.
-- Passer une commande : uniquement quand l'utilisateur le demande. S'il ne donne pas les quantités, propose-les (par ex. la dernière quantité commandée, ou de quoi remonter au-dessus du seuil) et attends son accord avant place_order. Ne commande jamais un article qui a déjà une commande en cours sauf demande explicite. Chaque article part chez son fournisseur, au dernier prix payé.
+- Passer une commande : uniquement quand l'utilisateur le demande, et jamais sans date d'expédition : s'il ne l'a pas donnée, demande-la (place_order exige etd au format AAAA-MM-JJ). S'il ne donne pas les quantités, propose-les (par ex. la dernière quantité commandée, ou de quoi remonter au-dessus du seuil) et attends son accord avant place_order. Ne commande jamais un article qui a déjà une commande en cours sauf demande explicite. Chaque article part chez son fournisseur, au dernier prix payé.
 - N'invente aucun produit ni chiffre : uniquement ce que renvoient les outils. Si un fournisseur ou un article est introuvable ou ambigu, dis-le.
 Réponds en français, de façon concise (listes à puces).`;
     try {

@@ -1,7 +1,7 @@
 import { expect, go, loginAs, resetApp, test, toast } from './fixtures';
 import type { Page } from '@playwright/test';
 
-type Pf = { id: string; supplierId: string; status: string; date: string; currency?: string; order?: { source: string }; lines: { productId: string; qty: number; price: number }[] };
+type Pf = { id: string; etd: string; supplierId: string; status: string; date: string; currency?: string; order?: { source: string }; lines: { productId: string; qty: number; price: number }[] };
 const proformas = (page: Page) =>
   page.evaluate(() => {
     const k = Object.keys(localStorage).find((x) => x.startsWith('jonas-buying-state'))!;
@@ -34,13 +34,17 @@ test.describe('Assistant commandes', () => {
     const before = await proformas(page);
     const panel = await openAssistant(page);
     await say(panel, 'Passe la commande de 10 000 JO-R301');
-    await expect(panel).toContainText('commande PF-2026-0154 passée au dernier prix payé');
+    // Sans date d'expédition, l'assistant la demande et ne commande rien
+    await expect(panel).toContainText('Pour quelle date d’expédition ?');
+    expect((await proformas(page)).some((p) => p.id === 'PF-2026-0154')).toBe(false);
+    await say(panel, 'le 15/01/2027');
+    await expect(panel).toContainText('commande PF-2026-0154 passée au dernier prix payé, départ souhaité le 15/01/2027');
     await expect(toast(page)).toContainText('Commande PF-2026-0154 passée');
     const card = panel.locator('.as-draft');
     await expect(card).toContainText('Northbay');
     await expect(card).toContainText('dernier prix payé : PF-2026-0145');
     const pf = (await proformas(page)).find((p) => p.id === 'PF-2026-0154')!;
-    expect(pf).toMatchObject({ supplierId: 'northbay', status: 'a_signer', order: { source: 'ia' } });
+    expect(pf).toMatchObject({ supplierId: 'northbay', status: 'a_signer', order: { source: 'ia' }, etd: '2027-01-15' });
     expect(pf.lines).toHaveLength(1);
     expect(pf.lines[0]).toMatchObject({ productId: 'JO-R301', qty: 10000 });
     expect(pf.lines[0].price).toBeCloseTo(lastPrice(before, 'JO-R301'), 4);
@@ -99,5 +103,13 @@ test.describe('Assistant commandes', () => {
     const j201 = low.products.find((p) => p.ref === 'JO-J201');
     if (j201) expect(j201.openOrders.map((o) => o.order)).toContain('PF-2026-0148');
     await expect(panel).toContainText('pcs (plateforme)');
+  });
+
+  test('date en semaine (« S05 ») et date passée refusée', async ({ page }) => {
+    const panel = await openAssistant(page);
+    await say(panel, 'Commande 2 000 JO-R305 départ le 01/01/2026');
+    await expect(panel).toContainText('Cette date est passée');
+    await say(panel, 'S05');
+    await expect(panel).toContainText('passée au dernier prix payé, départ souhaité le 01/02/2027 (S05)');
   });
 });
