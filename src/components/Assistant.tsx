@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bot, Loader2, Package, Send, Sparkles, Square, Undo2, X } from 'lucide-react';
-import { byId, currentUser, lastPricePaid, nextProformaId, supplierTerms, useAuth, useStore, type State } from '../data/store';
+import { PROFORMA_STATUS_LABEL, byId, currentUser, lastPricePaid, nextProformaId, productQuantities, supplierTerms, useAuth, useStore, type State } from '../data/store';
 import type { Proforma } from '../data/types';
 import { parseOrderCommand } from '../lib/orderCommand';
 import { TODAY, addDays, fdate, num } from '../lib/format';
@@ -9,6 +9,9 @@ import { toast } from './ui-shared';
 
 // Claude (capacité « sample » de l'Artifact), pour les demandes formulées librement
 type Sample = (input: unknown, opts?: object) => Promise<{ text: string }>;
+type Mcp = { callTool: (server: string, tool: string, input?: unknown, opts?: object) => Promise<{ payload?: unknown }> };
+/** Connecteur de stock de l'ERP (stock réel et dispo par référence) */
+const STOCK_SERVER = 'Stock jonas';
 type ClaudeWin = { claude?: { use?: (n: string) => Promise<unknown> } };
 const capability = async <T,>(name: string): Promise<T | null> => {
   const host = (window as unknown as ClaudeWin).claude;
@@ -27,7 +30,10 @@ interface Turn {
   orders?: string[];
 }
 
-const EXAMPLES = ['Passe la commande de 10 000 JO-R301', 'Commande 5 000 CP-T001 et 3 000 PF-P014, départ le 15/01/2027'];
+const EXAMPLES = [
+  'Passe la commande de 10 000 JO-R301',
+  'Dis-moi les produits de chez Horizon où il me reste moins de 1 000 pcs, et regarde s’il y a des commandes en cours',
+];
 
 /** Date d'expédition dictée : « départ le 15/01/2027 », « pour le 2027-01-15 » ; sinon dans 10 semaines */
 function etdOf(text: string) {
@@ -51,6 +57,57 @@ function plan(s: State, items: { productId: string; qty: number }[]) {
     bySup.set(p.supplierId, lines);
   }
   return bySup;
+}
+
+const norm = (x: string) => x.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+
+/** Fournisseur désigné par son nom (même partiel : « ningbo », « tide ») */
+function findSupplier(s: State, q: string) {
+  const w = norm(q).split(/\s+/).filter((x) => x.length > 1);
+  const score = (name: string) => w.filter((x) => norm(name).includes(x)).length;
+  return s.suppliers
+    .map((sup) => ({ sup, sc: Math.max(score(`${sup.name} ${sup.shortName} ${sup.city}`), 0) }))
+    .filter((x) => x.sc > 0)
+    .sort((a, b) => b.sc - a.sc)
+    .map((x) => x.sup);
+}
+
+/** Commandes en cours d'un produit : proformas pas encore arrivées (y compris reliquats) */
+function openOrders(s: State, productId: string) {
+  return s.proformas
+    .filter((pf) => pf.status !== 'arrive' && pf.lines.some((l) => l.productId === productId))
+    .map((pf) => ({ order: pf.id, status: PROFORMA_STATUS_LABEL[pf.status], qty: pf.lines.find((l) => l.productId === productId)!.qty, etd: pf.etd, eta: pf.eta }));
+}
+
+/**
+ * Stock par référence : ERP (connecteur Stock Jonas) quand il connaît la référence, sinon le stock de la plateforme.
+ * Renvoie aussi la date d'arrêté du stock ERP.
+ */
+async function stockOf(s: State, productIds: string[], signal?: AbortSignal) {
+  const prods = productIds.map((id) => byId(s.products, id));
+  const erp = new Map<string, { reel: number; dispo: number }>();
+  let asOf: string | undefined;
+  const mcp = await capability<Mcp>('mcp');
+  if (mcp) {
+    for (let i = 0; i < prods.length; i += 40) {
+      try {
+        const r = await mcp.callTool(STOCK_SERVER, 'disponibilite_reference', { references: prods.slice(i, i + 40).map((p) => p.ref).join(', ') }, { signal });
+        const pl = r.payload as { stock_arrete_au?: string; produits?: { reference?: string; stock_reel?: number; stock_dispo?: number }[] };
+        asOf = pl?.stock_arrete_au ?? asOf;
+        for (const x of pl?.produits ?? []) if (x.reference) erp.set(x.reference.toUpperCase(), { reel: Number(x.stock_reel) || 0, dispo: Number(x.stock_dispo) || 0 });
+      } catch {
+        /* connecteur indisponible : stock de la plateforme */
+      }
+    }
+  }
+  return {
+    asOf,
+    rows: prods.map((p) => {
+      const e = erp.get(p.ref.toUpperCase());
+      const local = productQuantities(s, p.id).stock;
+      return { productId: p.id, ref: p.ref, name: p.name, stock: e ? e.dispo : local, stockReel: e ? e.reel : local, source: e ? 'ERP' : 'plateforme' };
+    }),
+  };
 }
 
 /**
@@ -140,6 +197,40 @@ export default function Assistant() {
     const created: string[] = [];
     const tools = [
       {
+        name: 'low_stock',
+        description:
+          'Produits d’un fournisseur (nom même partiel) dont le stock disponible est sous un seuil, avec leurs commandes en cours. Renvoie {supplier, stockDate, products:[{productId, ref, name, stock, source, openOrders:[{order, status, qty, etd, eta}], onOrder}]}.',
+        inputSchema: { type: 'object', properties: { supplier: { type: 'string' }, threshold: { type: 'number' } }, required: ['supplier', 'threshold'] },
+        execute: async (i: Record<string, unknown>, ctx: { signal: AbortSignal }) => {
+          const sups = findSupplier(state, String(i.supplier ?? ''));
+          if (!sups.length) throw new Error(`Fournisseur introuvable : ${String(i.supplier)}. Fournisseurs : ${state.suppliers.map((x) => x.name).join(', ')}`);
+          const sup = sups[0];
+          const ids = state.products.filter((p) => p.supplierId === sup.id).map((p) => p.id);
+          const st = await stockOf(state, ids, ctx.signal);
+          const th = Number(i.threshold) || 1000;
+          const low = st.rows
+            .filter((r) => r.stock < th)
+            .sort((a, b) => a.stock - b.stock)
+            .slice(0, 60)
+            .map((r) => {
+              const oo = openOrders(state, r.productId);
+              return { ...r, openOrders: oo, onOrder: oo.reduce((t, o) => t + o.qty, 0) };
+            });
+          return { supplier: sup.name, stockDate: st.asOf ?? 'stock de la plateforme', totalProducts: ids.length, products: low };
+        },
+      },
+      {
+        name: 'open_orders',
+        description: 'Commandes en cours (non arrivées, reliquats compris) pour des produits. Entrée : productIds. Renvoie {productId, ref, openOrders:[{order, status, qty, etd, eta}]}.',
+        inputSchema: { type: 'object', properties: { productIds: { type: 'array', items: { type: 'string' } } }, required: ['productIds'] },
+        execute: (i: Record<string, unknown>) =>
+          (Array.isArray(i.productIds) ? i.productIds : []).slice(0, 80).map((id) => {
+            const p = state.products.find((x) => x.id === String(id));
+            if (!p) return { productId: String(id), error: 'inconnu' };
+            return { productId: p.id, ref: p.ref, openOrders: openOrders(state, p.id) };
+          }),
+      },
+      {
         name: 'find_products',
         description: 'Cherche dans le catalogue JONAS (référence JONAS ou fournisseur, mots de la désignation, marque). Renvoie {productId, ref, supplierRef, name, supplier}. Plusieurs mots = tous requis.',
         inputSchema: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] },
@@ -182,11 +273,13 @@ export default function Assistant() {
         },
       },
     ];
-    const RULES = `Tu es l'assistant commandes de JONAS (importateur). Nous sommes le ${TODAY}. Utilisateur : ${me.name}.
-Tu passes UNIQUEMENT les commandes que l'utilisateur te demande explicitement dans ce message (quantité + article). Ne déduis jamais une commande d'autre chose.
-1. Trouve chaque article avec find_products. N'invente aucun produit. Si un article est introuvable ou ambigu (plusieurs résultats possibles), ne passe rien et demande de préciser.
-2. Appelle place_order une fois avec toutes les lignes : chaque article part chez son fournisseur, au dernier prix payé.
-3. Réponds en français, en une ou deux phrases : numéros de commande passés, ou la question à poser.`;
+    const RULES = `Tu es l'assistant achats de JONAS (importateur). Nous sommes le ${TODAY}. Utilisateur : ${me.name}.
+Tu réponds aux questions sur le stock et les commandes, et tu passes les commandes que l'utilisateur demande.
+- Stock bas d'un fournisseur : low_stock (seuil donné par l'utilisateur). Présente une liste courte : réf., désignation, stock, et commandes en cours (n°, quantité, départ) ou « aucune commande en cours ». Précise la date du stock.
+- Commandes en cours : open_orders.
+- Passer une commande : uniquement quand l'utilisateur le demande. S'il ne donne pas les quantités, propose-les (par ex. la dernière quantité commandée, ou de quoi remonter au-dessus du seuil) et attends son accord avant place_order. Ne commande jamais un article qui a déjà une commande en cours sauf demande explicite. Chaque article part chez son fournisseur, au dernier prix payé.
+- N'invente aucun produit ni chiffre : uniquement ce que renvoient les outils. Si un fournisseur ou un article est introuvable ou ambigu, dis-le.
+Réponds en français, de façon concise (listes à puces).`;
     try {
       const r = await sample([{ role: 'user', content: RULES }, ...history.map((t) => ({ role: t.role, content: t.content }))], {
         tools,
@@ -291,7 +384,7 @@ Tu passes UNIQUEMENT les commandes que l'utilisateur te demande explicitement da
             <Bot size={20} />
             <div className="grow">
               <b>Assistant commandes</b>
-              <small>« Passe la commande de 10 000 KF032 » : chez son fournisseur, au dernier prix payé</small>
+              <small>Stock, commandes en cours, et commandes au dernier prix payé</small>
             </div>
             <button className="icon-btn" onClick={() => setOpen(false)} aria-label="Fermer l’assistant">
               <X size={18} />

@@ -73,4 +73,31 @@ test.describe('Assistant commandes', () => {
     await expect(panel).toContainText('Je ne trouve pas KF032');
     expect((await proformas(page)).length).toBe(n);
   });
+
+  test('stock bas d’un fournisseur et commandes en cours (Claude simulé)', async ({ page }) => {
+    await page.addInitScript(() => {
+      type Tool = { name: string; execute: (i: Record<string, unknown>, c: { signal: AbortSignal }) => unknown };
+      const sample = async (_input: unknown, opts: { tools: Tool[] }) => {
+        const low = (await opts.tools.find((x) => x.name === 'low_stock')!.execute({ supplier: 'horizon', threshold: 1000 }, { signal: new AbortController().signal })) as {
+          supplier: string;
+          products: { ref: string; stock: number; source: string; openOrders: { order: string }[] }[];
+        };
+        (window as unknown as { __low: unknown }).__low = low;
+        const text = `${low.supplier} : ${low.products.length} produit(s) sous 1 000 pcs\n` + low.products.map((p) => `- ${p.ref} : ${p.stock} pcs (${p.source}) · ${p.openOrders.length ? p.openOrders.map((o) => o.order).join(', ') : 'aucune commande en cours'}`).join('\n');
+        return { text };
+      };
+      (window as unknown as { claude: unknown }).claude = { use: async (n: string) => (n === 'sample' ? sample : null) };
+    });
+    await resetApp(page);
+    const panel = await openAssistant(page);
+    await say(panel, 'Dis-moi les produits de chez Horizon où il me reste moins de 1000 pcs, et regarde s’il y a des commandes en cours');
+    await expect(panel).toContainText('Ningbo Horizon Home');
+    const low = (await page.evaluate(() => (window as unknown as { __low: unknown }).__low)) as { products: { ref: string; stock: number; source: string; openOrders: { order: string }[] }[] };
+    expect(low.products.length).toBeGreaterThan(0);
+    expect(low.products.every((p) => p.stock < 1000 && p.source === 'plateforme')).toBe(true);
+    // JO-J201 est sur PF-2026-0148 (en développement) : commande en cours repérée
+    const j201 = low.products.find((p) => p.ref === 'JO-J201');
+    if (j201) expect(j201.openOrders.map((o) => o.order)).toContain('PF-2026-0148');
+    await expect(panel).toContainText('pcs (plateforme)');
+  });
 });

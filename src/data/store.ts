@@ -64,7 +64,7 @@ const withDefaults = (def: Company, saved?: Partial<Company>): Company => ({
   gs1Prefix: saved?.gs1Prefix || def.gs1Prefix,
 });
 
-export const STORAGE_KEY = 'jonas-buying-state-v16';
+export const STORAGE_KEY = 'jonas-buying-state-v17';
 
 export const currentUser = (s: State): User => s.users.find((u) => u.id === s.currentUserId) ?? s.users[0];
 

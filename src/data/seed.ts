@@ -403,6 +403,12 @@ export const proformas: Proforma[] = pfDefs.map((d, i) => {
   };
 });
 
+// Stock en entrepôt (démo) : varié, avec des articles sous les 1 000 pièces
+products.forEach((p, i) => {
+  const levels = [240, 3200, 860, 0, 5400, 1500, 620, 12000, 90, 2300, 4100, 980];
+  p.stock = { Péronne: levels[i % levels.length], Meaux: i % 5 === 0 ? 300 : 0, Lillois: 0 };
+});
+
 // Conditions de paiement par fournisseur (acompte habituel de ses proformas, solde à J+7 du départ)
 for (const s of suppliers) {
   const pcts = proformas.filter((p) => p.supplierId === s.id).map((p) => p.depositPct);
