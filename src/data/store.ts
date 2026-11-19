@@ -487,9 +487,12 @@ function importLinesOk(s: State, supplierId: string, lines: ImportLine[]) {
   const seen = new Set<string>();
   return lines.every((l) => {
     if (!(l.qty > 0) || !(l.price >= 0)) return false;
-    if (l.productId) return s.products.find((p) => p.id === l.productId)?.supplierId === supplierId;
+    // Produit JONAS existant (y compris d'un autre fournisseur, reconnu par sa référence JONAS)
+    if (l.productId) return s.products.some((p) => p.id === l.productId);
     const n = l.newProduct;
     if (!n || !n.name.trim() || !(n.pcb > 0) || !(n.cbmCarton > 0)) return false;
+    // Une référence JONAS existante désigne ce produit : pas de doublon
+    if (n.supplierRef?.trim() && s.products.some((p) => refKey(p.ref) === refKey(n.supplierRef!))) return false;
     // Une référence fournisseur ne peut pas désigner deux produits de ce fournisseur
     if (n.supplierRef?.trim()) {
       const k = refKey(n.supplierRef);

@@ -70,6 +70,8 @@ export async function pdfLines(data: ArrayBuffer, maxPages = 6): Promise<string[
 // Repli sans IA : une ligne de tableau = référence | désignation | quantité | prix unitaire | montant
 
 const num = (s: string) => {
+  // Une cellule avec des lettres (hors devise) n'est pas un nombre : « Storage box 30L » est une désignation
+  if (/[a-z]/i.test(s.replace(/\b(USD|EUR|CNY|RMB|US)\b|[$€¥]/gi, ''))) return NaN;
   const t = s.replace(/[\s  ]/g, '').replace(/[^\d.,-]/g, '');
   if (!t) return NaN;
   // « 1,234.50 » / « 1.234,50 » / « 4,5 »
@@ -192,14 +194,20 @@ export interface Match {
   by?: 'ref' | 'ean' | 'nom';
 }
 
-export function matchProduct(l: ExtractedLine, products: Product[]): Match {
+/**
+ * Produit correspondant à une ligne lue.
+ * `catalog` : tout le catalogue JONAS — une référence ou un EAN JONAS existant, c'est ce produit, quel que soit son fournisseur.
+ * `products` : produits du fournisseur — sa référence fournisseur connue, ou une désignation quasi identique.
+ */
+export function matchProduct(l: ExtractedLine, products: Product[], catalog: Product[] = products): Match {
   if (l.ref) {
-    // Référence JONAS, ou référence du fournisseur déjà connue
-    const p = products.find((x) => key(x.ref) === key(l.ref) || (x.supplierRef && key(x.supplierRef) === key(l.ref)));
+    const jonas = catalog.find((x) => key(x.ref) === key(l.ref));
+    if (jonas) return { product: jonas, by: 'ref' };
+    const p = products.find((x) => x.supplierRef && key(x.supplierRef) === key(l.ref));
     if (p) return { product: p, by: 'ref' };
   }
   if (l.ean) {
-    const p = products.find((x) => x.ean === l.ean);
+    const p = catalog.find((x) => x.ean === l.ean);
     if (p) return { product: p, by: 'ean' };
   }
   if (l.name) {

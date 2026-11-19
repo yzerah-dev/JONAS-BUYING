@@ -17,10 +17,10 @@ export interface EditLine {
 export const emptyLine = (): EditLine => ({ productId: '', qty: '', price: '' });
 export const toNum = (v?: string) => Number(String(v ?? '').replace(',', '.').replace(/\s/g, ''));
 
-/** Lignes lues sur une proforma → lignes à vérifier, rapprochées des produits du fournisseur */
-export function fromExtraction(lines: ExtractedLine[], products: Product[]): EditLine[] {
+/** Lignes lues sur une proforma → lignes à vérifier, rapprochées du catalogue JONAS et des produits du fournisseur */
+export function fromExtraction(lines: ExtractedLine[], products: Product[], catalog: Product[] = products): EditLine[] {
   return lines.map((l) => {
-    const m = matchProduct(l, products);
+    const m = matchProduct(l, products, catalog);
     return m.product
       ? { productId: m.product.id, qty: String(l.qty), price: String(l.price), by: m.by }
       : {
@@ -37,8 +37,15 @@ export function fromExtraction(lines: ExtractedLine[], products: Product[]): Edi
   });
 }
 
+const refKey = (r: string) => r.toUpperCase().replace(/[^A-Z0-9]/g, '');
+/** Ligne « nouveau produit » dont la référence est en fait une référence JONAS existante */
+export function jonasRefClash(l: EditLine, catalog: Product[]) {
+  return l.productId === 'new' && !!l.ref?.trim() ? catalog.find((p) => refKey(p.ref) === refKey(l.ref!)) : undefined;
+}
+
 /** Lignes prêtes à enregistrer, ou null si incomplètes */
-export function toImport(lines: EditLine[]): ImportLine[] | null {
+export function toImport(lines: EditLine[], catalog: Product[] = []): ImportLine[] | null {
+  if (lines.some((l) => jonasRefClash(l, catalog))) return null;
   const used = lines.filter((l) => l.productId);
   if (!used.length) return null;
   const out: ImportLine[] = [];

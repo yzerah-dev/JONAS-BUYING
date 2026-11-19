@@ -57,7 +57,7 @@ function NewProformaDialog({ onClose, onCreated }: { onClose: () => void; onCrea
     const ex = await extractProforma(f, f.type).catch(() => ({ lines: [], engine: 'aucun' as const }));
     setReading(false);
     if (ex.lines.length) {
-      setLines(fromExtraction(ex.lines, products));
+      setLines(fromExtraction(ex.lines, products, state.products));
       toast(t('ex.found', { n: ex.lines.length }));
     } else toast(t('ex.none'));
   };
@@ -65,7 +65,7 @@ function NewProformaDialog({ onClose, onCreated }: { onClose: () => void; onCrea
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return toast(t('np.needTitle'));
-    const ls = toImport(lines);
+    const ls = toImport(lines, state.products);
     if (!ls) return toast(t('ex.invalid'));
     if (supplierSide && !file) return toast(t('np.needFile'));
     let f: { fileId: string; name: string; size: number; mime: string } | undefined;

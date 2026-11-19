@@ -1502,3 +1502,4 @@ button.fw-doc.missing:hover { background: var(--red); color: #fff; }
 .np-new { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 0.8fr) minmax(0, 0.8fr); gap: 6px; }
 @media (max-width: 640px) { .np-new { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
 .np-codes { color: var(--violet); font-weight: 700; padding-left: 2px; }
+.np-clash { color: var(--red); font-weight: 700; }

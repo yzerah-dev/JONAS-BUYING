@@ -189,7 +189,7 @@ function UploadBox({ pf, revision, hasPending, open, setOpen }: { pf: Proforma; 
       toast(t('ex.none'));
       return send(file);
     }
-    setReview({ file, lines: fromExtraction(ex.lines, products) });
+    setReview({ file, lines: fromExtraction(ex.lines, products, state.products) });
   };
   if (!open)
     return (
@@ -244,7 +244,7 @@ function UploadBox({ pf, revision, hasPending, open, setOpen }: { pf: Proforma; 
                 type="button"
                 className="btn primary"
                 onClick={() => {
-                  const ls = toImport(review.lines);
+                  const ls = toImport(review.lines, state.products);
                   if (!ls) return toast(t('ex.invalid'));
                   send(review.file, ls);
                 }}

@@ -1,6 +1,6 @@
 import { Plus, Trash2 } from 'lucide-react';
 import { nextJonasCodes, useStore } from '../data/store';
-import { emptyLine, toNum, type EditLine } from '../lib/editLines';
+import { emptyLine, jonasRefClash, toNum, type EditLine } from '../lib/editLines';
 import { useT } from '../i18n';
 import Combobox from './Combobox';
 
@@ -9,9 +9,11 @@ export default function LinesEditor({ supplierId, currency, lines, setLines }: {
   const { state } = useStore();
   const { t, fmt, td } = useT();
   const products = state.products.filter((p) => p.supplierId === supplierId);
+  // Produits JONAS d'un autre fournisseur reconnus par leur référence : proposés aussi
+  const others = state.products.filter((p) => p.supplierId !== supplierId && lines.some((l) => l.productId === p.id));
   const options = [
     { id: 'new', label: t('ex.newProduct') },
-    ...products.map((p) => ({ id: p.id, label: `${p.ref} · ${td(p.name)}`, keywords: p.ean })),
+    ...[...products, ...others].map((p) => ({ id: p.id, label: `${p.ref} · ${td(p.name)}`, keywords: `${p.ean} ${p.supplierRef ?? ''}` })),
   ];
   // Codes JONAS qui seront attribués aux nouveaux produits, dans l'ordre des lignes
   const codes = nextJonasCodes(state, supplierId, lines.filter((l) => l.productId === 'new').length);
@@ -20,7 +22,10 @@ export default function LinesEditor({ supplierId, currency, lines, setLines }: {
   const total = lines.reduce((s, l) => s + (toNum(l.qty) || 0) * (toNum(l.price) || 0), 0);
   const badge = (l: EditLine) =>
     l.by === 'ref' ? (
-      <span className="pill green">{t('ex.matchRef')}</span>
+      <span className="pill green">
+        {t('ex.matchRef')}
+        {state.products.find((p) => p.id === l.productId && p.supplierId !== supplierId) ? ` · ${t('ex.otherSupplier')}` : ''}
+      </span>
     ) : l.by === 'ean' ? (
       <span className="pill green">{t('ex.matchEan')}</span>
     ) : l.by === 'nom' ? (
@@ -51,6 +56,14 @@ export default function LinesEditor({ supplierId, currency, lines, setLines }: {
               <Trash2 size={16} />
             </button>
           </div>
+          {jonasRefClash(l, state.products) && (
+            <div className="np-clash small">
+              {t('ex.clash', { ref: jonasRefClash(l, state.products)!.ref, name: td(jonasRefClash(l, state.products)!.name) })}{' '}
+              <button type="button" className="btn sm" onClick={() => set(i, { productId: jonasRefClash(l, state.products)!.id, by: 'ref' })}>
+                {t('ex.useIt')}
+              </button>
+            </div>
+          )}
           {l.productId === 'new' && (
             <div className="np-codes small">
               {t('ex.jonasCodes', { ref: codeOf(i)?.ref ?? '', ean: codeOf(i)?.ean ?? '' })}

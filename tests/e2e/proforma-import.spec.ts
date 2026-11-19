@@ -138,4 +138,35 @@ test.describe('Proforma déposée : lignes lues, produits reconnus ou créés', 
     await page.getByRole('button', { name: 'Signer et tamponner' }).click();
     expect((await state(page)).proformas.find((p) => p.id === 'PF-2026-0141')!.lines).toEqual([{ productId: before[0].productId, qty: 9000, price: 2.5 }]);
   });
+
+  test('une référence JONAS existante (même d’un autre fournisseur) est ce produit : rien à créer', async ({ page }) => {
+    const n0 = (await state(page)).products.length;
+    await loginAs(page, 'David');
+    await go(page, 'proformas');
+    await page.getByRole('button', { name: 'Nouvelle proforma' }).click();
+    const dlg = page.getByRole('dialog');
+    await page.locator('#np-sup').fill('tide');
+    await page.getByRole('option', { name: /Tide/ }).click();
+    await page.locator('#np-title').fill('Rangement (2e source)');
+    await dlg.getByLabel(/Proforma du fournisseur/).setInputFiles({
+      name: 'PI.pdf',
+      mimeType: 'application/pdf',
+      buffer: await proformaPdf([['JO-R301', 'Storage box 30L', 2000, 1.9]]),
+    });
+    const line = dlg.locator('.np-line-wrap').first();
+    await expect(line).toContainText('Reconnu (réf.) · autre fournisseur');
+    await expect(page.locator('#ln-prod-0')).toHaveValue(/JO-R301/);
+    // Forcer un « nouveau produit » avec cette référence est refusé
+    await page.locator('#ln-prod-0').click();
+    await page.getByRole('option', { name: '+ Nouveau produit' }).click();
+    await dlg.getByLabel('Réf. fournisseur 1').fill('JO-R301');
+    await expect(line).toContainText('JO-R301 est déjà une référence JONAS');
+    await line.getByRole('button', { name: 'Utiliser ce produit' }).click();
+    await expect(line).toContainText('Reconnu (réf.) · autre fournisseur');
+    await dlg.getByRole('button', { name: 'Créer la proforma' }).click();
+    await expect(toast(page)).toContainText('PF-2026-0154 créée');
+    const s = await state(page);
+    expect(s.products.length).toBe(n0);
+    expect(s.proformas.find((p) => p.id === 'PF-2026-0154')!.lines).toEqual([{ productId: 'JO-R301', qty: 2000, price: 1.9 }]);
+  });
 });
