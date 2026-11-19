@@ -119,6 +119,7 @@ export type Action =
       file?: { fileId: string; name: string; size: number; mime: string };
     }
   | { type: 'setSupplierTerms'; supplierId: string; terms: SupplierTerms }
+  | { type: 'cancelOrder'; id: string }
   | { type: 'requestSplit'; id: string; lines: { productId: string; qtyNow: number }[]; etdLater: ISODate; reason: string }
   | { type: 'acceptSplit'; id: string }
   | { type: 'refuseSplit'; id: string; reason?: string }
@@ -327,6 +328,11 @@ export function isAllowed(s: State, a: Action): boolean {
       if (!pf || bookingStage(pf) !== 'fournisseur') return false;
       if (!(isSupplier(u) ? pf.supplierId === u.supplierId : u.role === 'pilote')) return false;
       return s.containers.some((c) => c.allocations.some((x) => x.proformaId === pf.id) && ['a_booker', 'booking_demande'].includes(c.status));
+    }
+    case 'cancelOrder': {
+      // Annuler une commande JONAS tant que le fournisseur n'a rien déposé
+      const pf = s.proformas.find((x) => x.id === a.id);
+      return !!pf?.order && !pf.versions?.length && pf.status === 'a_signer' && (can(u, 'proforma.edit') || can(u, 'proforma.sign'));
     }
     case 'setSupplierTerms':
       return (
@@ -601,6 +607,26 @@ function materializeLines(s: State, supplierId: string, lines: ImportLine[], etd
   return { lines: out, created };
 }
 
+/**
+ * Dernier prix payé d'un produit : sa ligne sur la dernière proforma signée (sinon la dernière tout court),
+ * converti dans la devise donnée. À défaut, le prix d'achat de la fiche produit.
+ */
+export function lastPricePaid(s: State, productId: string, currency: Currency): { price: number; from?: string; date?: ISODate } {
+  const fx = (c: Currency) => s.settings.fx[c] ?? 1;
+  const withLine = s.proformas
+    .filter((p) => p.lines.some((l) => l.productId === productId))
+    .sort((a, b) => b.date.localeCompare(a.date));
+  const pf = withLine.find((p) => p.status !== 'a_signer') ?? withLine[0];
+  // 4 décimales : les petits articles se négocient au dixième de centime
+  const round = (n: number) => Math.round(n * 10000) / 10000;
+  if (pf) {
+    const l = pf.lines.find((x) => x.productId === productId)!;
+    return { price: round((l.price * fx(pf.currency ?? 'EUR')) / fx(currency)), from: pf.id, date: pf.date };
+  }
+  const p = s.products.find((x) => x.id === productId);
+  return { price: round((p?.pa ?? 0) / fx(currency)) };
+}
+
 /** Prochain numéro de proforma (PF-AAAA-NNNN), hors reliquats */
 export function nextProformaId(s: State) {
   const year = TODAY.slice(0, 4);
@@ -829,6 +855,8 @@ function applyAction(s: State, a: Action): State {
       };
       return { ...s, products: [...s.products, ...mat.created], proformas: [...s.proformas, pf] };
     }
+    case 'cancelOrder':
+      return { ...s, proformas: s.proformas.filter((p) => p.id !== a.id) };
     case 'setSupplierTerms':
       return { ...s, suppliers: s.suppliers.map((x) => (x.id === a.supplierId ? { ...x, terms: a.terms } : x)) };
     case 'requestSplit': {
@@ -1438,6 +1466,8 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
       return { target: a.id, text: `Proforma signée et tamponnée (expédition demandée ${a.etdWanted})` };
     case 'createProforma':
       return { target: a.id, text: `Nouvelle proforma ${a.id} : ${a.title}${a.file ? ' (déposée par le fournisseur)' : ''}` };
+    case 'cancelOrder':
+      return { target: a.id, text: 'Commande JONAS annulée avant proforma' };
     case 'setSupplierTerms':
       return { text: `${s.suppliers.find((x) => x.id === a.supplierId)?.shortName} : devise ${a.terms.currency}, acompte ${a.terms.depositPct} %, solde J+${a.terms.balanceDays}` };
     case 'requestSplit':
