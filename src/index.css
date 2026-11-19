@@ -1495,3 +1495,9 @@ button.fw-doc.missing:hover { background: var(--red); color: #fff; }
 .combo-list li.selected b { color: var(--green); }
 .combo-empty { color: var(--muted); font-size: 13px; cursor: default !important; }
 .combo-filter { min-width: 200px; }
+.np-line-wrap { display: grid; gap: 6px; }
+.np-line-wrap.is-new { padding: 8px; border-radius: 12px; background: var(--violet-soft); }
+.np-prod { display: grid; gap: 4px; min-width: 0; }
+.np-prod .pill { justify-self: start; font-size: 11px; }
+.np-new { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 0.8fr) minmax(0, 0.8fr); gap: 6px; }
+@media (max-width: 640px) { .np-new { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }

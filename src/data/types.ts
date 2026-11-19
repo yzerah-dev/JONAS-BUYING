@@ -261,6 +261,16 @@ export interface ProformaDoc {
   cancelledBy?: { version: number; at: string };
   /** Refus de la demande de modification */
   refused?: { at: string; by: string; reason: string };
+  /** Lignes lues sur le document (appliquées au dépôt pour la v1, à la signature pour une modification) */
+  lines?: ProformaLine[];
+}
+
+/** Ligne de proforma à enregistrer : un produit existant, ou un produit à créer (lu sur la proforma) */
+export interface ImportLine {
+  productId?: string;
+  newProduct?: { ref: string; name: string; ean?: string; pcb: number; cbmCarton: number };
+  qty: number;
+  price: number;
 }
 
 export interface ProformaSignature {

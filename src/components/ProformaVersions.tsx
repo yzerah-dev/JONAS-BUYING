@@ -1,14 +1,17 @@
 import { useState } from 'react';
-import { Ban, Download, FilePen, FileText, PenLine, Stamp, Upload, X } from 'lucide-react';
+import { Ban, Download, FilePen, FileText, Loader2, PenLine, Stamp, Upload, X } from 'lucide-react';
 import { byId, currentUser, pendingVersion, signedVersion, useAuth, useStore } from '../data/store';
 import { ROLE_DEFS } from '../data/permissions';
-import type { Company, Proforma, ProformaDoc } from '../data/types';
+import type { Company, ImportLine, Proforma, ProformaDoc } from '../data/types';
 import { newFileId, putBlob, saveBlob, fsize } from '../lib/files';
 import { versionFileName, versionPdf } from '../lib/proformaPdf';
 import { addDays, diffDays, fdate, weekLabel, TODAY } from '../lib/format';
 import { useT } from '../i18n';
 import { toast } from './ui-shared';
 import FileDrop from './FileDrop';
+import LinesEditor from './LinesEditor';
+import { fromExtraction, toImport, type EditLine } from '../lib/editLines';
+import { extractProforma } from '../lib/proformaExtract';
 
 const OK_TYPES = ['application/pdf', 'image/png', 'image/jpeg'];
 const STATUS_COLOR: Record<ProformaDoc['status'], string> = { a_signer: 'orange', signee: 'green', annulee: 'red', refusee: 'red', remplacee: 'grey' };
@@ -158,18 +161,35 @@ export default function ProformaVersions({ pf }: { pf: Proforma }) {
 function UploadBox({ pf, revision, hasPending, open, setOpen }: { pf: Proforma; revision: boolean; hasPending: boolean; open: boolean; setOpen: (o: boolean) => void }) {
   const { dispatch } = useStore();
   const { t } = useT();
+  const { state } = useStore();
   const [reason, setReason] = useState('');
+  const [reading, setReading] = useState(false);
+  const [review, setReview] = useState<{ file: File; lines: EditLine[] } | null>(null);
+  const products = state.products.filter((p) => p.supplierId === pf.supplierId);
+  const send = async (file: File, lines?: ImportLine[]) => {
+    const fileId = newFileId(pf.id, 0);
+    await putBlob(fileId, file);
+    const n = (pf.versions ?? []).reduce((m, v) => Math.max(m, v.version), 0) + 1;
+    dispatch({ type: 'uploadProforma', id: pf.id, fileId, name: file.name, size: file.size, mime: file.type, reason: revision ? reason.trim() : undefined, lines });
+    const created = lines?.filter((l) => l.newProduct).length ?? 0;
+    toast(t('pv.uploadedToast', { n }) + (created ? ` · ${t('ex.created', { n: created })}` : ''));
+    setReason('');
+    setReview(null);
+    setOpen(false);
+  };
+  // Dépôt : on lit les lignes du document, à vérifier avant d'enregistrer
   const pick = async (file?: File) => {
     if (!file) return;
     if (!OK_TYPES.includes(file.type)) return toast(t('pv.badType'));
     if (revision && !reason.trim()) return toast(t('pv.needReason'));
-    const fileId = newFileId(pf.id, 0);
-    await putBlob(fileId, file);
-    const n = (pf.versions ?? []).reduce((m, v) => Math.max(m, v.version), 0) + 1;
-    dispatch({ type: 'uploadProforma', id: pf.id, fileId, name: file.name, size: file.size, mime: file.type, reason: revision ? reason.trim() : undefined });
-    toast(t('pv.uploadedToast', { n }));
-    setReason('');
-    setOpen(false);
+    setReading(true);
+    const ex = await extractProforma(file, file.type).catch(() => ({ lines: [], engine: 'aucun' as const }));
+    setReading(false);
+    if (!ex.lines.length) {
+      toast(t('ex.none'));
+      return send(file);
+    }
+    setReview({ file, lines: fromExtraction(ex.lines, products) });
   };
   if (!open)
     return (
@@ -191,6 +211,50 @@ function UploadBox({ pf, revision, hasPending, open, setOpen }: { pf: Proforma; 
         </>
       )}
       <FileDrop onFile={pick} ariaLabel={revision ? t('pv.revise') : t('pv.upload')} />
+      {reading && (
+        <span className="small muted row" style={{ gap: 6 }}>
+          <Loader2 size={14} className="spin" /> {t('ex.reading')}
+        </span>
+      )}
+      {review && (
+        <div className="palette-back" onMouseDown={() => setReview(null)}>
+          <div className="card rc-dialog bk-dialog np-dialog" role="dialog" aria-label={t('ex.title', { file: review.file.name })} onMouseDown={(e) => e.stopPropagation()}>
+            <header className="rc-head">
+              <div>
+                <h2>{t('ex.title', { file: review.file.name })}</h2>
+                <span className="muted small">
+                  {t('ex.hint')} {revision ? t('ex.applyAtSign') : t('ex.applyNow')}
+                </span>
+              </div>
+              <button type="button" className="icon-btn" onClick={() => setReview(null)} aria-label={t('ex.cancel')}>
+                <X size={20} />
+              </button>
+            </header>
+            <div className="bk-form">
+              <div className="bk-wide">
+                <LinesEditor supplierId={pf.supplierId} currency={pf.currency ?? 'EUR'} lines={review.lines} setLines={(l) => setReview({ ...review, lines: l })} />
+              </div>
+            </div>
+            <footer className="rc-foot">
+              <span />
+              <button type="button" className="btn" onClick={() => send(review.file)}>
+                {t('ex.skip')}
+              </button>
+              <button
+                type="button"
+                className="btn primary"
+                onClick={() => {
+                  const ls = toImport(review.lines);
+                  if (!ls) return toast(t('ex.invalid'));
+                  send(review.file, ls);
+                }}
+              >
+                <Upload size={16} /> {t('ex.save')}
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
       {(revision || hasPending) && (
         <div className="row" style={{ justifyContent: 'flex-end' }}>
           <button type="button" className="btn sm" onClick={() => setOpen(false)}>

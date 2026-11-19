@@ -28,11 +28,13 @@ test.describe('Nouvelle proforma', () => {
     const dlg = page.getByRole('dialog');
     await expect(dlg).toContainText('Nouvelle proforma PF-2026-0154');
     await page.locator('#np-title').fill('Coussins outdoor');
-    await dlg.getByLabel('Produit 1').selectOption({ index: 1 });
+    await page.locator('#ln-prod-0').click();
+    await page.getByRole('option').nth(1).click();
     await dlg.getByLabel('Quantité 1').fill('2000');
     await dlg.getByLabel('Prix unitaire 1').fill('4,5');
     await dlg.getByRole('button', { name: 'Ajouter une ligne' }).click();
-    await dlg.getByLabel('Produit 2').selectOption({ index: 2 });
+    await page.locator('#ln-prod-1').click();
+    await page.getByRole('option').nth(2).click();
     await dlg.getByLabel('Quantité 2').fill('1000');
     await dlg.getByLabel('Prix unitaire 2').fill('10');
     await expect(dlg).toContainText('Devise USD · 40 % d’acompte · solde à J+10 du départ');
@@ -69,7 +71,8 @@ test.describe('Nouvelle proforma', () => {
     await page.getByRole('option', { name: /Xiamen Tide Living/ }).click();
     await expect(page.locator('#np-sup')).toHaveValue('Xiamen Tide Living');
     await page.locator('#np-title').fill('Sabots enfant');
-    await dlg.getByLabel('Produit 1').selectOption({ index: 1 });
+    await page.locator('#ln-prod-0').click();
+    await page.getByRole('option').nth(1).click();
     await dlg.getByLabel('Quantité 1').fill('5000');
     await dlg.getByLabel('Prix unitaire 1').fill('2');
     await dlg.getByRole('button', { name: 'Créer la proforma' }).click();

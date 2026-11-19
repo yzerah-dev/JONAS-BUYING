@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Send, Trash2, X } from 'lucide-react';
+import { Loader2, Plus, Send, X } from 'lucide-react';
 import { currentUser, nextProformaId, supplierTerms, useAuth, useStore } from '../data/store';
 import { isSupplier } from '../data/permissions';
 import { newFileId, putBlob } from '../lib/files';
@@ -8,11 +8,11 @@ import { useT } from '../i18n';
 import { toast } from './ui-shared';
 import FileDrop from './FileDrop';
 import Combobox from './Combobox';
+import LinesEditor from './LinesEditor';
+import { emptyLine, fromExtraction, toImport, type EditLine } from '../lib/editLines';
+import { extractProforma } from '../lib/proformaExtract';
 
 const OK_TYPES = ['application/pdf', 'image/png', 'image/jpeg'];
-type Line = { productId: string; qty: string; price: string };
-/** Prix saisi avec virgule ou point */
-const toNum = (v: string) => Number(String(v).replace(',', '.').replace(/\s/g, ''));
 
 /** Bouton « Nouvelle proforma » : côté JONAS (acheteurs, Direction) et côté fournisseur (avec sa proforma jointe) */
 export function NewProformaButton({ onCreated, className = 'pf-btn' }: { onCreated?: (id: string) => void; className?: string }) {
@@ -35,7 +35,7 @@ export function NewProformaButton({ onCreated, className = 'pf-btn' }: { onCreat
 
 function NewProformaDialog({ onClose, onCreated }: { onClose: () => void; onCreated?: (id: string) => void }) {
   const { state, dispatch } = useStore();
-  const { t, fmt, td } = useT();
+  const { t } = useT();
   const me = currentUser(state);
   const supplierSide = isSupplier(me);
   const id = nextProformaId(state);
@@ -43,21 +43,30 @@ function NewProformaDialog({ onClose, onCreated }: { onClose: () => void; onCrea
   const [title, setTitle] = useState('');
   const [etd, setEtd] = useState(addDays(TODAY, 70));
   const [eta, setEta] = useState(addDays(TODAY, 105));
-  const [lines, setLines] = useState<Line[]>([{ productId: '', qty: '', price: '' }]);
+  const [lines, setLines] = useState<EditLine[]>([emptyLine()]);
   const [file, setFile] = useState<File | null>(null);
+  const [reading, setReading] = useState(false);
   const products = state.products.filter((p) => p.supplierId === supplierId);
   const terms = supplierTerms(state, supplierId);
   const currency = terms.currency;
-  const total = lines.reduce((s, l) => s + (Number(l.qty) || 0) * (toNum(l.price) || 0), 0);
-  const setLine = (i: number, patch: Partial<Line>) => setLines(lines.map((l, j) => (j === i ? { ...l, ...patch } : l)));
+  // Proforma jointe : on lit ses lignes et on les rapproche des produits du fournisseur
+  const attach = async (f: File) => {
+    if (!OK_TYPES.includes(f.type)) return toast(t('pv.badType'));
+    setFile(f);
+    setReading(true);
+    const ex = await extractProforma(f, f.type).catch(() => ({ lines: [], engine: 'aucun' as const }));
+    setReading(false);
+    if (ex.lines.length) {
+      setLines(fromExtraction(ex.lines, products));
+      toast(t('ex.found', { n: ex.lines.length }));
+    } else toast(t('ex.none'));
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return toast(t('np.needTitle'));
-    const ls = lines
-      .filter((l) => l.productId)
-      .map((l) => ({ productId: l.productId, qty: Math.round(Number(l.qty)), price: toNum(l.price) }));
-    if (!ls.length || ls.some((l) => !(l.qty > 0) || !(l.price >= 0))) return toast(t('np.needLines'));
+    const ls = toImport(lines);
+    if (!ls) return toast(t('ex.invalid'));
     if (supplierSide && !file) return toast(t('np.needFile'));
     let f: { fileId: string; name: string; size: number; mime: string } | undefined;
     if (file) {
@@ -96,7 +105,7 @@ function NewProformaDialog({ onClose, onCreated }: { onClose: () => void; onCrea
                   .map((s) => ({ id: s.id, label: s.name, sub: `${s.flag} ${s.city} · ${s.country}`, keywords: s.shortName }))}
                 onChange={(v) => {
                   setSupplierId(v);
-                  setLines([{ productId: '', qty: '', price: '' }]);
+                  setLines([emptyLine()]);
                 }}
               />
             </label>
@@ -125,54 +134,18 @@ function NewProformaDialog({ onClose, onCreated }: { onClose: () => void; onCrea
           </label>
           <p className="bk-wide np-terms">{t('np.terms', { cur: terms.currency, dep: terms.depositPct, days: terms.balanceDays })}</p>
 
-          <div className="bk-wide np-lines">
-            <b className="small">{t('np.lines')}</b>
-            {products.length === 0 && <p className="small muted">{t('np.noProducts')}</p>}
-            {lines.map((l, i) => (
-              <div key={i} className="np-line">
-                <select aria-label={`${t('np.product')} ${i + 1}`} className="input" value={l.productId} onChange={(e) => setLine(i, { productId: e.target.value })}>
-                  <option value="">{t('np.product')}…</option>
-                  {products.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.ref} · {td(p.name)}
-                    </option>
-                  ))}
-                </select>
-                <input aria-label={`${t('np.qty')} ${i + 1}`} className="input" type="number" min={1} placeholder={t('np.qty')} value={l.qty} onChange={(e) => setLine(i, { qty: e.target.value })} />
-                <input
-                  aria-label={`${t('np.price')} ${i + 1}`}
-                  className="input"
-                  inputMode="decimal"
-                  placeholder={`${t('np.price')} (${currency})`}
-                  value={l.price}
-                  onChange={(e) => setLine(i, { price: e.target.value })}
-                />
-                <span className="np-amount">{fmt.num((Number(l.qty) || 0) * (toNum(l.price) || 0))}</span>
-                <button type="button" className="icon-btn" aria-label={t('np.removeLine')} disabled={lines.length === 1} onClick={() => setLines(lines.filter((_, j) => j !== i))}>
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            ))}
-            <div className="row" style={{ justifyContent: 'space-between' }}>
-              <button type="button" className="btn sm" onClick={() => setLines([...lines, { productId: '', qty: '', price: '' }])}>
-                <Plus size={14} /> {t('np.addLine')}
-              </button>
-              <b>
-                {t('np.total')} : {fmt.num(total)} {currency}
-              </b>
-            </div>
-          </div>
-
           <div className="bk-wide np-filebox">
             <span className="small bold">{supplierSide ? t('np.file') : t('np.fileOpt')}</span>
-            <FileDrop
-              ariaLabel={supplierSide ? t('np.file') : t('np.fileOpt')}
-              current={file?.name}
-              onFile={(f) => {
-                if (!OK_TYPES.includes(f.type)) return toast(t('pv.badType'));
-                setFile(f);
-              }}
-            />
+            <FileDrop ariaLabel={supplierSide ? t('np.file') : t('np.fileOpt')} current={file?.name} onFile={attach} />
+            {reading && (
+              <span className="small muted row" style={{ gap: 6 }}>
+                <Loader2 size={14} className="spin" /> {t('ex.reading')}
+              </span>
+            )}
+          </div>
+
+          <div className="bk-wide">
+            <LinesEditor supplierId={supplierId} currency={currency} lines={lines} setLines={setLines} />
           </div>
         </div>
         <footer className="rc-foot">

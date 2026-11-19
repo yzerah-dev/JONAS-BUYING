@@ -3,6 +3,9 @@ import * as seed from './seed';
 import type {
   Brand,
   BookingProposal,
+  Currency,
+  ImportLine,
+  ProformaLine,
   SupplierTerms,
   Company,
   ProformaDoc,
@@ -105,7 +108,7 @@ export type Action =
       title: string;
       etd: ISODate;
       eta: ISODate;
-      lines: { productId: string; qty: number; price: number }[];
+      lines: ImportLine[];
       /** Proforma déposée par le fournisseur (obligatoire côté fournisseur) */
       file?: { fileId: string; name: string; size: number; mime: string };
     }
@@ -113,7 +116,7 @@ export type Action =
   | { type: 'requestSplit'; id: string; lines: { productId: string; qtyNow: number }[]; etdLater: ISODate; reason: string }
   | { type: 'acceptSplit'; id: string }
   | { type: 'refuseSplit'; id: string; reason?: string }
-  | { type: 'uploadProforma'; id: string; fileId: string; name: string; size: number; mime: string; reason?: string }
+  | { type: 'uploadProforma'; id: string; fileId: string; name: string; size: number; mime: string; reason?: string; lines?: ImportLine[] }
   | { type: 'refuseProformaVersion'; id: string; reason: string }
   | { type: 'setProformaStatus'; id: string; status: ProformaStatus }
   | { type: 'payDeposit'; id: string }
@@ -330,8 +333,7 @@ export function isAllowed(s: State, a: Action): boolean {
     case 'createProforma': {
       // JONAS (acheteurs, Direction) ou le fournisseur, qui joint alors sa proforma
       if (s.proformas.some((p) => p.id === a.id)) return false;
-      if (!a.title.trim() || !a.etd || !a.lines.length || a.lines.some((l) => l.qty <= 0 || l.price < 0)) return false;
-      if (a.lines.some((l) => s.products.find((p) => p.id === l.productId)?.supplierId !== a.supplierId)) return false;
+      if (!a.title.trim() || !a.etd || !importLinesOk(s, a.supplierId, a.lines)) return false;
       if (isSupplier(u)) return a.supplierId === u.supplierId && !!a.file;
       return can(u, 'proforma.edit') || can(u, 'proforma.sign');
     }
@@ -366,6 +368,7 @@ export function isAllowed(s: State, a: Action): boolean {
       const pf = s.proformas.find((x) => x.id === a.id);
       if (!pf || !(isSupplier(u) ? pf.supplierId === u.supplierId : u.role === 'pilote')) return false;
       if (['en_transit', 'arrive'].includes(pf.status) || (pf.split && pf.split.part > 1)) return false;
+      if (a.lines && !importLinesOk(s, pf.supplierId, a.lines)) return false;
       return !signedVersion(pf) || !!a.reason?.trim();
     }
     case 'signProforma':
@@ -469,6 +472,82 @@ export const DEFAULT_TERMS: SupplierTerms = { currency: 'EUR', depositPct: 30, b
 export const supplierTerms = (s: State, supplierId: string): SupplierTerms => s.suppliers.find((x) => x.id === supplierId)?.terms ?? DEFAULT_TERMS;
 /** « 30 % d'acompte · solde à J+7 du départ » */
 export const termsLabel = (t: SupplierTerms) => `${t.depositPct} % d’acompte · solde à J+${t.balanceDays} du départ (copie du BL)`;
+
+/** Cours de la devise en € */
+const fxRate = (s: State, cur: Currency) => s.settings.fx[cur] ?? 1;
+const refKey = (r: string) => r.toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+/** Lignes à enregistrer valides : produits du fournisseur, ou nouveaux produits avec une référence inédite */
+function importLinesOk(s: State, supplierId: string, lines: ImportLine[]) {
+  if (!lines.length) return false;
+  const seen = new Set<string>();
+  return lines.every((l) => {
+    if (!(l.qty > 0) || !(l.price >= 0)) return false;
+    if (l.productId) return s.products.find((p) => p.id === l.productId)?.supplierId === supplierId;
+    const n = l.newProduct;
+    if (!n || !n.ref.trim() || !n.name.trim() || !(n.pcb > 0) || !(n.cbmCarton > 0)) return false;
+    const k = refKey(n.ref);
+    if (seen.has(k) || s.products.some((p) => refKey(p.ref) === k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
+/**
+ * Transforme les lignes lues sur une proforma en lignes de proforma : crée les nouveaux produits
+ * (rayon, marque et designer habituels du fournisseur, pack à définir, à développer).
+ */
+function materializeLines(s: State, supplierId: string, lines: ImportLine[], etd: ISODate, fx: number) {
+  const mine = s.products.filter((p) => p.supplierId === supplierId);
+  const most = <K extends keyof Product>(k: K, fallback: Product[K]) => {
+    const count = new Map<Product[K], number>();
+    for (const p of mine) count.set(p[k], (count.get(p[k]) ?? 0) + 1);
+    return [...count.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? fallback;
+  };
+  const created: Product[] = [];
+  const out: ProformaLine[] = lines.map((l) => {
+    if (l.productId) return { productId: l.productId, qty: l.qty, price: l.price };
+    const n = l.newProduct!;
+    const ref = n.ref.trim().toUpperCase();
+    const deadline = addDays(etd, -35);
+    const p: Product = {
+      id: ref,
+      ref,
+      ean: n.ean ?? '',
+      name: n.name.trim(),
+      brandId: most('brandId', 'jonas'),
+      supplierId,
+      rayon: most('rayon', 'Divers'),
+      collection: 'Nouveauté',
+      gender: 'Mixte',
+      material: 'À préciser',
+      emoji: most('emoji', '📦'),
+      tint: '#eef1f5',
+      pa: Math.round(l.price * fx * 100) / 100,
+      pcb: n.pcb,
+      cbmCarton: n.cbmCarton,
+      weight: 0.5,
+      developed: false,
+      devStage: 0,
+      devDeadline: addDays(etd, -45),
+      nextAction: 'Valider le brief',
+      targetQty: l.qty,
+      pack: {
+        type: 'À définir',
+        designer: most('pack', mine[0]?.pack ?? ({ designer: 'Léa' } as Product['pack'])).designer,
+        artworkDeadline: deadline,
+        validations: { david: { state: 'pending' }, direction: { state: 'todo' }, moinard: { state: 'todo' }, fournisseur: { state: 'todo' } },
+        dieCut: 'none',
+        artworkVersions: 0,
+        sentToSupplier: false,
+      },
+      stock: { Péronne: 0, Meaux: 0, Lillois: 0 },
+    };
+    created.push(p);
+    return { productId: p.id, qty: l.qty, price: l.price };
+  });
+  return { lines: out, created };
+}
 
 /** Prochain numéro de proforma (PF-AAAA-NNNN), hors reliquats */
 export function nextProformaId(s: State) {
@@ -664,6 +743,7 @@ function applyAction(s: State, a: Action): State {
       const u = currentUser(s);
       const bySupplier = isSupplier(u);
       const terms = supplierTerms(s, a.supplierId);
+      const mat = materializeLines(s, a.supplierId, a.lines, a.etd, fxRate(s, terms.currency));
       const pf: Proforma = {
         id: a.id,
         supplierId: a.supplierId,
@@ -674,18 +754,21 @@ function applyAction(s: State, a: Action): State {
         status: 'a_signer',
         etd: a.etd,
         eta: a.eta,
-        lines: a.lines,
+        lines: mat.lines,
         depositPct: terms.depositPct,
         depositPaid: false,
         balancePaid: false,
         balanceDue: addDays(a.etd, terms.balanceDays),
         documents: ['Conditions d’achat.pdf'],
         versions: a.file
-          ? [{ version: 1, fileId: a.file.fileId, name: a.file.name, size: a.file.size, type: a.file.mime, uploadedAt: nowStamp(), uploadedBy: me, status: 'a_signer' }]
+          ? [{ version: 1, fileId: a.file.fileId, name: a.file.name, size: a.file.size, type: a.file.mime, uploadedAt: nowStamp(), uploadedBy: me, status: 'a_signer', lines: mat.lines }]
           : undefined,
-        history: [{ date: TODAY, user: me, text: bySupplier ? 'Proforma créée et déposée par le fournisseur' : 'Proforma créée par JONAS' }],
+        history: [
+          { date: TODAY, user: me, text: bySupplier ? 'Proforma créée et déposée par le fournisseur' : 'Proforma créée par JONAS' },
+          ...(mat.created.length ? [{ date: TODAY, user: me, text: `${mat.created.length} produit(s) créé(s) depuis la proforma : ${mat.created.map((p) => p.ref).join(', ')}` }] : []),
+        ],
       };
-      return { ...s, proformas: [...s.proformas, pf] };
+      return { ...s, products: [...s.products, ...mat.created], proformas: [...s.proformas, pf] };
     }
     case 'setSupplierTerms':
       return { ...s, suppliers: s.suppliers.map((x) => (x.id === a.supplierId ? { ...x, terms: a.terms } : x)) };
@@ -705,8 +788,10 @@ function applyAction(s: State, a: Action): State {
         splitRequest: undefined,
         history: [...pf.history, hist(me, `Demande d'expédition partielle ${a.reason ? `refusée : ${a.reason}` : 'annulée'}`)],
       }));
-    case 'uploadProforma':
-      return mapPF(s, a.id, (pf) => {
+    case 'uploadProforma': {
+      const pf0 = s.proformas.find((x) => x.id === a.id)!;
+      const mat = a.lines ? materializeLines(s, pf0.supplierId, a.lines, pf0.etd, fxRate(s, pf0.currency ?? 'EUR')) : null;
+      const next = mapPF(s, a.id, (pf) => {
         const versions = pf.versions ?? [];
         const signed = signedVersion(pf);
         const n = versions.reduce((m, v) => Math.max(m, v.version), 0) + 1;
@@ -720,6 +805,7 @@ function applyAction(s: State, a: Action): State {
           uploadedBy: me,
           reason: signed ? a.reason?.trim() : undefined,
           status: 'a_signer',
+          lines: mat?.lines,
         };
         return {
           ...pf,
@@ -728,9 +814,14 @@ function applyAction(s: State, a: Action): State {
           history: [
             ...pf.history,
             hist(me, signed ? `Demande de modification : proforma v${n} déposée (${doc.reason})` : `Proforma v${n} déposée par le fournisseur (${a.name})`),
+            ...(mat?.created.length ? [hist(me, `${mat.created.length} produit(s) créé(s) depuis la proforma : ${mat.created.map((p) => p.ref).join(', ')}`)] : []),
           ],
+          // Première version : les lignes lues remplacent celles de la proforma ; une modification les applique à la signature
+          lines: mat && !signed ? mat.lines : pf.lines,
         };
       });
+      return mat ? { ...next, products: [...next.products, ...mat.created] } : next;
+    }
     case 'signProforma': {
       const u = currentUser(s);
       const at = nowStamp();
@@ -740,6 +831,7 @@ function applyAction(s: State, a: Action): State {
         const shift = diffDays(a.etdWanted, pf.etd);
         return {
           ...pf,
+          lines: prev && doc.lines?.length ? doc.lines : pf.lines,
           status: pf.status === 'a_signer' ? 'en_dev' : pf.status,
           etd: a.etdWanted,
           eta: addDays(pf.eta, shift),
