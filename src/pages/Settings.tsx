@@ -4,7 +4,8 @@ import { Check, Lock, RotateCcw, Users } from 'lucide-react';
 import { useAuth, useStore } from '../data/store';
 import { MODULE_LABELS, PERM_LABELS, ROLE_DEFS, ROLES, type Module, type Perm } from '../data/permissions';
 import { VALIDATION_LABELS, VALIDATION_STEPS, type Role, type ValidationStep } from '../data/types';
-import { Pill } from '../components/ui';
+import { Pill, Seg } from '../components/ui';
+import { ZOOMS, applyZoom, readZoom, type Zoom } from '../lib/zoom';
 import { toast } from '../components/ui-shared';
 import { initials } from '../lib/format';
 
@@ -188,6 +189,8 @@ export default function Settings() {
         </div>
       </div>
 
+      <ZoomCard />
+
       <CompanyCard />
 
       <div className="card pad mb">
@@ -328,6 +331,27 @@ function CompanyCard() {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Taille d'affichage, propre à chaque utilisateur (navigateur) */
+function ZoomCard() {
+  const [z, setZ] = useState<Zoom>(readZoom);
+  return (
+    <div className="card pad mb">
+      <div className="card-title">Taille d’affichage</div>
+      <p className="small muted" style={{ marginTop: 0 }}>
+        Automatique : réduite sur les grands écrans (60 % à partir de 1800 px de large, 70 % puis 80 % sur les écrans plus petits, 100 % sur téléphone). Réglage propre à ce navigateur.
+      </p>
+      <Seg
+        value={z}
+        onChange={(v) => {
+          setZ(v);
+          applyZoom(v);
+        }}
+        options={ZOOMS.map((id) => ({ id, label: id === 'auto' ? 'Automatique' : `${id} %` }))}
+      />
     </div>
   );
 }
