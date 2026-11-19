@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { Plus, Send, Trash2, Upload, X } from 'lucide-react';
-import { currentUser, nextProformaId, useAuth, useStore } from '../data/store';
+import { currentUser, nextProformaId, supplierTerms, useAuth, useStore } from '../data/store';
 import { isSupplier } from '../data/permissions';
-import type { Currency } from '../data/types';
 import { newFileId, putBlob } from '../lib/files';
 import { TODAY, addDays } from '../lib/format';
 import { useT } from '../i18n';
@@ -42,11 +41,11 @@ function NewProformaDialog({ onClose, onCreated }: { onClose: () => void; onCrea
   const [title, setTitle] = useState('');
   const [etd, setEtd] = useState(addDays(TODAY, 70));
   const [eta, setEta] = useState(addDays(TODAY, 105));
-  const [currency, setCurrency] = useState<Currency>('USD');
-  const [deposit, setDeposit] = useState('30');
   const [lines, setLines] = useState<Line[]>([{ productId: '', qty: '', price: '' }]);
   const [file, setFile] = useState<File | null>(null);
   const products = state.products.filter((p) => p.supplierId === supplierId);
+  const terms = supplierTerms(state, supplierId);
+  const currency = terms.currency;
   const total = lines.reduce((s, l) => s + (Number(l.qty) || 0) * (toNum(l.price) || 0), 0);
   const setLine = (i: number, patch: Partial<Line>) => setLines(lines.map((l, j) => (j === i ? { ...l, ...patch } : l)));
 
@@ -64,7 +63,7 @@ function NewProformaDialog({ onClose, onCreated }: { onClose: () => void; onCrea
       await putBlob(fileId, file);
       f = { fileId, name: file.name, size: file.size, mime: file.type };
     }
-    dispatch({ type: 'createProforma', id, supplierId, title, etd, eta, currency, depositPct: Math.max(0, Math.min(100, Number(deposit) || 0)), lines: ls, file: f });
+    dispatch({ type: 'createProforma', id, supplierId, title, etd, eta, lines: ls, file: f });
     toast(supplierSide ? t('np.createdSup', { id }) : t('np.createdJonas', { id }));
     onClose();
     onCreated?.(id);
@@ -127,18 +126,7 @@ function NewProformaDialog({ onClose, onCreated }: { onClose: () => void; onCrea
             {t('np.eta')}
             <input id="np-eta" className="input" type="date" required value={eta} onChange={(e) => setEta(e.target.value)} />
           </label>
-          <label htmlFor="np-cur">
-            {t('np.currency')}
-            <select id="np-cur" className="input" value={currency} onChange={(e) => setCurrency(e.target.value as Currency)}>
-              {(['USD', 'EUR', 'CNY'] as const).map((c) => (
-                <option key={c}>{c}</option>
-              ))}
-            </select>
-          </label>
-          <label htmlFor="np-dep">
-            {t('np.deposit')}
-            <input id="np-dep" className="input" type="number" min={0} max={100} value={deposit} onChange={(e) => setDeposit(e.target.value)} />
-          </label>
+          <p className="bk-wide np-terms">{t('np.terms', { cur: terms.currency, dep: terms.depositPct, days: terms.balanceDays })}</p>
 
           <div className="bk-wide np-lines">
             <b className="small">{t('np.lines')}</b>

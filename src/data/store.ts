@@ -3,6 +3,7 @@ import * as seed from './seed';
 import type {
   Brand,
   BookingProposal,
+  SupplierTerms,
   Company,
   ProformaDoc,
   Container,
@@ -56,7 +57,7 @@ const withDefaults = (def: Company, saved?: Partial<Company>): Company => ({
   vat: saved?.vat || def.vat,
 });
 
-export const STORAGE_KEY = 'jonas-buying-state-v15';
+export const STORAGE_KEY = 'jonas-buying-state-v16';
 
 export const currentUser = (s: State): User => s.users.find((u) => u.id === s.currentUserId) ?? s.users[0];
 
@@ -104,12 +105,11 @@ export type Action =
       title: string;
       etd: ISODate;
       eta: ISODate;
-      currency: 'EUR' | 'USD' | 'CNY';
-      depositPct: number;
       lines: { productId: string; qty: number; price: number }[];
       /** Proforma déposée par le fournisseur (obligatoire côté fournisseur) */
       file?: { fileId: string; name: string; size: number; mime: string };
     }
+  | { type: 'setSupplierTerms'; supplierId: string; terms: SupplierTerms }
   | { type: 'requestSplit'; id: string; lines: { productId: string; qtyNow: number }[]; etdLater: ISODate; reason: string }
   | { type: 'acceptSplit'; id: string }
   | { type: 'refuseSplit'; id: string; reason?: string }
@@ -319,6 +319,14 @@ export function isAllowed(s: State, a: Action): boolean {
       if (!(isSupplier(u) ? pf.supplierId === u.supplierId : u.role === 'pilote')) return false;
       return s.containers.some((c) => c.allocations.some((x) => x.proformaId === pf.id) && ['a_booker', 'booking_demande'].includes(c.status));
     }
+    case 'setSupplierTerms':
+      return (
+        !!s.suppliers.find((x) => x.id === a.supplierId) &&
+        (can(u, 'finance.pay') || can(u, 'proforma.sign')) &&
+        a.terms.depositPct >= 0 &&
+        a.terms.depositPct <= 100 &&
+        a.terms.balanceDays >= 0
+      );
     case 'createProforma': {
       // JONAS (acheteurs, Direction) ou le fournisseur, qui joint alors sa proforma
       if (s.proformas.some((p) => p.id === a.id)) return false;
@@ -456,6 +464,12 @@ export function shipmentsOf(s: State, pf: Proforma): Proforma[] {
   const root = pf.split?.root ?? pf.id;
   return s.proformas.filter((p) => p.id === root || p.split?.root === root).sort((a, b) => (a.split?.part ?? 1) - (b.split?.part ?? 1));
 }
+/** Devise et conditions de paiement d'un fournisseur (par défaut : EUR, 30 % d'acompte, solde à J+7 du départ) */
+export const DEFAULT_TERMS: SupplierTerms = { currency: 'EUR', depositPct: 30, balanceDays: 7 };
+export const supplierTerms = (s: State, supplierId: string): SupplierTerms => s.suppliers.find((x) => x.id === supplierId)?.terms ?? DEFAULT_TERMS;
+/** « 30 % d'acompte · solde à J+7 du départ » */
+export const termsLabel = (t: SupplierTerms) => `${t.depositPct} % d’acompte · solde à J+${t.balanceDays} du départ (copie du BL)`;
+
 /** Prochain numéro de proforma (PF-AAAA-NNNN), hors reliquats */
 export function nextProformaId(s: State) {
   const year = TODAY.slice(0, 4);
@@ -649,10 +663,11 @@ function applyAction(s: State, a: Action): State {
     case 'createProforma': {
       const u = currentUser(s);
       const bySupplier = isSupplier(u);
+      const terms = supplierTerms(s, a.supplierId);
       const pf: Proforma = {
         id: a.id,
         supplierId: a.supplierId,
-        currency: a.currency,
+        currency: terms.currency,
         title: a.title.trim(),
         poNumber: `PO-JONAS-${27000 + s.proformas.length}`,
         date: TODAY,
@@ -660,10 +675,10 @@ function applyAction(s: State, a: Action): State {
         etd: a.etd,
         eta: a.eta,
         lines: a.lines,
-        depositPct: a.depositPct,
+        depositPct: terms.depositPct,
         depositPaid: false,
         balancePaid: false,
-        balanceDue: addDays(a.etd, 7),
+        balanceDue: addDays(a.etd, terms.balanceDays),
         documents: ['Conditions d’achat.pdf'],
         versions: a.file
           ? [{ version: 1, fileId: a.file.fileId, name: a.file.name, size: a.file.size, type: a.file.mime, uploadedAt: nowStamp(), uploadedBy: me, status: 'a_signer' }]
@@ -672,6 +687,8 @@ function applyAction(s: State, a: Action): State {
       };
       return { ...s, proformas: [...s.proformas, pf] };
     }
+    case 'setSupplierTerms':
+      return { ...s, suppliers: s.suppliers.map((x) => (x.id === a.supplierId ? { ...x, terms: a.terms } : x)) };
     case 'requestSplit': {
       const u = currentUser(s);
       return mapPF(s, a.id, (pf) => ({
@@ -1270,6 +1287,8 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
       return { target: a.id, text: `Proforma signée et tamponnée (expédition demandée ${a.etdWanted})` };
     case 'createProforma':
       return { target: a.id, text: `Nouvelle proforma ${a.id} : ${a.title}${a.file ? ' (déposée par le fournisseur)' : ''}` };
+    case 'setSupplierTerms':
+      return { text: `${s.suppliers.find((x) => x.id === a.supplierId)?.shortName} : devise ${a.terms.currency}, acompte ${a.terms.depositPct} %, solde J+${a.terms.balanceDays}` };
     case 'requestSplit':
       return { target: a.id, text: `Demande d'expédition partielle : ${a.reason}` };
     case 'acceptSplit':

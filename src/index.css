@@ -1470,3 +1470,7 @@ button.fw-doc.missing:hover { background: var(--red); color: #fff; }
   .np-line { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .np-line select { grid-column: 1 / -1; }
 }
+.terms-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; gap: 12px; align-items: end; }
+.terms-grid label { display: grid; gap: 4px; font-size: 13px; font-weight: 600; }
+.np-terms { margin: 0; padding: 8px 12px; border-radius: 10px; background: var(--grey-soft); font-size: 13px; font-weight: 600; }
+@media (max-width: 720px) { .terms-grid { grid-template-columns: minmax(0, 1fr); } }

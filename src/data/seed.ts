@@ -403,6 +403,13 @@ export const proformas: Proforma[] = pfDefs.map((d, i) => {
   };
 });
 
+// Conditions de paiement par fournisseur (acompte habituel de ses proformas, solde à J+7 du départ)
+for (const s of suppliers) {
+  const pcts = proformas.filter((p) => p.supplierId === s.id).map((p) => p.depositPct);
+  const dep = pcts.length ? Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length / 5) * 5 : 30;
+  s.terms = { currency: 'EUR', depositPct: dep, balanceDays: 7 };
+}
+
 // ---- Conteneurs -------------------------------------------------------------
 
 const carriers: [string, string][] = [['MSC', 'MSCU'], ['CMA CGM', 'CMAU'], ['Maersk', 'TGHU'], ['COSCO', 'TCLU'], ['Hapag-Lloyd', 'CAIU']];

@@ -28,9 +28,13 @@ import {
   payments,
   proformaTotals,
   supplierStats,
+  supplierTerms,
+  termsLabel,
+  useAuth,
   useStore,
 } from '../data/store';
-import { CONTAINER_STATUSES } from '../data/types';
+import { toast } from '../components/ui-shared';
+import { CONTAINER_STATUSES, type Currency, type SupplierTerms } from '../data/types';
 import { ContainerStatusPill, Kpi, Pill, ProductThumb, ProformaStatusPill, Ring, Seg, SupplierLogo, Tabs } from '../components/ui';
 import { TODAY, dec, eur, fdate, fshort, num, weekLabel } from '../lib/format';
 
@@ -95,6 +99,8 @@ export default function SupplierDetail() {
           )}
         </div>
       </div>
+
+      <TermsCard supplierId={sup.id} />
 
       <Tabs<Tab>
         value={tab}
@@ -367,6 +373,55 @@ function PfTable({ ids }: { ids: string[] }) {
           })}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+/** Devise et conditions de paiement du fournisseur : reprises par chaque nouvelle proforma (Finance, Direction, Pilote) */
+function TermsCard({ supplierId }: { supplierId: string }) {
+  const { state, dispatch } = useStore();
+  const auth = useAuth();
+  const saved = supplierTerms(state, supplierId);
+  const [t, setT] = useState<SupplierTerms>(saved);
+  const edit = auth.can('finance.pay') || auth.can('proforma.sign');
+  const dirty = JSON.stringify(t) !== JSON.stringify(saved);
+  return (
+    <div className="card pad mb terms-card">
+      <div className="card-title">Devise et conditions de paiement</div>
+      <p className="small muted" style={{ marginTop: 0 }}>
+        Reprises automatiquement par chaque nouvelle proforma de ce fournisseur (les proformas existantes gardent leurs conditions). Actuellement : {saved.currency} ·{' '}
+        {termsLabel(saved)}.
+      </p>
+      <div className="terms-grid">
+        <label htmlFor="tm-cur">
+          Devise
+          <select id="tm-cur" className="input" disabled={!edit} value={t.currency} onChange={(e) => setT({ ...t, currency: e.target.value as Currency })}>
+            <option value="EUR">EUR €</option>
+            <option value="USD">USD $</option>
+            <option value="CNY">CNY ¥</option>
+          </select>
+        </label>
+        <label htmlFor="tm-dep">
+          Acompte à la commande (%)
+          <input id="tm-dep" className="input" type="number" min={0} max={100} disabled={!edit} value={t.depositPct} onChange={(e) => setT({ ...t, depositPct: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })} />
+        </label>
+        <label htmlFor="tm-days">
+          Solde : jours après le départ
+          <input id="tm-days" className="input" type="number" min={0} max={180} disabled={!edit} value={t.balanceDays} onChange={(e) => setT({ ...t, balanceDays: Math.max(0, Number(e.target.value) || 0) })} />
+        </label>
+        {edit && (
+          <button
+            className="btn primary"
+            disabled={!dirty}
+            onClick={() => {
+              dispatch({ type: 'setSupplierTerms', supplierId, terms: t });
+              toast('Conditions du fournisseur enregistrées');
+            }}
+          >
+            Enregistrer
+          </button>
+        )}
+      </div>
     </div>
   );
 }

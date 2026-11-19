@@ -335,21 +335,14 @@ function DetailsTab({ pf, state }: { pf: Proforma; state: State }) {
           <dd>FOB {byId(state.suppliers, pf.supplierId).port}</dd>
           <dt>Devise</dt>
           <dd>
-            <select
-              className="input"
-              aria-label="Devise de la proforma"
-              disabled={!auth.can('proforma.edit')}
-              value={pf.currency ?? 'EUR'}
-              onChange={(e) => dispatch({ type: 'setProformaCurrency', id: pf.id, currency: e.target.value as 'EUR' | 'USD' | 'CNY' })}
-            >
-              <option value="EUR">EUR €</option>
-              <option value="USD">USD $</option>
-              <option value="CNY">CNY ¥</option>
-            </select>
+            {pf.currency ?? 'EUR'} <span className="xs muted">· paramètre du fournisseur</span>
           </dd>
           <dt>Paiement</dt>
           <dd>
-            {pf.depositPct} % acompte, solde à l’expédition
+            {pf.depositPct} % d’acompte · solde le {fdate(pf.balanceDue)}{' '}
+            <Link className="xs" to={`/fournisseurs/${pf.supplierId}`}>
+              conditions du fournisseur
+            </Link>
           </dd>
           <dt>Port de départ</dt>
           <dd>{byId(state.suppliers, pf.supplierId).port}</dd>

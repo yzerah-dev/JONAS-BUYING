@@ -24,6 +24,16 @@ export interface Supplier {
   /** Style du logo dans les listes : lettre en dégradé ou pastille ronde */
   mark?: 'letter' | 'badge';
   active: boolean;
+  /** Devise et conditions de paiement du fournisseur : reprises par chaque nouvelle proforma */
+  terms?: SupplierTerms;
+}
+
+export interface SupplierTerms {
+  currency: Currency;
+  /** Acompte à la commande (% du montant) */
+  depositPct: number;
+  /** Solde payé N jours après le départ (contre copie du BL) */
+  balanceDays: number;
 }
 
 export interface Brand {

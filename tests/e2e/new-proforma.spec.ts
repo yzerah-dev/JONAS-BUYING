@@ -12,7 +12,16 @@ test.describe('Nouvelle proforma', () => {
     await resetApp(page);
   });
 
-  test('le fournisseur crée et dépose sa proforma : JONAS la reçoit à signer', async ({ page }) => {
+  test('le fournisseur crée et dépose sa proforma : JONAS la reçoit à signer, aux conditions du fournisseur', async ({ page }) => {
+    // Devise et paiement paramétrés sur le fournisseur
+    await loginAs(page, 'Finance');
+    await go(page, 'fournisseurs/horizon');
+    await page.locator('#tm-cur').selectOption('USD');
+    await page.locator('#tm-dep').fill('40');
+    await page.locator('#tm-days').fill('10');
+    await page.locator('.terms-card').getByRole('button', { name: 'Enregistrer' }).click();
+    await expect(toast(page)).toContainText('Conditions du fournisseur enregistrées');
+
     await loginAs(page, 'Wang Lei');
     await go(page, 'portail/proformas');
     await page.getByRole('button', { name: 'Nouvelle proforma' }).click();
@@ -26,6 +35,7 @@ test.describe('Nouvelle proforma', () => {
     await dlg.getByLabel('Produit 2').selectOption({ index: 2 });
     await dlg.getByLabel('Quantité 2').fill('1000');
     await dlg.getByLabel('Prix unitaire 2').fill('10');
+    await expect(dlg).toContainText('Devise USD · 40 % d’acompte · solde à J+10 du départ');
     await expect(dlg).toContainText(/Total : 19[\s\u202f]000 USD/);
     // Proforma jointe obligatoire côté fournisseur
     await dlg.getByRole('button', { name: 'Envoyer à JONAS' }).click();
@@ -42,6 +52,12 @@ test.describe('Nouvelle proforma', () => {
     await page.locator('.page-head').getByRole('button', { name: 'Signer' }).click();
     await page.getByRole('button', { name: 'Signer et tamponner' }).click();
     await expect(toast(page)).toContainText('PF-2026-0154 signée et tamponnée');
+    const pf = await page.evaluate(() => {
+      const k = Object.keys(localStorage).find((x) => x.startsWith('jonas-buying-state'))!;
+      return JSON.parse(localStorage.getItem(k)!).proformas.find((p: { id: string }) => p.id === 'PF-2026-0154');
+    });
+    expect(pf.currency).toBe('USD');
+    expect(pf.depositPct).toBe(40);
   });
 
   test('JONAS crée une proforma : le fournisseur la voit et dépose son document', async ({ page }) => {

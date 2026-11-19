@@ -416,6 +416,7 @@ export const zh: Record<Key, string> = {
   'np.needLines': '请至少添加一行（产品、数量、单价）',
   'np.needFile': '请附上您的形式发票',
   'np.noProducts': '该供应商暂无已上架产品。',
+  'np.terms': '币种 {cur} · 定金 {dep}% · 开船后 {days} 天付尾款 — 供应商付款条件',
   'be.title': '订舱',
   'be.carrier': '船公司',
   'be.no': '订舱号',
