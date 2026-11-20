@@ -4,6 +4,8 @@ import { Check, ChevronDown, LogIn } from 'lucide-react';
 import { currentUser, useStore } from '../data/store';
 import { homeOf, ROLE_DEFS } from '../data/permissions';
 import { initials } from '../lib/format';
+import { remoteEnabled } from '../data/remote';
+import { supabase } from '../data/supabaseSync';
 import { useT } from '../i18n/context';
 
 /** Changement d'utilisateur (démo) — remplacé par une vraie authentification plus tard. */
@@ -59,7 +61,15 @@ export default function UserSwitcher() {
           {initials(me.name === 'Yzerah' ? 'Y Z' : me.name)}
         </button>
       </div>
-      {open && (
+      {open && remoteEnabled() && (
+        <div className="card menu">
+          <div className="menu-title">{me.name}</div>
+          <div className="menu-row" onClick={() => supabase().auth.signOut()}>
+            Se déconnecter
+          </div>
+        </div>
+      )}
+      {open && !remoteEnabled() && (
         <div className="card menu">
           <div className="menu-title">
             <LogIn size={13} /> {t('us.loginAs')}

@@ -3,6 +3,7 @@
 // (nom, chemin, taille, version, auteur) vont dans l'état de l'application.
 // À remplacer par un stockage serveur partagé (ex. Supabase Storage).
 import JSZip from 'jszip';
+import { remoteEnabled } from '../data/remote';
 
 const DB_NAME = 'jonas-buying-files';
 const STORE = 'blobs';
@@ -29,8 +30,22 @@ async function tx<T>(mode: IDBTransactionMode, run: (s: IDBObjectStore) => IDBRe
 /** Identifiant unique d'un fichier stocké */
 export const newFileId = (productId: string, i: number) => `${productId}-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 7)}`;
 
-export const putBlob = (id: string, blob: Blob) => tx('readwrite', (s) => s.put(blob, id));
-export const getBlob = (id: string) => tx<Blob | undefined>('readonly', (s) => s.get(id) as IDBRequest<Blob | undefined>);
+const localPut = (id: string, blob: Blob) => tx('readwrite', (s) => s.put(blob, id));
+const localGet = (id: string) => tx<Blob | undefined>('readonly', (s) => s.get(id) as IDBRequest<Blob | undefined>);
+
+/** Enregistre un fichier : dans le navigateur, et dans le stockage partagé quand la base Supabase est configurée */
+export async function putBlob(id: string, blob: Blob) {
+  await localPut(id, blob).catch(() => undefined);
+  if (remoteEnabled()) await (await import('../data/supabaseSync')).putRemoteFile(id, blob);
+}
+/** Lit un fichier : copie du navigateur, sinon stockage partagé */
+export async function getBlob(id: string): Promise<Blob | undefined> {
+  const local = await localGet(id).catch(() => undefined);
+  if (local || !remoteEnabled()) return local;
+  const remote = await (await import('../data/supabaseSync')).getRemoteFile(id);
+  if (remote) await localPut(id, remote).catch(() => undefined);
+  return remote;
+}
 export const deleteBlob = (id: string) => tx('readwrite', (s) => s.delete(id));
 
 /** Fichier choisi ou déposé, avec son chemin relatif dans le dossier */
