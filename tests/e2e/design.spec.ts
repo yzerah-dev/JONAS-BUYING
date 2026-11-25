@@ -3,6 +3,7 @@ import { chipCount, expect, go, loginAs, packRef, planCell, planTotal, resetApp,
 test.describe('Espace Designer – planning et validation', () => {
   test.beforeEach(async ({ page }) => {
     await resetApp(page, 'design');
+    await page.getByRole('button', { name: 'Planning de charge' }).click();
     await expect(page.locator('.pk-plan')).toBeVisible();
   });
 
@@ -30,13 +31,14 @@ test.describe('Espace Designer – planning et validation', () => {
     await btn.click();
     await expect(toast(page)).toContainText(String(n));
     // Plus rien à valider pour la Direction sur cette case
-    await expect(page.locator('.pk-chip', { hasText: 'À valider' })).toBeDisabled();
+    await expect(page.locator('.pk-chip', { hasText: 'À valider' })).toHaveCount(0);
   });
 });
 
 test.describe('Espace Designer – réaffectation (administrateur)', () => {
   test.beforeEach(async ({ page }) => {
     await resetApp(page, 'design');
+    await page.getByRole('button', { name: 'Planning de charge' }).click();
     await expect(page.locator('.pk-plan')).toBeVisible();
   });
 
@@ -92,7 +94,7 @@ test.describe('Espace Designer – réaffectation (administrateur)', () => {
   });
 
   test('tri et regroupement par marque', async ({ page }) => {
-    await page.getByRole('tab', { name: 'Designer × semaine' }).click();
+    await (await planCell(page, 'ABIR', 'S47')).click();
     await page.locator('#pk-sort').selectOption('marque');
     await page.locator('#pk-group').selectOption('marque');
     const groups = (await page.locator('.pk-group-head').allInnerTexts()).map((t) => t.split('\n')[0].trim());
@@ -103,6 +105,7 @@ test.describe('Espace Designer – réaffectation (administrateur)', () => {
   test('le designer peut trier mais ni glisser ni pousser en urgent', async ({ page }) => {
     await loginAs(page, 'ABIR');
     await go(page, 'design');
+    await page.getByRole('button', { name: 'Planning de charge' }).click();
     await expect(page.locator('.pk-plan')).toBeVisible({ timeout: 15000 });
     await expect(page.locator('#pk-sort option')).toContainText(['Priorité', 'Marque', 'Collection', 'Type de pack', 'Échéance']);
     await expect(page.locator('.pk-row').first()).toBeVisible();
@@ -116,6 +119,7 @@ test.describe('Espace Designer – démarrage des packs', () => {
     await resetApp(page);
     await loginAs(page, 'ABIR');
     await go(page, 'design');
+    await page.getByRole('button', { name: 'Planning de charge' }).click();
     await expect(page.locator('.pk-plan')).toBeVisible();
   });
 
@@ -193,8 +197,8 @@ test('vues par designer (toutes les semaines) et par semaine (tous les designers
   const views = page.getByRole('tablist', { name: 'Vue' });
   // Par designer : ABIR, rangée semaine par semaine
   await views.getByRole('tab', { name: 'Par designer' }).click();
-  await page.getByLabel('Designer').selectOption('ABIR');
-  await expect(page.locator('.pk-scope h2')).toContainText('ABIR · toutes les semaines');
+  await page.getByRole('group', { name: 'Designer' }).getByRole('button', { name: /ABIR/ }).click();
+  await expect(page.getByRole('group', { name: 'Designer' }).getByRole('button', { name: /ABIR/ })).toHaveAttribute('aria-pressed', 'true');
   // Cartes semaine comme la page Proformas : semaine en cours ouverte, les autres se déplient
   await expect(page.locator('.pk-week').first()).toContainText('Semaine');
   expect(await page.locator('.pk-week').count()).toBeGreaterThan(1);
@@ -204,11 +208,11 @@ test('vues par designer (toutes les semaines) et par semaine (tous les designers
   await expect(page.locator('.pk-week:not(.open)')).toHaveCount((await page.locator('.pk-week').count()) - (await page.locator('.pk-week.open').count()));
   // Par semaine : tous les designers, rangés designer par designer
   await views.getByRole('tab', { name: 'Par semaine' }).click();
-  await expect(page.locator('.pk-scope h2')).toContainText('Toute l’équipe · Semaine');
   const heads = await page.locator('.pk-group-head').allInnerTexts();
   expect(heads.some((h) => h.includes('ABIR'))).toBe(true);
   expect(heads.some((h) => h.includes('ROLAND'))).toBe(true);
-  // Designer × semaine : la case du planning
-  await views.getByRole('tab', { name: 'Designer × semaine' }).click();
+  // Designer × semaine : en cliquant une case du planning
+  await (await planCell(page, 'ABIR', 'S47')).click();
+  await expect(views.getByRole('tab', { name: 'Designer × semaine' })).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('.pk-group-head')).toHaveCount(0);
 });

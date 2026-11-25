@@ -1875,3 +1875,13 @@ select.pi-input { cursor: pointer; }
 .pk-docs .pf-folder-name { font-size: 12px; }
 .ps-round.over .ps-circle { transform: scale(1.1); box-shadow: 0 0 0 6px rgba(18, 137, 108, 0.35); border-color: var(--green); }
 .ps-round.over { background: var(--green-soft); }
+/* Développement simplifié : pastilles designers */
+.pk-designers { display: flex; flex-wrap: wrap; gap: 8px; }
+.pk-dchip { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px 0 8px; border-radius: 999px; border: 1px solid var(--line); background: #fff; font-weight: 700; font-size: 14px; cursor: pointer; }
+.pk-dchip b { font-size: 15px; color: var(--muted); }
+.pk-dchip.active { background: var(--grad, var(--green)); color: #fff; border-color: transparent; }
+.pk-dchip.active b { color: #fff; }
+.pk-dchip .dev-avatar { width: 26px; height: 26px; font-size: 11px; }
+.pk-views { gap: 6px; }
+.pk-view { height: 38px; font-size: 14px; }
+@media (max-width: 760px) { .pk-designers { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; } .pk-dchip { flex: none; } }

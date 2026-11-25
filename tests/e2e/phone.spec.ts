@@ -49,6 +49,7 @@ test.describe('Téléphone : pas de défilement horizontal', () => {
   test('/design – designer connecté', async ({ page }) => {
     await resetApp(page);
     await setUser(page, 'lea', 'design');
+    await page.getByRole('button', { name: 'Planning de charge' }).click();
     await expect(page.locator('.pk-plan')).toBeVisible();
     await expectNoHorizontalOverflow(page);
   });

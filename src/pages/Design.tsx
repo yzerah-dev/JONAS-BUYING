@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, Box, Calendar, Check, ChevronDown, ChevronUp, Download, FileText, Flame, History, Layers, Paperclip, Play, Scissors, Search, Send, X } from 'lucide-react';
+import { AlertTriangle, Box, Calendar, Users, Check, ChevronDown, ChevronUp, Download, FileText, Flame, History, Layers, Paperclip, Play, Scissors, Search, Send, X } from 'lucide-react';
 import PackFiles from '../components/PackFiles';
 import { pressable } from '../lib/a11y';
 import { brandOf, byId, capacityOf, matchTrack, packDone, packLate, packTrack, TRACK_CHIPS, TRACK_ORDER, useAuth, useStore, type State, type TrackFilter } from '../data/store';
@@ -78,7 +78,11 @@ export default function Design() {
 function DesignPage() {
   const { state, dispatch } = useStore();
   const auth = useAuth();
-  const designers = useMemo(() => [...new Set(state.products.map((p) => p.pack.designer))].sort(), [state.products]);
+  // Designers : toute l'équipe (même sans produit attribué), plus ceux déjà sur des produits
+  const designers = useMemo(
+    () => [...new Set([...state.users.filter((u) => u.role === 'designer' && u.active && u.designerName).map((u) => u.designerName!), ...state.products.map((p) => p.pack.designer)])].sort(),
+    [state.products, state.users],
+  );
   const colorOf = designerColor;
 
   // Colonnes du planning : de la semaine précédente à la dernière échéance (défilement horizontal)
@@ -90,6 +94,7 @@ function DesignPage() {
 
   const [designer, setDesigner] = useState(auth.user.designerName ?? 'all');
   const [view, setView] = useState<'case' | 'designer' | 'semaine'>('designer');
+  const [showPlan, setShowPlan] = useState(false);
   // Cartes semaine repliées / dépliées (par défaut : semaine en cours et suivante ouvertes)
   const [toggled, setToggled] = useState<Set<string>>(new Set());
   const [week, setWeek] = useState(weekKey(TODAY));
@@ -132,9 +137,6 @@ function DesignPage() {
     .filter((p) => !s || `${p.ref} ${p.name} ${byId(state.suppliers, p.supplierId).name} ${brandOf(state.brands, p.brandId).name} ${p.collection} ${p.pack.type}`.toLowerCase().includes(s))
     .sort(sorters[sortBy]);
   const sel = list.find((p) => p.id === selId) ?? scope.find((p) => p.id === selId);
-  const done = scope.filter(packDone).length;
-  const late = scope.filter(packLate).length;
-  const weekSample = weeks.find((w) => w.key === week)?.sample ?? TODAY;
 
   const shown = list.slice(0, view === 'designer' ? Math.max(limit, 1000) : limit);
   const groups: [string, Product[]][] = useMemo(() => {
@@ -238,94 +240,85 @@ function DesignPage() {
 
   return (
     <div className="pf-page">
-      <div className="row wrap" style={{ gap: 16 }}>
+      <div className="row wrap" style={{ gap: 12, alignItems: 'center' }}>
         <h1 className="pf-title">Développement</h1>
-        <span className="muted">
-          Capacité par défaut : {state.settings.defaultCapacity} packs / designer / semaine{auth.can('users.manage') ? ' (réglable dans Paramètres)' : ''}
-        </span>
+        <div className="grow" />
+        <button type="button" className={`btn ${showPlan ? 'primary' : ''}`} aria-expanded={showPlan} onClick={() => setShowPlan(!showPlan)}>
+          <Calendar size={16} /> Planning de charge
+        </button>
       </div>
 
-      {/* Planning de charge designers × semaines */}
-      <div className="card pk-plan-wrap">
-        <table className="pk-plan">
-          <thead>
-            <tr>
-              <th>Designer</th>
-              {weeks.map((w) => (
-                <th key={w.key} className={w.key === weekKey(TODAY) ? 'now' : ''}>
-                  <b>{weekLabel(w.sample)}</b>
-                  <small>{weekRange(w.sample).replace(/ \d{4}$/, '')}</small>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {[...designers, 'all'].map((d) => (
-              <tr key={d} className={d === 'all' ? 'total' : ''}>
-                <th {...(d === 'all' ? {} : dropZone(`who-${d}`, d))} className={dropKey === `who-${d}` ? 'pk-drop' : ''}>
-                  <button className="pk-who" onClick={() => pick(d, week)}>
-                    {d === 'all' ? (
-                      <b>Équipe</b>
-                    ) : (
-                      <>
-                        <span className="dev-avatar" style={{ background: colorOf(d) }}>
-                          {initials(d)}
-                        </span>
-                        <b>{d}</b>
-                      </>
-                    )}
-                  </button>
-                </th>
-                {weeks.map((w) => {
-                  const items = cell(d, w.key);
-                  const ok = items.filter(packDone).length;
-                  const lateN = items.filter(packLate).length;
-                  const cap = d === 'all' ? designers.reduce((t, x) => t + capacityOf(state, x), 0) : capacityOf(state, d);
-                  const over = items.length > cap;
-                  const active = designer === d && week === w.key;
-                  return (
-                    <td key={w.key} {...dropZone(`${d}|${w.key}`, d === 'all' ? undefined : d, w.sample)}>
-                      <button
-                        className={`pk-cell ${active ? 'active' : ''} ${over ? 'over' : ''} ${!items.length ? 'empty' : ''} ${dropKey === `${d}|${w.key}` ? 'drop' : ''}`}
-                        onClick={() => pick(d, w.key)}
-                      >
-                        <span className="pk-cell-n">
-                          <b>{ok}</b>/{items.length}
-                        </span>
-                        <span className="pk-bar">
-                          <span style={{ width: `${items.length ? (ok / items.length) * 100 : 0}%` }} />
-                        </span>
-                        <span className="pk-cell-flags">
-                          {over && <em className="over">+{items.length - cap}</em>}
-                          {lateN > 0 && <em className="late">{lateN} retard</em>}
-                        </span>
-                      </button>
-                    </td>
-                  );
-                })}
+      {/* Planning de charge designers × semaines (replié par défaut) */}
+      {showPlan && (
+        <div className="card pk-plan-wrap">
+          <table className="pk-plan">
+            <thead>
+              <tr>
+                <th>Designer</th>
+                {weeks.map((w) => (
+                  <th key={w.key} className={w.key === weekKey(TODAY) ? 'now' : ''}>
+                    <b>{weekLabel(w.sample)}</b>
+                    <small>{weekRange(w.sample).replace(/ \d{4}$/, '')}</small>
+                  </th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {canAssign && (
-        <div className="pk-hint">
-          Administrateur : glissez un pack (ou votre sélection) sur une case du planning pour changer de designer et/ou de semaine, ou sur un nom de designer pour ne changer que le designer.
+            </thead>
+            <tbody>
+              {[...designers, 'all'].map((d) => (
+                <tr key={d} className={d === 'all' ? 'total' : ''}>
+                  <th {...(d === 'all' ? {} : dropZone(`who-${d}`, d))} className={dropKey === `who-${d}` ? 'pk-drop' : ''}>
+                    <button className="pk-who" onClick={() => pick(d, week)}>
+                      {d === 'all' ? (
+                        <b>Équipe</b>
+                      ) : (
+                        <>
+                          <span className="dev-avatar" style={{ background: colorOf(d) }}>
+                            {initials(d)}
+                          </span>
+                          <b>{d}</b>
+                        </>
+                      )}
+                    </button>
+                  </th>
+                  {weeks.map((w) => {
+                    const items = cell(d, w.key);
+                    const ok = items.filter(packDone).length;
+                    const lateN = items.filter(packLate).length;
+                    const cap = d === 'all' ? designers.reduce((t, x) => t + capacityOf(state, x), 0) : capacityOf(state, d);
+                    const over = items.length > cap;
+                    const active = designer === d && week === w.key;
+                    return (
+                      <td key={w.key} {...dropZone(`${d}|${w.key}`, d === 'all' ? undefined : d, w.sample)}>
+                        <button
+                          className={`pk-cell ${active ? 'active' : ''} ${over ? 'over' : ''} ${!items.length ? 'empty' : ''} ${dropKey === `${d}|${w.key}` ? 'drop' : ''}`}
+                          onClick={() => pick(d, w.key)}
+                        >
+                          <span className="pk-cell-n">
+                            <b>{ok}</b>/{items.length}
+                          </span>
+                          <span className="pk-bar">
+                            <span style={{ width: `${items.length ? (ok / items.length) * 100 : 0}%` }} />
+                          </span>
+                          <span className="pk-cell-flags">
+                            {over && <em className="over">+{items.length - cap}</em>}
+                            {lateN > 0 && <em className="late">{lateN} retard</em>}
+                          </span>
+                        </button>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
       <div className="split">
         <div className="col" style={{ gap: 12 }}>
-          {/* Choix de la vue */}
+          {/* Vue et designers */}
           <div className="pk-views" role="tablist" aria-label="Vue">
-            {(
-              [
-                ['designer', 'Par designer'],
-                ['semaine', 'Par semaine'],
-                ['case', 'Designer × semaine'],
-              ] as const
-            ).map(([v, label]) => (
+            {([['designer', 'Par designer'], ['semaine', 'Par semaine'], ...(view === 'case' ? ([['case', 'Designer × semaine']] as const) : [])] as const).map(([v, label]) => (
               <button
                 key={v}
                 type="button"
@@ -337,16 +330,6 @@ function DesignPage() {
                 {label}
               </button>
             ))}
-            {view !== 'semaine' && (
-              <select className="input pk-view-pick" aria-label="Designer" value={designer} onChange={(e) => setDesigner(e.target.value)}>
-                <option value="all">Toute l’équipe</option>
-                {designers.map((d) => (
-                  <option key={d} value={d}>
-                    {d}
-                  </option>
-                ))}
-              </select>
-            )}
             {view !== 'designer' && (
               <select className="input pk-view-pick" aria-label="Semaine" value={week} onChange={(e) => setWeek(e.target.value)}>
                 {weeks.map((w) => (
@@ -357,51 +340,36 @@ function DesignPage() {
               </select>
             )}
           </div>
-
-          <div className="pk-scope">
-            {designer !== 'all' && view !== 'semaine' && (
-              <span className="dev-avatar lg" style={{ background: colorOf(designer) }}>
-                {initials(designer)}
-              </span>
-            )}
-            <div>
-              <h2>
-                {view === 'semaine' ? 'Toute l’équipe' : designer === 'all' ? 'Toute l’équipe' : designer}
-                {view === 'designer' ? ' · toutes les semaines' : ` · Semaine ${weekLabel(weekSample).slice(1)}`}
-              </h2>
-              <span className="muted">{view === 'designer' ? 'Packs à venir, semaine par semaine' : weekRange(weekSample)}</span>
+          {view !== 'semaine' && (
+            <div className="pk-designers" role="group" aria-label="Designer">
+              {['all', ...designers].map((d) => {
+                const n = state.products.filter((p) => (d === 'all' || p.pack.designer === d) && weekKey(p.pack.artworkDeadline) >= (weeks[0]?.key ?? weekKey(TODAY))).length;
+                return (
+                  <button key={d} type="button" className={`pk-dchip ${designer === d ? 'active' : ''}`} aria-pressed={designer === d} onClick={() => (setDesigner(d), setSelected(new Set()))}>
+                    {d === 'all' ? (
+                      <Users size={15} />
+                    ) : (
+                      <span className="dev-avatar" style={{ background: colorOf(d) }}>
+                        {initials(d)}
+                      </span>
+                    )}
+                    {d === 'all' ? 'Toute l’équipe' : d}
+                    <b>{n}</b>
+                  </button>
+                );
+              })}
             </div>
-            <div className="pk-scope-stats">
-              <span>
-                <b>{scope.length}</b> packs
-              </span>
-              <span className="green">
-                <b>{done}</b> validés
-              </span>
-              <span className="violet-t">
-                <b>{scope.filter((p) => statusKey(p) === 'en_creation').length}</b> en création
-              </span>
-              <span className={late ? 'red' : ''}>
-                <b>{late}</b> en retard
-              </span>
-              {designer !== 'all' && view === 'case' && (
-                <span className={scope.length > capacityOf(state, designer) ? 'red' : 'muted'}>
-                  <b>{scope.length}</b>/{capacityOf(state, designer)} capacité
-                </span>
-              )}
-            </div>
-            <div className="pk-scope-bar">
-              <span style={{ width: `${scope.length ? (done / scope.length) * 100 : 0}%` }} />
-            </div>
-          </div>
+          )}
 
           <div className="pk-chips">
             {STATUS_CHIPS.map((c) => {
               const n = scope.filter((p) => matches(p, c.id)).length;
               return (
-                <button key={c.id} className={`pk-chip ${status === c.id ? 'active' : ''} ${c.id === 'retard' && n ? 'warn' : ''}`} onClick={() => setStatus(c.id)} disabled={!n && c.id !== 'all'}>
-                  {c.label} <b>{n}</b>
-                </button>
+                (n > 0 || c.id === 'all' || status === c.id) && (
+                  <button key={c.id} className={`pk-chip ${status === c.id ? 'active' : ''} ${c.id === 'retard' && n ? 'warn' : ''}`} onClick={() => setStatus(c.id)}>
+                    {c.label} <b>{n}</b>
+                  </button>
+                )
               );
             })}
           </div>

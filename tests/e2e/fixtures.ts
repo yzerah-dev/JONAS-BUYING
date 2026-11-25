@@ -99,6 +99,8 @@ export async function chipCount(page: Page, label: string) {
 
 /** Case du planning designers × semaines de l'Espace Designer. */
 export async function planCell(page: Page, designer: string, week: string): Promise<Locator> {
+  // Le planning de charge est replié par défaut : on l'ouvre
+  if (!(await page.locator('.pk-plan').isVisible())) await page.getByRole('button', { name: 'Planning de charge' }).click();
   await page.locator('.pk-plan thead th').nth(1).waitFor();
   const heads = await page.locator('.pk-plan thead th').allInnerTexts();
   const idx = heads.findIndex((t) => t.includes(week));
