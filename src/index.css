@@ -1674,3 +1674,20 @@ select.pi-input { cursor: pointer; }
 .ps-facts small { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); }
 .ps-facts b { font-size: 17px; }
 .pack-space > .btn { align-self: flex-start; }
+
+/* Design & Pack : trois ronds, puis la validation */
+.ps-rounds { display: flex; justify-content: center; gap: 48px; flex-wrap: wrap; padding: 8px 0 4px; }
+.ps-round { display: flex; flex-direction: column; align-items: center; gap: 6px; background: none; border: 0; cursor: pointer; padding: 6px 10px; border-radius: 16px; }
+.ps-round.open { background: #f4f7f6; }
+.ps-circle { width: 96px; height: 96px; border-radius: 50%; display: grid; place-items: center; border: 4px solid; transition: transform 0.15s; }
+.ps-round:hover .ps-circle { transform: scale(1.04); }
+.ps-round.ok .ps-circle { background: var(--green); border-color: var(--green); color: #fff; }
+.ps-round.todo .ps-circle { background: #fff8ec; border-color: #f59e0b; border-style: dashed; color: #b45309; }
+.ps-round.open .ps-circle { box-shadow: 0 0 0 5px rgba(18, 137, 108, 0.18); }
+.ps-round b { font-size: 17px; }
+.ps-round small { font-size: 13px; color: var(--muted); }
+.ps-round.todo small { color: #b45309; font-weight: 700; }
+.ps-grid.single { grid-template-columns: 1fr; }
+.ps-validation { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line, #e3e7e5); }
+.ps-validation-title { font-size: 16px; font-weight: 800; margin-bottom: 6px; }
+.pack-space > .btn { justify-self: start; width: fit-content; }

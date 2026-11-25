@@ -1,48 +1,24 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import {
-  Archive,
-  Download,
-  File as FileIcon,
-  FileImage,
-  FileText,
-  Folder,
-  FolderUp,
-  Loader2,
-  Trash2,
-  Upload,
-  X,
-} from "lucide-react";
-import { canPackFiles, currentUser, useAuth, useStore } from "../data/store";
-import type { PackFile, PackFileKind, Product } from "../data/types";
-import {
-  deleteBlob,
-  newFileId,
-  supplierScope,
-  ext,
-  fromDrop,
-  fromInput,
-  fsize,
-  getBlob,
-  putBlob,
-  saveBlob,
-  zipBlobs,
-  type PickedFile,
-} from "../lib/files";
-import { fstamp } from "../lib/format";
-import { toast } from "./ui-shared";
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Archive, Check, Download, Package, Scissors, File as FileIcon, FileImage, FileText, Folder, FolderUp, Loader2, Trash2, Upload, X } from 'lucide-react';
+import { canPackFiles, currentUser, useAuth, useStore } from '../data/store';
+import type { PackFile, PackFileKind, Product } from '../data/types';
+import { deleteBlob, newFileId, supplierScope, ext, fromDrop, fromInput, fsize, getBlob, putBlob, saveBlob, zipBlobs, type PickedFile } from '../lib/files';
+import { fstamp } from '../lib/format';
+import { toast } from './ui-shared';
 
-const IMAGE = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg"]);
+const IMAGE = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg']);
 const isImage = (f: PackFile) => IMAGE.has(ext(f.name));
-const QUALITY_TYPES = [
-  "MSDS (fiche de sécurité)",
-  "Fiche composition",
-  "Certificat de conformité",
-  "Rapport de test",
-  "Fiche technique",
-  "Autre",
+const QUALITY_TYPES = ['MSDS (fiche de sécurité)', 'Fiche composition', 'Certificat de conformité', 'Rapport de test', 'Fiche technique', 'Autre'];
+
+type Round = 'diecut' | 'pack' | 'docs';
+/** Les trois ronds de l'espace pack */
+const ROUNDS: { id: Round; label: string; icon: typeof Scissors }[] = [
+  { id: 'diecut', label: 'Die cut', icon: Scissors },
+  { id: 'pack', label: 'Pack', icon: Package },
+  { id: 'docs', label: 'Documents', icon: FileText },
 ];
 
-/** Les 6 rubriques de l'espace pack, dans l'ordre du travail */
+/** Les rubriques de l'espace pack (le rond « Pack » regroupe brief, ancien pack, pack et dossier pack) */
 const SECTIONS: {
   kind: PackFileKind;
   title: string;
@@ -51,68 +27,59 @@ const SECTIONS: {
   zip: string;
 }[] = [
   {
-    kind: "brief",
-    title: "Brief marketing",
-    who: "Acheteur · Direction · Pilote",
-    hint: "Photos de ce à quoi le pack doit ressembler (références, inspirations, concurrents).",
-    zip: "1 - Brief marketing",
+    kind: 'brief',
+    title: 'Brief marketing',
+    who: 'Acheteur · Direction · Pilote',
+    hint: 'Photos de ce à quoi le pack doit ressembler (références, inspirations, concurrents).',
+    zip: '1 - Brief marketing',
   },
   {
-    kind: "diecut",
-    title: "Die cut",
-    who: "Acheteur · Direction · Pilote · Fournisseur",
-    hint: "Gabarit de découpe, tous formats (PDF, AI, DXF, EPS, ZIP…).",
-    zip: "2 - Die cut",
+    kind: 'diecut',
+    title: 'Die cut',
+    who: 'Acheteur · Direction · Pilote · Fournisseur',
+    hint: 'Gabarit de découpe, tous formats (PDF, AI, DXF, EPS, ZIP…).',
+    zip: '2 - Die cut',
   },
   {
-    kind: "oldpack",
-    title: "Ancien pack",
-    who: "Acheteur · Direction · Pilote · Fournisseur",
-    hint: "Pack existant à reprendre ou à faire évoluer.",
-    zip: "3 - Ancien pack",
+    kind: 'oldpack',
+    title: 'Ancien pack',
+    who: 'Acheteur · Direction · Pilote · Fournisseur',
+    hint: 'Pack existant à reprendre ou à faire évoluer.',
+    zip: '3 - Ancien pack',
   },
   {
-    kind: "pack",
-    title: "Pack",
-    who: "Designer",
-    hint: "Fichier final du pack (AI, PDF…). Chaque dépôt crée une version qui part en validation.",
-    zip: "4 - Pack",
+    kind: 'pack',
+    title: 'Pack',
+    who: 'Designer',
+    hint: 'Fichier final du pack (AI, PDF…). Chaque dépôt crée une version qui part en validation.',
+    zip: '4 - Pack',
   },
   {
-    kind: "crea",
-    title: "Dossier pack",
-    who: "Designer",
-    hint: "Tous les fichiers de travail : sources, rendus, typos… (un dossier entier peut être déposé).",
-    zip: "5 - Dossier pack",
+    kind: 'crea',
+    title: 'Dossier pack',
+    who: 'Designer',
+    hint: 'Tous les fichiers de travail : sources, rendus, typos… (un dossier entier peut être déposé).',
+    zip: '5 - Dossier pack',
   },
   {
-    kind: "quality",
-    title: "Fiches qualité",
-    who: "Acheteur · Direction · Pilote · Fournisseur",
-    hint: "MSDS, fiche composition, certificats, rapports de test…",
-    zip: "6 - Fiches qualité",
+    kind: 'quality',
+    title: 'Fiches qualité',
+    who: 'Acheteur · Direction · Pilote · Fournisseur',
+    hint: 'MSDS, fiche composition, certificats, rapports de test…',
+    zip: '6 - Fiches qualité',
   },
 ];
 
 function KindIcon({ f }: { f: PackFile }) {
   const e = ext(f.name);
   if (isImage(f)) return <FileImage size={16} />;
-  if (["pdf", "ai", "eps", "psd", "indd", "dxf", "svg"].includes(e))
-    return <FileText size={16} />;
-  if (["zip", "rar", "7z"].includes(e)) return <Archive size={16} />;
+  if (['pdf', 'ai', 'eps', 'psd', 'indd', 'dxf', 'svg'].includes(e)) return <FileText size={16} />;
+  if (['zip', 'rar', '7z'].includes(e)) return <Archive size={16} />;
   return <FileIcon size={16} />;
 }
 
 /** Miniature d'une image stockée (chargée à la demande) */
-function Thumb({
-  f,
-  onOpen,
-  big,
-}: {
-  f: PackFile;
-  onOpen: (url: string) => void;
-  big?: boolean;
-}) {
+function Thumb({ f, onOpen, big }: { f: PackFile; onOpen: (url: string) => void; big?: boolean }) {
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
     let u: string | null = null;
@@ -127,14 +94,7 @@ function Thumb({
     };
   }, [f.id]);
   if (!url) return <span className="pf-file-ico">{<KindIcon f={f} />}</span>;
-  return (
-    <img
-      className={big ? "ps-inspi" : "pf-file-thumb"}
-      src={url}
-      alt={f.name}
-      onClick={() => onOpen(url)}
-    />
-  );
+  return <img className={big ? 'ps-inspi' : 'pf-file-thumb'} src={url} alt={f.name} onClick={() => onOpen(url)} />;
 }
 
 /**
@@ -148,36 +108,35 @@ export default function PackFiles({ p }: { p: Product }) {
   const can = (kind: PackFileKind) => canPackFiles(state, me, p.id, kind);
   const files = p.pack.files ?? [];
   const of = (kind: PackFileKind) => files.filter((f) => f.kind === kind);
-  const packs = of("pack").sort((a, b) => (b.version ?? 0) - (a.version ?? 0));
+  const packs = of('pack').sort((a, b) => (b.version ?? 0) - (a.version ?? 0));
   const [busy, setBusy] = useState<string | null>(null);
   const [over, setOver] = useState<PackFileKind | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [docType, setDocType] = useState(QUALITY_TYPES[0]);
-  const [brief, setBrief] = useState(p.pack.brief ?? "");
-  const [briefSeen, setBriefSeen] = useState(p.pack.brief ?? "");
-  if ((p.pack.brief ?? "") !== briefSeen) {
-    setBriefSeen(p.pack.brief ?? "");
-    setBrief(p.pack.brief ?? "");
+  // Rond ouvert : le designer arrive sur le pack ; les autres sur le premier rond à faire
+  const [open, setOpen] = useState<Round>(() => {
+    if (me.role === 'designer') return 'pack';
+    const has = (k: PackFileKind) => files.some((f) => f.kind === k);
+    return !has('diecut') ? 'diecut' : !has('pack') ? 'pack' : 'docs';
+  });
+  const [brief, setBrief] = useState(p.pack.brief ?? '');
+  const [briefSeen, setBriefSeen] = useState(p.pack.brief ?? '');
+  if ((p.pack.brief ?? '') !== briefSeen) {
+    setBriefSeen(p.pack.brief ?? '');
+    setBrief(p.pack.brief ?? '');
   }
-  const inputs = useRef<
-    Partial<Record<PackFileKind | "dir", HTMLInputElement | null>>
-  >({});
+  const inputs = useRef<Partial<Record<PackFileKind | 'dir', HTMLInputElement | null>>>({});
   const canBrief = auth.allowed({
-    type: "setPackBrief",
+    type: 'setPackBrief',
     productId: p.id,
-    brief: "",
+    brief: '',
   });
 
   async function upload(kind: PackFileKind, picked: PickedFile[]) {
     if (!picked.length) return;
-    if (kind === "pack") picked = picked.slice(0, 1);
-    if (kind === "brief")
-      picked = picked.filter(
-        ({ file }) =>
-          file.type.startsWith("image/") || IMAGE.has(ext(file.name)),
-      );
-    if (!picked.length)
-      return toast("Brief marketing : déposez des photos (JPG, PNG, WEBP…)");
+    if (kind === 'pack') picked = picked.slice(0, 1);
+    if (kind === 'brief') picked = picked.filter(({ file }) => file.type.startsWith('image/') || IMAGE.has(ext(file.name)));
+    if (!picked.length) return toast('Brief marketing : déposez des photos (JPG, PNG, WEBP…)');
     setBusy(`Envoi de ${picked.length} fichier(s)…`);
     try {
       const metas = [];
@@ -190,18 +149,14 @@ export default function PackFiles({ p }: { p: Product }) {
           path,
           size: file.size,
           type: file.type,
-          ...(kind === "quality" ? { docType } : {}),
+          ...(kind === 'quality' ? { docType } : {}),
         });
       }
-      dispatch({ type: "addPackFiles", productId: p.id, kind, files: metas });
+      dispatch({ type: 'addPackFiles', productId: p.id, kind, files: metas });
       const title = SECTIONS.find((s) => s.kind === kind)!.title;
-      toast(
-        kind === "pack"
-          ? `Pack V${Math.max(0, ...packs.map((f) => f.version ?? 0)) + 1} envoyé en validation`
-          : `${metas.length} fichier(s) ajouté(s) : ${title}`,
-      );
+      toast(kind === 'pack' ? `Pack V${Math.max(0, ...packs.map((f) => f.version ?? 0)) + 1} envoyé en validation` : `${metas.length} fichier(s) ajouté(s) : ${title}`);
     } catch {
-      toast("Envoi impossible : espace de stockage insuffisant ou refusé.");
+      toast('Envoi impossible : espace de stockage insuffisant ou refusé.');
     } finally {
       setBusy(null);
     }
@@ -209,44 +164,38 @@ export default function PackFiles({ p }: { p: Product }) {
 
   async function download(f: PackFile) {
     const blob = await getBlob(f.id);
-    if (!blob) return toast("Fichier introuvable sur cet appareil.");
+    if (!blob) return toast('Fichier introuvable sur cet appareil.');
     const r = await saveBlob(blob, f.name);
-    if (r === "zipped")
-      toast(
-        `${f.name} téléchargé dans un .zip (format non téléchargeable tel quel ici)`,
-      );
-    if (r === "unavailable")
-      toast("Téléchargement non disponible dans cette vue.");
+    if (r === 'zipped') toast(`${f.name} téléchargé dans un .zip (format non téléchargeable tel quel ici)`);
+    if (r === 'unavailable') toast('Téléchargement non disponible dans cette vue.');
   }
 
   async function downloadAll() {
-    setBusy("Préparation du .zip…");
+    setBusy('Préparation du .zip…');
     try {
       const items = [];
       for (const s of SECTIONS) {
-        const list = s.kind === "pack" ? packs.slice(0, 1) : of(s.kind);
+        const list = s.kind === 'pack' ? packs.slice(0, 1) : of(s.kind);
         for (const f of list) {
           const blob = await getBlob(f.id);
           if (blob)
             items.push({
-              path: `${s.zip}/${s.kind === "quality" && f.docType ? `${f.docType}/` : ""}${s.kind === "crea" ? f.path : f.name}`,
+              path: `${s.zip}/${s.kind === 'quality' && f.docType ? `${f.docType}/` : ''}${s.kind === 'crea' ? f.path : f.name}`,
               blob,
             });
         }
       }
-      if (!items.length)
-        return toast("Aucun fichier disponible sur cet appareil.");
+      if (!items.length) return toast('Aucun fichier disponible sur cet appareil.');
       const zip = await zipBlobs(items);
       const r = await saveBlob(zip, `${p.ref}_dossier_pack.zip`);
-      if (r === "unavailable")
-        toast("Téléchargement non disponible dans cette vue.");
+      if (r === 'unavailable') toast('Téléchargement non disponible dans cette vue.');
     } finally {
       setBusy(null);
     }
   }
 
   async function remove(f: PackFile) {
-    dispatch({ type: "removePackFile", productId: p.id, fileId: f.id });
+    dispatch({ type: 'removePackFile', productId: p.id, fileId: f.id });
     await deleteBlob(f.id).catch(() => undefined);
     toast(`${f.name} supprimé`);
   }
@@ -255,13 +204,13 @@ export default function PackFiles({ p }: { p: Product }) {
     can(kind)
       ? {
           onDragOver: (e: React.DragEvent) => {
-            if (!e.dataTransfer.types.includes("Files")) return;
+            if (!e.dataTransfer.types.includes('Files')) return;
             e.preventDefault();
             setOver(kind);
           },
           onDragLeave: () => setOver(null),
           onDrop: async (e: React.DragEvent) => {
-            if (!e.dataTransfer.types.includes("Files")) return;
+            if (!e.dataTransfer.types.includes('Files')) return;
             e.preventDefault();
             setOver(null);
             upload(kind, await fromDrop(e.dataTransfer));
@@ -271,11 +220,7 @@ export default function PackFiles({ p }: { p: Product }) {
 
   const fileLine = (f: PackFile, label?: ReactNode) => (
     <div key={f.id} className="pf-file">
-      {isImage(f) ? (
-        <Thumb f={f} onOpen={setPreview} />
-      ) : (
-        <span className="pf-file-ico">{<KindIcon f={f} />}</span>
-      )}
+      {isImage(f) ? <Thumb f={f} onOpen={setPreview} /> : <span className="pf-file-ico">{<KindIcon f={f} />}</span>}
       <span className="pf-file-name">
         <b title={f.path}>
           {label}
@@ -285,19 +230,11 @@ export default function PackFiles({ p }: { p: Product }) {
           {fsize(f.size)} · {fstamp(f.uploadedAt)} · {f.uploadedBy}
         </small>
       </span>
-      <button
-        className="icon-btn"
-        title="Télécharger"
-        onClick={() => download(f)}
-      >
+      <button className="icon-btn" title="Télécharger" onClick={() => download(f)}>
         <Download size={16} />
       </button>
       {can(f.kind) && (
-        <button
-          className="icon-btn danger-ico"
-          title="Supprimer"
-          onClick={() => remove(f)}
-        >
+        <button className="icon-btn danger-ico" title="Supprimer" onClick={() => remove(f)}>
           <Trash2 size={16} />
         </button>
       )}
@@ -305,11 +242,7 @@ export default function PackFiles({ p }: { p: Product }) {
   );
 
   /** Bouton de dépôt d'une rubrique (avec son champ fichier) */
-  const pick = (
-    kind: PackFileKind,
-    label: string,
-    opts: { multiple?: boolean; accept?: string; primary?: boolean } = {},
-  ) =>
+  const pick = (kind: PackFileKind, label: string, opts: { multiple?: boolean; accept?: string; primary?: boolean } = {}) =>
     can(kind) && (
       <>
         <input
@@ -321,103 +254,73 @@ export default function PackFiles({ p }: { p: Product }) {
           multiple={opts.multiple}
           accept={opts.accept}
           aria-label={`Déposer : ${SECTIONS.find((s) => s.kind === kind)!.title}`}
-          onChange={(e) => (
-            upload(kind, fromInput(e.target.files)),
-            (e.target.value = "")
-          )}
+          onChange={(e) => (upload(kind, fromInput(e.target.files)), (e.target.value = ''))}
         />
-        <button
-          className={`btn sm ${opts.primary ? "primary" : ""}`}
-          onClick={() => inputs.current[kind]?.click()}
-          disabled={!!busy}
-        >
+        <button className={`btn sm ${opts.primary ? 'primary' : ''}`} onClick={() => inputs.current[kind]?.click()} disabled={!!busy}>
           <Upload size={14} /> {label}
         </button>
       </>
     );
 
   const status = (kind: PackFileKind) => {
-    const n = kind === "pack" ? packs.length : of(kind).length;
-    if (kind === "brief")
-      return (
-        (p.pack.brief ? "Texte" : "") +
-          (n ? `${p.pack.brief ? " + " : ""}${n} photo(s)` : "") || "À faire"
-      );
-    if (kind === "pack") return n ? `V${packs[0].version}` : "À faire";
-    return n ? `${n} fichier(s)` : kind === "oldpack" ? "Aucun" : "Manquant";
+    const n = kind === 'pack' ? packs.length : of(kind).length;
+    if (kind === 'brief') return (p.pack.brief ? 'Texte' : '') + (n ? `${p.pack.brief ? ' + ' : ''}${n} photo(s)` : '') || 'À faire';
+    if (kind === 'pack') return n ? `V${packs[0].version}` : 'À faire';
+    return n ? `${n} fichier(s)` : kind === 'oldpack' ? 'Aucun' : 'Manquant';
   };
-  const done = (kind: PackFileKind) =>
-    kind === "brief"
-      ? !!p.pack.brief || of("brief").length > 0
-      : of(kind).length > 0;
+  const done = (kind: PackFileKind) => (kind === 'brief' ? !!p.pack.brief || of('brief').length > 0 : of(kind).length > 0);
 
-  const section = (
-    kind: PackFileKind,
-    actions: ReactNode,
-    children: ReactNode,
-  ) => {
+  const section = (kind: PackFileKind, actions: ReactNode, children: ReactNode) => {
     const s = SECTIONS.find((x) => x.kind === kind)!;
     return (
-      <section
-        className={`pf-drop ps-section ${over === kind ? "over" : ""} ${kind === "brief" ? "wide" : ""}`}
-        aria-label={s.title}
-        {...drop(kind)}
-      >
+      <section className={`pf-drop ps-section ${over === kind ? 'over' : ''} ${kind === 'brief' ? 'wide' : ''}`} aria-label={s.title} {...drop(kind)}>
         <header>
           <b>{s.title}</b>
-          <span
-            className={`ps-status ${done(kind) ? "ok" : kind === "oldpack" ? "" : "todo"}`}
-          >
-            {status(kind)}
-          </span>
+          <span className={`ps-status ${done(kind) ? 'ok' : kind === 'oldpack' ? '' : 'todo'}`}>{status(kind)}</span>
           <div className="grow" />
           {actions}
         </header>
         <div className="ps-who">Déposé par : {s.who}</div>
         {children}
-        {can(kind) && (
-          <div className="pf-hint">{s.hint} Glissez-déposez ici.</div>
-        )}
+        {can(kind) && <div className="pf-hint">{s.hint} Glissez-déposez ici.</div>}
       </section>
     );
   };
 
   // Dossier pack : arborescence
-  const crea = of("crea").sort((a, b) => a.path.localeCompare(b.path));
+  const crea = of('crea').sort((a, b) => a.path.localeCompare(b.path));
   const folders = new Map<string, PackFile[]>();
   for (const f of crea) {
-    const dir = f.path.includes("/")
-      ? f.path.slice(0, f.path.lastIndexOf("/"))
-      : "";
+    const dir = f.path.includes('/') ? f.path.slice(0, f.path.lastIndexOf('/')) : '';
     folders.set(dir, [...(folders.get(dir) ?? []), f]);
   }
-  const quality = of("quality");
-  const qualityTypes = [...new Set(quality.map((f) => f.docType ?? "Autre"))];
+  const roundDone = (r: Round) => (r === 'diecut' ? of('diecut').length > 0 : r === 'pack' ? packs.length > 0 : of('quality').length > 0);
+  const roundStatus = (r: Round) => (r === 'diecut' ? `${of('diecut').length} fichier(s)` : r === 'pack' ? `V${packs[0]?.version}` : `${of('quality').length} document(s)`);
+  const quality = of('quality');
+  const qualityTypes = [...new Set(quality.map((f) => f.docType ?? 'Autre'))];
 
   return (
     <div className="pf-files pack-space">
-      {/* Où en est le pack : une case par rubrique */}
-      <div className="ps-summary">
-        {SECTIONS.map((s, i) => (
-          <div
-            key={s.kind}
-            className={`ps-tile ${done(s.kind) ? "ok" : s.kind === "oldpack" ? "" : "todo"}`}
-          >
-            <span className="ps-num">{i + 1}</span>
-            <div>
-              <b>{s.title}</b>
-              <small>{status(s.kind)}</small>
-            </div>
-          </div>
-        ))}
+      {/* Trois ronds : die cut, pack, documents — vert quand c'est uploadé */}
+      <div className="ps-rounds" role="tablist">
+        {ROUNDS.map((r) => {
+          const ok = roundDone(r.id);
+          return (
+            <button key={r.id} type="button" role="tab" aria-selected={open === r.id} aria-label={`${r.label} : ${ok ? 'uploadé' : 'à uploader'}`} className={`ps-round ${ok ? 'ok' : 'todo'} ${open === r.id ? 'open' : ''}`} onClick={() => setOpen(r.id)}>
+              <span className="ps-circle">{ok ? <Check size={34} strokeWidth={3} /> : <r.icon size={30} />}</span>
+              <b>{r.label}</b>
+              <small>{ok ? roundStatus(r.id) : 'À uploader'}</small>
+            </button>
+          );
+        })}
       </div>
 
-      <div className="ps-grid">
-        {section(
-          "brief",
-          pick("brief", "Ajouter des photos", {
+      <div className={`ps-grid ${open === 'pack' ? '' : 'single'}`}>
+        {open === 'pack' && section(
+          'brief',
+          pick('brief', 'Ajouter des photos', {
             multiple: true,
-            accept: "image/*",
+            accept: 'image/*',
           }),
           <>
             {canBrief ? (
@@ -429,9 +332,9 @@ export default function PackFiles({ p }: { p: Product }) {
                 value={brief}
                 onChange={(e) => setBrief(e.target.value)}
                 onBlur={() => {
-                  if (brief.trim() === (p.pack.brief ?? "")) return;
-                  dispatch({ type: "setPackBrief", productId: p.id, brief });
-                  toast("Brief marketing enregistré");
+                  if (brief.trim() === (p.pack.brief ?? '')) return;
+                  dispatch({ type: 'setPackBrief', productId: p.id, brief });
+                  toast('Brief marketing enregistré');
                 }}
               />
             ) : p.pack.brief ? (
@@ -439,17 +342,13 @@ export default function PackFiles({ p }: { p: Product }) {
             ) : (
               <p className="muted small">Pas encore de brief écrit.</p>
             )}
-            {of("brief").length > 0 && (
+            {of('brief').length > 0 && (
               <div className="ps-inspis">
-                {of("brief").map((f) => (
+                {of('brief').map((f) => (
                   <div key={f.id} className="ps-inspi-box">
                     <Thumb f={f} onOpen={setPreview} big />
-                    {can("brief") && (
-                      <button
-                        className="icon-btn danger-ico"
-                        title="Supprimer"
-                        onClick={() => remove(f)}
-                      >
+                    {can('brief') && (
+                      <button className="icon-btn danger-ico" title="Supprimer" onClick={() => remove(f)}>
                         <Trash2 size={14} />
                       </button>
                     )}
@@ -460,59 +359,44 @@ export default function PackFiles({ p }: { p: Product }) {
           </>,
         )}
 
-        {section(
-          "diecut",
-          pick("diecut", "Déposer le die cut", { multiple: true }),
+        {open === 'diecut' && section(
+          'diecut',
+          pick('diecut', 'Déposer le die cut', { multiple: true }),
           <>
-            {of("diecut").map((f) => fileLine(f))}
-            {!of("diecut").length && (
-              <p className="muted small">
-                {p.pack.dieCut === "requested"
-                  ? "Demandé au fournisseur, pas encore reçu."
-                  : "Pas encore de die cut."}
-              </p>
-            )}
+            {of('diecut').map((f) => fileLine(f))}
+            {!of('diecut').length && <p className="muted small">{p.pack.dieCut === 'requested' ? 'Demandé au fournisseur, pas encore reçu.' : 'Pas encore de die cut.'}</p>}
           </>,
         )}
 
-        {section(
-          "oldpack",
-          pick("oldpack", "Déposer l'ancien pack", { multiple: true }),
+        {open === 'pack' && section(
+          'oldpack',
+          pick('oldpack', "Déposer l'ancien pack", { multiple: true }),
           <>
-            {of("oldpack").map((f) => fileLine(f))}
-            {!of("oldpack").length && (
-              <p className="muted small">Aucun : nouveau pack.</p>
-            )}
+            {of('oldpack').map((f) => fileLine(f))}
+            {!of('oldpack').length && <p className="muted small">Aucun : nouveau pack.</p>}
           </>,
         )}
 
-        {section(
-          "pack",
-          pick("pack", packs.length ? "Nouvelle version" : "Uploader le pack", {
+        {open === 'pack' && section(
+          'pack',
+          pick('pack', packs.length ? 'Nouvelle version' : 'Uploader le pack', {
             primary: true,
           }),
           <>
             {packs.map((f, i) => (
-              <div key={f.id} className={i === 0 ? "pf-current" : "pf-old"}>
-                {fileLine(
-                  f,
-                  <span className={`pf-ver ${i === 0 ? "on" : ""}`}>
-                    V{f.version}
-                  </span>,
-                )}
+              <div key={f.id} className={i === 0 ? 'pf-current' : 'pf-old'}>
+                {fileLine(f, <span className={`pf-ver ${i === 0 ? 'on' : ''}`}>V{f.version}</span>)}
               </div>
             ))}
-            {!packs.length && (
-              <p className="muted small">Pas encore de pack déposé.</p>
-            )}
+            {!packs.length && <p className="muted small">Pas encore de pack déposé.</p>}
           </>,
         )}
 
-        {section(
-          "crea",
-          can("crea") && (
+        {open === 'pack' && section(
+          'crea',
+          can('crea') && (
             <>
-              {pick("crea", "Ajouter des fichiers", { multiple: true })}
+              {pick('crea', 'Ajouter des fichiers', { multiple: true })}
               <input
                 ref={(el) => {
                   inputs.current.dir = el;
@@ -521,27 +405,17 @@ export default function PackFiles({ p }: { p: Product }) {
                 multiple
                 hidden
                 aria-label="Déposer un dossier : Dossier pack"
-                {...({ webkitdirectory: "", directory: "" } as Record<
-                  string,
-                  string
-                >)}
-                onChange={(e) => (
-                  upload("crea", fromInput(e.target.files)),
-                  (e.target.value = "")
-                )}
+                {...({ webkitdirectory: '', directory: '' } as Record<string, string>)}
+                onChange={(e) => (upload('crea', fromInput(e.target.files)), (e.target.value = ''))}
               />
-              <button
-                className="btn sm"
-                onClick={() => inputs.current.dir?.click()}
-                disabled={!!busy}
-              >
+              <button className="btn sm" onClick={() => inputs.current.dir?.click()} disabled={!!busy}>
                 <FolderUp size={14} /> Ajouter un dossier
               </button>
             </>
           ),
           <>
             {[...folders.entries()].map(([dir, list]) => (
-              <div key={dir || "/"} className="pf-folder">
+              <div key={dir || '/'} className="pf-folder">
                 {dir && (
                   <div className="pf-folder-name">
                     <Folder size={15} /> {dir} <small>{list.length}</small>
@@ -550,27 +424,20 @@ export default function PackFiles({ p }: { p: Product }) {
                 {list.map((f) => fileLine(f))}
               </div>
             ))}
-            {!crea.length && (
-              <p className="muted small">Pas encore de fichiers.</p>
-            )}
+            {!crea.length && <p className="muted small">Pas encore de fichiers.</p>}
           </>,
         )}
 
-        {section(
-          "quality",
-          can("quality") && (
+        {open === 'docs' && section(
+          'quality',
+          can('quality') && (
             <>
-              <select
-                className="input ps-doctype"
-                aria-label="Type de fiche qualité"
-                value={docType}
-                onChange={(e) => setDocType(e.target.value)}
-              >
+              <select className="input ps-doctype" aria-label="Type de fiche qualité" value={docType} onChange={(e) => setDocType(e.target.value)}>
                 {QUALITY_TYPES.map((t) => (
                   <option key={t}>{t}</option>
                 ))}
               </select>
-              {pick("quality", "Déposer", { multiple: true })}
+              {pick('quality', 'Déposer', { multiple: true })}
             </>
           ),
           <>
@@ -579,14 +446,10 @@ export default function PackFiles({ p }: { p: Product }) {
                 <div className="pf-folder-name">
                   <FileText size={15} /> {t}
                 </div>
-                {quality
-                  .filter((f) => (f.docType ?? "Autre") === t)
-                  .map((f) => fileLine(f))}
+                {quality.filter((f) => (f.docType ?? 'Autre') === t).map((f) => fileLine(f))}
               </div>
             ))}
-            {!quality.length && (
-              <p className="muted small">Pas encore de fiche qualité.</p>
-            )}
+            {!quality.length && <p className="muted small">Pas encore de fiche qualité.</p>}
           </>,
         )}
       </div>

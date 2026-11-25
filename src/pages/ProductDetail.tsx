@@ -271,18 +271,20 @@ function DesignCard({ p, full }: { p: Product; full?: boolean }) {
           <b>{p.pack.artworkVersions ? `V${p.pack.artworkVersions}` : '—'}</b>
         </div>
       </div>
-      <div className="small bold mt">Validation du pack</div>
-      <ValidationCircuit product={p} />
-      {full && !packDone(p) && auth.allowed({ type: 'validatePack', productId: p.id }) && (
-        <button className="btn primary sm mt" onClick={() => dispatch({ type: 'validatePack', productId: p.id })}>
-          <Check size={13} /> Valider l’étape en cours
-        </button>
-      )}
       {full && (
         <div className="mt">
           <PackFiles p={p} />
         </div>
       )}
+      <div className="ps-validation">
+        <div className="ps-validation-title">Validation du pack</div>
+        <ValidationCircuit product={p} />
+        {full && !packDone(p) && auth.allowed({ type: 'validatePack', productId: p.id }) && (
+          <button className="btn primary mt" onClick={() => dispatch({ type: 'validatePack', productId: p.id })}>
+            <Check size={15} /> Valider l’étape en cours
+          </button>
+        )}
+      </div>
     </Card>
   );
 }
