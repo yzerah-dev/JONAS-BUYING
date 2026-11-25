@@ -73,16 +73,37 @@ export function rowsToLines(rows: unknown[][]): ExtractedLine[] {
   return out;
 }
 
-/** Lit un fichier Excel (.xlsx, .xls) ou CSV */
-export async function readSheet(file: Blob): Promise<ExtractedLine[]> {
+/** Feuilles d'un fichier Excel (.xlsx, .xls) ou CSV : lignes de cellules, lignes vides retirées */
+/** raw : valeurs brutes (nombres) pour la lecture des lignes ; sinon texte tel qu'affiché dans Excel */
+export async function sheetTables(file: Blob | Uint8Array, raw = false): Promise<{ name: string; rows: unknown[][] }[]> {
   const XLSX = await import('xlsx');
-  const wb = XLSX.read(new Uint8Array(await file.arrayBuffer()), { type: 'array' });
-  for (const name of wb.SheetNames) {
-    const rows = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[name], { header: 1, raw: true, defval: '' });
-    const lines = rowsToLines(rows);
+  const data = file instanceof Uint8Array ? file : new Uint8Array(await file.arrayBuffer());
+  const wb = XLSX.read(data, { type: 'array', cellDates: true });
+  return wb.SheetNames.map((name) => ({
+    name,
+    rows: XLSX.utils
+      .sheet_to_json<unknown[]>(wb.Sheets[name], { header: 1, raw, defval: '' })
+      .filter((r) => r.some((c) => String(c ?? '').trim() !== '')),
+  })).filter((s) => s.rows.length);
+}
+
+/** Lit les lignes d'un fichier Excel (.xlsx, .xls) ou CSV : première feuille où l'on trouve un tableau d'articles */
+export async function readSheet(file: Blob): Promise<ExtractedLine[]> {
+  for (const s of await sheetTables(file, true)) {
+    const lines = rowsToLines(s.rows);
     if (lines.length) return lines;
   }
   return [];
+}
+
+/** Contenu d'un Excel en texte (cellules séparées par « | »), pour une lecture par Claude */
+export async function sheetText(file: Blob, max = 30000): Promise<string> {
+  const out: string[] = [];
+  for (const s of await sheetTables(file)) {
+    out.push(`# Feuille ${s.name}`);
+    for (const r of s.rows) out.push(r.map((c) => String(c ?? '').trim()).join(' | '));
+  }
+  return out.join('\n').slice(0, max);
 }
 
 export const SHEET_TYPES = [
@@ -90,4 +111,10 @@ export const SHEET_TYPES = [
   'application/vnd.ms-excel',
   'text/csv',
 ];
-export const isSheet = (f: File) => SHEET_TYPES.includes(f.type) || /\.(xlsx|xls|csv)$/i.test(f.name);
+export const SHEET_ACCEPT = '.xlsx,.xls,.csv';
+/** Fichier Excel ou CSV (d'après le type, ou l'extension quand le navigateur ne donne pas de type) */
+export const isSheet = (f: { type?: string; name?: string }) => SHEET_TYPES.includes(f.type ?? '') || /\.(xlsx|xls|csv)$/i.test(f.name ?? '');
+/** Type d'un fichier Excel/CSV, même quand le navigateur n'en donne pas */
+export const sheetMime = (f: { type?: string; name?: string }) =>
+  f.type || (/\.csv$/i.test(f.name ?? '') ? 'text/csv' : /\.xls$/i.test(f.name ?? '') ? 'application/vnd.ms-excel' : SHEET_TYPES[0]);
+

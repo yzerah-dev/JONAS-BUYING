@@ -11,10 +11,11 @@ import Combobox from './Combobox';
 import LinesEditor from './LinesEditor';
 import { emptyLine, fromExtraction, toImport, type EditLine } from '../lib/editLines';
 import { extractProforma } from '../lib/proformaExtract';
-import { isSheet, readSheet } from '../lib/excelImport';
+import { isSheet, readSheet, sheetMime, SHEET_ACCEPT } from '../lib/excelImport';
 import { Seg } from './ui';
 
 const OK_TYPES = ['application/pdf', 'image/png', 'image/jpeg'];
+const PROFORMA_ACCEPT = `.pdf,.png,.jpg,.jpeg,${SHEET_ACCEPT},application/pdf,image/png,image/jpeg`;
 
 /** Bouton « Nouvelle proforma » : côté JONAS (acheteurs, Direction) et côté fournisseur (avec sa proforma jointe) */
 export function NewProformaButton({ onCreated, className = 'pf-btn' }: { onCreated?: (id: string) => void; className?: string }) {
@@ -56,10 +57,10 @@ function NewProformaDialog({ onClose, onCreated }: { onClose: () => void; onCrea
   const currency = terms.currency;
   // Proforma jointe : on lit ses lignes et on les rapproche des produits du fournisseur
   const attach = async (f: File) => {
-    if (!OK_TYPES.includes(f.type)) return toast(t('pv.badType'));
+    if (!OK_TYPES.includes(f.type) && !isSheet(f)) return toast(t('pv.badType'));
     setFile(f);
     setReading(true);
-    const ex = await extractProforma(f, f.type).catch(() => ({ lines: [], engine: 'aucun' as const }));
+    const ex = await extractProforma(f, f.type, f.name).catch(() => ({ lines: [], engine: 'aucun' as const }));
     setReading(false);
     if (ex.lines.length) {
       setLines(fromExtraction(ex.lines, products, state.products));
@@ -90,7 +91,7 @@ function NewProformaDialog({ onClose, onCreated }: { onClose: () => void; onCrea
     if (file) {
       const fileId = newFileId(supplierScope(supplierId), id, 0);
       await putBlob(fileId, file);
-      f = { fileId, name: file.name, size: file.size, mime: file.type };
+      f = { fileId, name: file.name, size: file.size, mime: isSheet(file) ? sheetMime(file) : file.type };
     }
     let order: { source: typeof source; file?: { fileId: string; name: string; size: number; mime: string } } | undefined;
     if (!supplierSide) {
@@ -191,7 +192,7 @@ function NewProformaDialog({ onClose, onCreated }: { onClose: () => void; onCrea
 
           <div className="bk-wide np-filebox">
             <span className="small bold">{supplierSide ? t('np.file') : t('np.fileOpt')}</span>
-            <FileDrop ariaLabel={supplierSide ? t('np.file') : t('np.fileOpt')} current={file?.name} onFile={attach} />
+            <FileDrop ariaLabel={supplierSide ? t('np.file') : t('np.fileOpt')} current={file?.name} onFile={attach} accept={PROFORMA_ACCEPT} />
             {reading && (
               <span className="small muted row" style={{ gap: 6 }}>
                 <Loader2 size={14} className="spin" /> {t('ex.reading')}

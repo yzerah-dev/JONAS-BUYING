@@ -5,6 +5,7 @@
 import { PDFDocument, StandardFonts, degrees, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
 import type { Company, Proforma, ProformaDoc, Supplier, Product } from '../data/types';
 import { getBlob } from './files';
+import { isSheet, sheetTables } from './excelImport';
 
 const BLUE = rgb(0.11, 0.25, 0.69);
 const RED = rgb(0.78, 0.12, 0.12);
@@ -86,8 +87,54 @@ async function originalBytes(pf: Proforma, doc: ProformaDoc, ctx: PdfContext): P
   return { bytes: await demoProformaPdf(pf, doc, ctx), type: 'application/pdf' };
 }
 
-/** Ouvre l'original comme PDF (une image devient une page A4) */
-async function asPdf(bytes: Uint8Array, type: string): Promise<PDFDocument> {
+/** Proforma Excel / CSV mise en page en PDF (A4 paysage) : cellules telles qu'affichées dans Excel.
+ *  La dernière page garde le bas libre pour la signature et le tampon JONAS. */
+async function sheetPdf(bytes: Uint8Array, fileName: string): Promise<PDFDocument> {
+  const pdf = await PDFDocument.create();
+  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const W = 842, H = 595, M = 24, SIGN = 200;
+  const sheets = await sheetTables(bytes);
+  let page = pdf.addPage([W, H]);
+  let y = H - M;
+  const title = (t: string) => {
+    page.drawText(safe(t).slice(0, 140), { x: M, y: y - 10, size: 10, font: bold, color: INK });
+    y -= 22;
+  };
+  title(`Proforma Excel : ${fileName}`);
+  for (const s of sheets) {
+    const ncol = Math.min(14, Math.max(...s.rows.map((r) => r.length)));
+    // Largeur des colonnes selon le texte le plus long (bornée), ramenée à la largeur de la page
+    const len = Array.from({ length: ncol }, (_, c) => Math.min(40, Math.max(3, ...s.rows.map((r) => String(r[c] ?? '').length))));
+    const total = len.reduce((a, b) => a + b, 0);
+    const widths = len.map((l) => ((W - 2 * M) * l) / total);
+    const size = Math.max(6, Math.min(9, (W - 2 * M) / total / 0.5));
+    if (sheets.length > 1) title(`Feuille ${s.name}`);
+    for (const r of s.rows) {
+      if (y < M + 14) {
+        page = pdf.addPage([W, H]);
+        y = H - M;
+      }
+      let x = M;
+      for (let c = 0; c < ncol; c++) {
+        let t = safe(String(r[c] ?? '').replace(/\s+/g, ' ').trim());
+        while (t && font.widthOfTextAtSize(t, size) > widths[c] - 3) t = t.slice(0, -1);
+        if (t) page.drawText(t, { x: x + 1.5, y: y - size, size, font, color: INK });
+        x += widths[c];
+      }
+      page.drawLine({ start: { x: M, y: y - size - 3 }, end: { x: W - M, y: y - size - 3 }, thickness: 0.3, color: rgb(0.85, 0.85, 0.88) });
+      y -= size + 6;
+    }
+    y -= 10;
+  }
+  // Place pour la signature et le tampon (coin bas droit)
+  if (y < M + SIGN) pdf.addPage([W, H]);
+  return pdf;
+}
+
+/** Ouvre l'original comme PDF (une image devient une page A4, un Excel un tableau) */
+async function asPdf(bytes: Uint8Array, type: string, name = ''): Promise<PDFDocument> {
+  if (isSheet({ type, name }) || (bytes[0] === 0x50 && bytes[1] === 0x4b) || (bytes[0] === 0xd0 && bytes[1] === 0xcf)) return sheetPdf(bytes, name || 'proforma.xlsx');
   if (type === 'application/pdf' || (bytes[0] === 0x25 && bytes[1] === 0x50)) return PDFDocument.load(bytes, { ignoreEncryption: true });
   const pdf = await PDFDocument.create();
   const isPng = type.includes('png') || bytes[0] === 0x89;
@@ -178,7 +225,7 @@ export async function versionPdf(pf: Proforma, doc: ProformaDoc, ctx: PdfContext
   if (!doc.signature) {
     if (type === 'application/pdf') return new Blob([bytes as BlobPart], { type });
   }
-  const pdf = await asPdf(bytes, type);
+  const pdf = await asPdf(bytes, type, doc.name);
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
   const pages = pdf.getPages();

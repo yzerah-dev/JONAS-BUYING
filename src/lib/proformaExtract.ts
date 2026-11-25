@@ -3,7 +3,9 @@
 // des produits à créer. Deux moteurs :
 //  - Claude (capacité « sample » de l'Artifact) : PDF (texte) et photos, n'importe quelle mise en page ;
 //  - lecture du texte du PDF ligne à ligne (repli, sans IA) : tableaux simples.
+// Proforma en Excel / CSV : colonnes reconnues par leurs en-têtes ; sinon lue par Claude.
 import type { Product } from '../data/types';
+import { isSheet, readSheet, sheetText } from './excelImport';
 
 export interface ExtractedLine {
   ref: string;
@@ -17,7 +19,7 @@ export interface ExtractedLine {
 
 export interface Extraction {
   lines: ExtractedLine[];
-  engine: 'claude' | 'texte' | 'aucun';
+  engine: 'claude' | 'texte' | 'excel' | 'aucun';
   currency?: string;
 }
 
@@ -145,8 +147,24 @@ function clean(v: unknown): Extraction | null {
   return { lines, engine: 'claude', currency: o.currency };
 }
 
-/** Lit les lignes d'une proforma (PDF ou photo) */
-export async function extractProforma(file: Blob, type: string): Promise<Extraction> {
+/** Lit les lignes d'une proforma (PDF, photo, Excel ou CSV) */
+export async function extractProforma(file: Blob, type: string, name = ''): Promise<Extraction> {
+  if (isSheet({ type, name })) {
+    const lines = await readSheet(file).catch(() => []);
+    if (lines.length) return { lines, engine: 'excel' };
+    // Mise en page inhabituelle (en-têtes non reconnus) : Claude lit le contenu des cellules
+    const sample = await sampleCap();
+    if (sample) {
+      try {
+        const text = await sheetText(file);
+        const r = text && clean(await sample.json(`${PROMPT}\n\nContenu de la proforma Excel (cellules séparées par « | ») :\n${text}`, { modelTier: 'default' }));
+        if (r && r.lines.length) return r;
+      } catch {
+        /* Claude indisponible : rien lu */
+      }
+    }
+    return { lines: [], engine: 'aucun' };
+  }
   const isPdf = type === 'application/pdf';
   let text: string[] = [];
   if (isPdf) {

@@ -12,8 +12,10 @@ import FileDrop from './FileDrop';
 import LinesEditor from './LinesEditor';
 import { fromExtraction, toImport, type EditLine } from '../lib/editLines';
 import { extractProforma } from '../lib/proformaExtract';
+import { isSheet, sheetMime, SHEET_ACCEPT } from '../lib/excelImport';
 
 const OK_TYPES = ['application/pdf', 'image/png', 'image/jpeg'];
+const PROFORMA_ACCEPT = `.pdf,.png,.jpg,.jpeg,${SHEET_ACCEPT},application/pdf,image/png,image/jpeg`;
 const STATUS_COLOR: Record<ProformaDoc['status'], string> = { a_signer: 'orange', signee: 'green', annulee: 'red', refusee: 'red', remplacee: 'grey' };
 
 /** Télécharge le PDF d'une version (signée : avec signature et tampon ; annulée : avec bandeau) */
@@ -171,7 +173,7 @@ function UploadBox({ pf, revision, hasPending, open, setOpen }: { pf: Proforma; 
     const fileId = newFileId(supplierScope(pf.supplierId), pf.id, 0);
     await putBlob(fileId, file);
     const n = (pf.versions ?? []).reduce((m, v) => Math.max(m, v.version), 0) + 1;
-    dispatch({ type: 'uploadProforma', id: pf.id, fileId, name: file.name, size: file.size, mime: file.type, reason: revision ? reason.trim() : undefined, lines });
+    dispatch({ type: 'uploadProforma', id: pf.id, fileId, name: file.name, size: file.size, mime: isSheet(file) ? sheetMime(file) : file.type, reason: revision ? reason.trim() : undefined, lines });
     const created = lines?.filter((l) => l.newProduct).length ?? 0;
     toast(t('pv.uploadedToast', { n }) + (created ? ` · ${t('ex.created', { n: created })}` : ''));
     setReason('');
@@ -181,10 +183,10 @@ function UploadBox({ pf, revision, hasPending, open, setOpen }: { pf: Proforma; 
   // Dépôt : on lit les lignes du document, à vérifier avant d'enregistrer
   const pick = async (file?: File) => {
     if (!file) return;
-    if (!OK_TYPES.includes(file.type)) return toast(t('pv.badType'));
+    if (!OK_TYPES.includes(file.type) && !isSheet(file)) return toast(t('pv.badType'));
     if (revision && !reason.trim()) return toast(t('pv.needReason'));
     setReading(true);
-    const ex = await extractProforma(file, file.type).catch(() => ({ lines: [], engine: 'aucun' as const }));
+    const ex = await extractProforma(file, file.type, file.name).catch(() => ({ lines: [], engine: 'aucun' as const }));
     setReading(false);
     if (!ex.lines.length) {
       toast(t('ex.none'));
@@ -211,7 +213,7 @@ function UploadBox({ pf, revision, hasPending, open, setOpen }: { pf: Proforma; 
           </label>
         </>
       )}
-      <FileDrop onFile={pick} ariaLabel={revision ? t('pv.revise') : t('pv.upload')} />
+      <FileDrop onFile={pick} ariaLabel={revision ? t('pv.revise') : t('pv.upload')} accept={PROFORMA_ACCEPT} />
       {reading && (
         <span className="small muted row" style={{ gap: 6 }}>
           <Loader2 size={14} className="spin" /> {t('ex.reading')}

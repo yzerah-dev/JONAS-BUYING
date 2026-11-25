@@ -3,6 +3,7 @@ import { inflateSync } from 'node:zlib';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
 import { expect, go, loginAs, resetApp, test, toast } from './fixtures';
 import type { Page } from '@playwright/test';
+import * as XLSX from 'xlsx';
 
 /** PDF minimal « déposé par le fournisseur » */
 async function supplierPdf(title: string) {
@@ -145,4 +146,47 @@ test('glisser-déposer la proforma sur la zone de dépôt', async ({ page }) => 
   await zone.dispatchEvent('drop', { dataTransfer: dt });
   await expect(toast(page)).toContainText('Proforma v1 déposée');
   await expect(page.locator('.pv-row')).toContainText('PI-glisse.pdf');
+});
+
+test('proforma en Excel : lignes lues, puis signée et tamponnée en PDF', async ({ page }) => {
+  await resetApp(page);
+  // Proforma Excel du fournisseur : en-tête de société, puis le tableau d'articles
+  const ws = XLSX.utils.aoa_to_sheet([
+    ['WENZHOU TEX CO., LTD', '', '', ''],
+    ['PROFORMA INVOICE No. WZ-2026-119', '', '', ''],
+    [],
+    ['Item No.', 'Description', 'Qty (pcs)', 'Unit price USD'],
+    ['CP-PL03', 'Plateforme', 4800, 6.4],
+    ['YD-C003', 'Claquettes homme', 2400, 3.6],
+    ['TOTAL', '', 7200, ''],
+  ]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'PI');
+  const buffer = Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
+
+  await loginAs(page, 'Li Qiang');
+  await go(page, 'portail/proformas?pf=PF-2026-0150');
+  // Type vide (comme certains navigateurs pour un .xlsx) : reconnu par l'extension
+  await page.getByLabel('Déposer la proforma').setInputFiles({ name: 'PI-WZ-2026-119.xlsx', mimeType: '', buffer });
+  const dlg = page.getByRole('dialog', { name: /Lignes lues sur PI-WZ-2026-119.xlsx/ });
+  await expect(dlg.locator('.np-line-wrap')).toHaveCount(2);
+  await expect(dlg.getByLabel('Quantité 1')).toHaveValue('4800');
+  await expect(dlg.getByLabel('Quantité 2')).toHaveValue('2400');
+  await expect(dlg.locator('.np-line-wrap').nth(0)).toContainText('Reconnu');
+  await dlg.getByRole('button', { name: 'Déposer avec ces lignes' }).click();
+  await expect(toast(page)).toContainText('Proforma v1 déposée');
+  await expect(page.locator('.pv-row')).toContainText('PI-WZ-2026-119.xlsx');
+
+  await loginAs(page, 'Rudy Zerah');
+  await go(page, 'proformas/PF-2026-0150');
+  await page.locator('.page-head').getByRole('button', { name: 'Signer' }).click();
+  await page.locator('#sg-etd').fill('2026-12-16');
+  await page.getByRole('button', { name: 'Signer et tamponner' }).click();
+  await expect(toast(page)).toContainText('PF-2026-0150 signée et tamponnée');
+  await page.getByRole('button', { name: /^Documents/ }).click();
+  const pdf = await downloadVersion(page, 1);
+  expect(pdf.name).toBe('PF-2026-0150_v1_signee.pdf');
+  expect(pdf.text.startsWith('%PDF')).toBe(true);
+  // Contenu de l'Excel mis en page, puis signature et tampon JONAS
+  for (const s of ['PROFORMA INVOICE No. WZ-2026-119', 'CP-PL03', 'Claquettes homme', 'JONAS INTERNATIONAL', 'Rudy Zerah', '16/12/2026 (S51)']) expect(pdf.text).toContain(hex(s));
 });
