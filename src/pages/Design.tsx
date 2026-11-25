@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, Box, Check, Download, FileText, Flame, History, Layers, Paperclip, Play, Scissors, Search, Send, X } from 'lucide-react';
+import { AlertTriangle, Box, Calendar, Check, ChevronDown, ChevronUp, Download, FileText, Flame, History, Layers, Paperclip, Play, Scissors, Search, Send, X } from 'lucide-react';
 import PackFiles from '../components/PackFiles';
 import { pressable } from '../lib/a11y';
 import { brandOf, byId, capacityOf, matchTrack, packDone, packLate, packTrack, TRACK_CHIPS, TRACK_ORDER, useAuth, useStore, type State, type TrackFilter } from '../data/store';
@@ -10,7 +10,6 @@ import { VALIDATION_LABELS, VALIDATION_STEPS } from '../data/types';
 import { BrandLogo, ProductPic, Pill, ProductThumb, Tabs, ValidationCircuit } from '../components/ui';
 import { designerColor, toast } from '../components/ui-shared';
 import { TODAY, addDays, fdate, fshort, fstamp, initials, weekKey, weekLabel, weekRange } from '../lib/format';
-
 
 function packStatus(p: Product): [string, string] {
   const v = p.pack.validations;
@@ -24,7 +23,6 @@ function packStatus(p: Product): [string, string] {
 function proformaOf(s: State, p: Product) {
   return s.proformas.filter((pf) => pf.status !== 'arrive' && pf.lines.some((l) => l.productId === p.id)).sort((a, b) => a.etd.localeCompare(b.etd))[0];
 }
-
 
 type StatusKey = 'all' | 'urgent' | 'retard' | 'a_traiter' | 'en_creation' | 'a_valider' | 'en_validation' | 'a_envoyer' | 'fournisseur' | 'valide';
 const STATUS_CHIPS: { id: StatusKey; label: string }[] = [
@@ -91,7 +89,9 @@ function DesignPage() {
   }, [state.products]);
 
   const [designer, setDesigner] = useState(auth.user.designerName ?? 'all');
-  const [view, setView] = useState<'case' | 'designer' | 'semaine'>('case');
+  const [view, setView] = useState<'case' | 'designer' | 'semaine'>('designer');
+  // Cartes semaine repliées / dépliées (par défaut : semaine en cours et suivante ouvertes)
+  const [toggled, setToggled] = useState<Set<string>>(new Set());
   const [week, setWeek] = useState(weekKey(TODAY));
   const [status, setStatus] = useState<StatusKey>('all');
   const [track, setTrack] = useState<TrackFilter>('all');
@@ -115,8 +115,7 @@ function DesignPage() {
     echeance: (a, b) => a.pack.artworkDeadline.localeCompare(b.pack.artworkDeadline) || sortPacks(a, b),
   };
 
-  const cell = (d: string | 'all', wk: string) =>
-    state.products.filter((p) => (d === 'all' || p.pack.designer === d) && weekKey(p.pack.artworkDeadline) === wk);
+  const cell = (d: string | 'all', wk: string) => state.products.filter((p) => (d === 'all' || p.pack.designer === d) && weekKey(p.pack.artworkDeadline) === wk);
 
   // Vue : un designer sur toutes les semaines, une semaine pour tous les designers, ou une case du planning
   const firstWeek = weeks[0]?.key ?? weekKey(TODAY);
@@ -137,7 +136,7 @@ function DesignPage() {
   const late = scope.filter(packLate).length;
   const weekSample = weeks.find((w) => w.key === week)?.sample ?? TODAY;
 
-  const shown = list.slice(0, limit);
+  const shown = list.slice(0, view === 'designer' ? Math.max(limit, 1000) : limit);
   const groups: [string, Product[]][] = useMemo(() => {
     // Vue par designer : rangée semaine par semaine ; vue par semaine : designer par designer
     if (view === 'designer') {
@@ -146,7 +145,7 @@ function DesignPage() {
         const k = weekKey(p.pack.artworkDeadline);
         map.set(k, [...(map.get(k) ?? []), p]);
       }
-      return [...map.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([, items]) => [`Semaine ${weekLabel(items[0].pack.artworkDeadline).slice(1)} · ${weekRange(items[0].pack.artworkDeadline)}`, items]);
+      return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
     }
     if (view === 'semaine') {
       const map = new Map<string, Product[]>();
@@ -310,7 +309,11 @@ function DesignPage() {
         </table>
       </div>
 
-      {canAssign && <div className="pk-hint">Administrateur : glissez un pack (ou votre sélection) sur une case du planning pour changer de designer et/ou de semaine, ou sur un nom de designer pour ne changer que le designer.</div>}
+      {canAssign && (
+        <div className="pk-hint">
+          Administrateur : glissez un pack (ou votre sélection) sur une case du planning pour changer de designer et/ou de semaine, ou sur un nom de designer pour ne changer que le designer.
+        </div>
+      )}
 
       <div className="split">
         <div className="col" style={{ gap: 12 }}>
@@ -323,7 +326,14 @@ function DesignPage() {
                 ['case', 'Designer × semaine'],
               ] as const
             ).map(([v, label]) => (
-              <button key={v} type="button" role="tab" aria-selected={view === v} className={`pk-view ${view === v ? 'active' : ''}`} onClick={() => (setView(v), setSelected(new Set()), setStatus('all'), setLimit(50))}>
+              <button
+                key={v}
+                type="button"
+                role="tab"
+                aria-selected={view === v}
+                className={`pk-view ${view === v ? 'active' : ''}`}
+                onClick={() => (setView(v), setSelected(new Set()), setStatus('all'), setLimit(50))}
+              >
                 {label}
               </button>
             ))}
@@ -400,7 +410,14 @@ function DesignPage() {
           <div className="dev-trackbar pk-trackbar" role="group" aria-label="Suivi pack">
             <span className="pk-trackbar-title">Suivi pack</span>
             {TRACK_CHIPS.map(([k, label]) => (
-              <button key={k} type="button" className={`trk-tile ${track === k ? 'active' : ''}`} aria-pressed={track === k} aria-label={`${label} (${scope.filter((p) => matchTrack(p, k)).length})`} onClick={() => setTrack(k)}>
+              <button
+                key={k}
+                type="button"
+                className={`trk-tile ${track === k ? 'active' : ''}`}
+                aria-pressed={track === k}
+                aria-label={`${label} (${scope.filter((p) => matchTrack(p, k)).length})`}
+                onClick={() => setTrack(k)}
+              >
                 {k === 'all' ? <span className="trk-round all">{scope.length}</span> : <TrackRound k={k} />}
                 <span className="trk-tile-label">{label}</span>
                 {k !== 'all' && <b>{scope.filter((p) => matchTrack(p, k)).length}</b>}
@@ -423,21 +440,25 @@ function DesignPage() {
                 ))}
               </select>
             </label>
-            <label className="pk-group" htmlFor="pk-group">
-              <span className="xs muted">Grouper</span>
-              <select id="pk-group" className="input" value={groupBy} onChange={(e) => setGroupBy(e.target.value as GroupBy)}>
-                {(Object.keys(GROUP_LABELS) as GroupBy[]).map((k) => (
-                  <option key={k} value={k}>
-                    {GROUP_LABELS[k]}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {view !== 'designer' && (
+              <label className="pk-group" htmlFor="pk-group">
+                <span className="xs muted">Grouper</span>
+                <select id="pk-group" className="input" value={groupBy} onChange={(e) => setGroupBy(e.target.value as GroupBy)}>
+                  {(Object.keys(GROUP_LABELS) as GroupBy[]).map((k) => (
+                    <option key={k} value={k}>
+                      {GROUP_LABELS[k]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
           </div>
 
           {selected.size > 0 && (
             <div className="pk-bulk">
-              <b>{selected.size} sélectionné{selected.size > 1 ? 's' : ''}</b>
+              <b>
+                {selected.size} sélectionné{selected.size > 1 ? 's' : ''}
+              </b>
               {canValidate.length > 0 && (
                 <button className="btn sm primary" onClick={() => bulk(canValidate, 'validatePack', 'validation(s) enregistrée(s)')}>
                   <Check size={14} /> Valider mon étape ({canValidate.length})
@@ -494,11 +515,7 @@ function DesignPage() {
                       </option>
                     ))}
                   </select>
-                  <button
-                    className="btn sm"
-                    disabled={!moveTo.designer && !moveTo.week}
-                    onClick={() => move([...selected], moveTo.designer || undefined, moveTo.week || undefined)}
-                  >
+                  <button className="btn sm" disabled={!moveTo.designer && !moveTo.week} onClick={() => move([...selected], moveTo.designer || undefined, moveTo.week || undefined)}>
                     Déplacer
                   </button>
                 </span>
@@ -524,52 +541,76 @@ function DesignPage() {
               <span className="pk-c-st">Statut</span>
             </div>
             {list.length === 0 && <div className="empty">Aucun pack pour ce filtre.</div>}
-            {groups.map(([g, items]) => (
-              <div key={g || 'all'}>
-                {g && (
-                  <div className="pk-group-head">
-                    {g} <b>{items.length}</b>
-                  </div>
-                )}
-                {items.map((p) => (
-                  <PackRow
-                    key={p.id}
-                    p={p}
-                    state={state}
-                    checked={selected.has(p.id)}
-                    active={sel?.id === p.id}
-                    showDesigner={designer === 'all'}
-                    color={colorOf(p.pack.designer)}
-                    draggable={canAssign}
-                    onDragStart={(e) => {
-                      e.dataTransfer.setData(DRAG_MIME, JSON.stringify(dragIds(p.id)));
-                      e.dataTransfer.effectAllowed = 'move';
-                    }}
-                    onUrgent={
-                      canPush
-                        ? () => {
-                            dispatch({ type: 'toggleUrgent', productId: p.id });
-                            toast(p.urgent ? `${p.ref} retiré de PUSH URGENT` : `${p.ref} poussé en urgent`);
-                          }
-                        : undefined
-                    }
-                    onStart={
-                      !p.pack.startedAt && p.pack.validations.direction.state === 'todo' && auth.allowed({ type: 'startPack', productId: p.id })
-                        ? () => {
-                            dispatch({ type: 'startPack', productId: p.id });
-                            toast(`${p.ref} : pack commencé`);
-                          }
-                        : undefined
-                    }
-                    onCheck={() => toggle(p.id)}
-                    onOpen={() => {
-                      setSelId(p.id);
-                      revealPanel();
-                    }}
-                  />
-                ))}
-              </div>
-            ))}
+            {groups.map(([g, items]) => {
+              const nextWeek = weekKey(addDays(TODAY, 7));
+              const isWeek = view === 'designer';
+              // Semaine en cours et suivante ouvertes par défaut ; un clic inverse
+              const open = !isWeek || (g >= weekKey(TODAY) && g <= nextWeek) !== toggled.has(g);
+              return (
+                <div key={g || 'all'} className={isWeek ? `pf-week pk-week ${open ? 'open' : ''}` : undefined}>
+                  {isWeek ? (
+                    <WeekHead
+                      items={items}
+                      current={g === weekKey(TODAY)}
+                      open={open}
+                      capacity={designer !== 'all' ? capacityOf(state, designer) : undefined}
+                      onToggle={() =>
+                        setToggled((s) => {
+                          const n = new Set(s);
+                          if (n.has(g)) n.delete(g);
+                          else n.add(g);
+                          return n;
+                        })
+                      }
+                    />
+                  ) : (
+                    g && (
+                      <div className="pk-group-head">
+                        {g} <b>{items.length}</b>
+                      </div>
+                    )
+                  )}
+                  {open &&
+                    items.map((p) => (
+                      <PackRow
+                        key={p.id}
+                        p={p}
+                        state={state}
+                        checked={selected.has(p.id)}
+                        active={sel?.id === p.id}
+                        showDesigner={designer === 'all'}
+                        color={colorOf(p.pack.designer)}
+                        draggable={canAssign}
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData(DRAG_MIME, JSON.stringify(dragIds(p.id)));
+                          e.dataTransfer.effectAllowed = 'move';
+                        }}
+                        onUrgent={
+                          canPush
+                            ? () => {
+                                dispatch({ type: 'toggleUrgent', productId: p.id });
+                                toast(p.urgent ? `${p.ref} retiré de PUSH URGENT` : `${p.ref} poussé en urgent`);
+                              }
+                            : undefined
+                        }
+                        onStart={
+                          !p.pack.startedAt && p.pack.validations.direction.state === 'todo' && auth.allowed({ type: 'startPack', productId: p.id })
+                            ? () => {
+                                dispatch({ type: 'startPack', productId: p.id });
+                                toast(`${p.ref} : pack commencé`);
+                              }
+                            : undefined
+                        }
+                        onCheck={() => toggle(p.id)}
+                        onOpen={() => {
+                          setSelId(p.id);
+                          revealPanel();
+                        }}
+                      />
+                    ))}
+                </div>
+              );
+            })}
             {list.length > limit && (
               <button className="pk-more" onClick={() => setLimit(limit + 50)}>
                 Afficher plus ({list.length - limit} restants)
@@ -580,6 +621,52 @@ function DesignPage() {
         <div className="sticky-panel">{sel ? <PackPanel p={sel} /> : <div className="card empty">Sélectionnez un pack pour voir son détail, ses fichiers et son circuit de validation.</div>}</div>
       </div>
     </div>
+  );
+}
+
+/** En-tête de semaine, comme la page Proformas : date, nombre de packs, retards, urgents, validés, capacité */
+function WeekHead({ items, current, open, capacity, onToggle }: { items: Product[]; current: boolean; open: boolean; capacity?: number; onToggle: () => void }) {
+  const sample = items[0].pack.artworkDeadline;
+  const late = items.filter(packLate).length;
+  const urgent = items.filter((p) => p.urgent).length;
+  const validated = items.filter(packDone).length;
+  const title = `Semaine ${weekLabel(sample).slice(1)}`;
+  return (
+    <header className="pf-week-head" {...pressable(onToggle, `${title} : ${open ? 'replier' : 'déplier'}`)} aria-expanded={open}>
+      <Calendar className="pf-week-cal" size={38} strokeWidth={1.8} />
+      <div className="pf-week-title">
+        <h2>
+          {title} {current && <span className="dev-now">en cours</span>}
+        </h2>
+        <span>{weekRange(sample)}</span>
+      </div>
+      <span className="pf-count">
+        {items.length} pack{items.length > 1 ? 's' : ''}
+      </span>
+      <div className="pf-metrics">
+        <div className="pf-metric">
+          <small>En retard</small>
+          <b className={late ? 'red' : ''}>{late}</b>
+        </div>
+        <div className="pf-metric">
+          <small>Urgents</small>
+          <b className={urgent ? 'red' : ''}>{urgent}</b>
+        </div>
+        <div className="pf-metric">
+          <small>Validés</small>
+          <b className="green">{validated}</b>
+        </div>
+        {capacity !== undefined && (
+          <div className="pf-metric">
+            <small>Capacité</small>
+            <b className={items.length > capacity ? 'red' : ''}>
+              {items.length}/{capacity}
+            </b>
+          </div>
+        )}
+      </div>
+      <span className="pf-chevron">{open ? <ChevronUp size={24} /> : <ChevronDown size={24} />}</span>
+    </header>
   );
 }
 
@@ -793,7 +880,13 @@ function PackPanel({ p }: { p: Product }) {
         <div className="col">
           <div>
             État :{' '}
-            {p.pack.dieCut === 'received' ? <Pill color="green">Reçu</Pill> : p.pack.dieCut === 'requested' ? <Pill color="orange">Demandé au fournisseur</Pill> : <Pill color="grey">Non demandé</Pill>}
+            {p.pack.dieCut === 'received' ? (
+              <Pill color="green">Reçu</Pill>
+            ) : p.pack.dieCut === 'requested' ? (
+              <Pill color="orange">Demandé au fournisseur</Pill>
+            ) : (
+              <Pill color="grey">Non demandé</Pill>
+            )}
           </div>
           {p.pack.dieCut === 'requested' && auth.allowed({ type: 'receiveDieCut', productId: p.id }) && (
             <button className="btn sm" onClick={() => dispatch({ type: 'receiveDieCut', productId: p.id })}>
@@ -804,7 +897,8 @@ function PackPanel({ p }: { p: Product }) {
       )}
       {sub === 'brief' && (
         <div className="small">
-          Pack {p.pack.type.toLowerCase()} pour la marque {brandOf(state.brands, p.brandId).name}, collection {p.collection}. Rendu attendu le {fdate(p.pack.artworkDeadline)} (designer : {p.pack.designer}).
+          Pack {p.pack.type.toLowerCase()} pour la marque {brandOf(state.brands, p.brandId).name}, collection {p.collection}. Rendu attendu le {fdate(p.pack.artworkDeadline)} (designer :{' '}
+          {p.pack.designer}).
         </div>
       )}
       {sub === 'fichiers' && <PackFiles p={p} />}
@@ -816,9 +910,7 @@ function PackPanel({ p }: { p: Product }) {
             <Play size={13} className="violet-t" /> Commencé par <b>{p.pack.designer}</b> le <b>{fstamp(p.pack.startedAt)}</b>
           </div>
         ) : (
-          <div className="small muted">
-            Pas encore commencé{p.pack.plannedStart ? ` · début prévu le ${fdate(p.pack.plannedStart)}` : ''}
-          </div>
+          <div className="small muted">Pas encore commencé{p.pack.plannedStart ? ` · début prévu le ${fdate(p.pack.plannedStart)}` : ''}</div>
         )}
         {!p.pack.startedAt && auth.allowed({ type: 'startPack', productId: p.id }) && (
           <div className="pk-startrow">
@@ -852,16 +944,18 @@ function PackPanel({ p }: { p: Product }) {
       <ValidationCircuit product={p} />
 
       <div className="grid2 mt">
-        {auth.can('pack.design') && <button
-          className="btn"
-          disabled={p.pack.dieCut !== 'none'}
-          onClick={() => {
-            dispatch({ type: 'requestDieCut', productId: p.id });
-            toast('Die cut demandé au fournisseur');
-          }}
-        >
-          <Scissors size={15} /> Demander le die cut
-        </button>}
+        {auth.can('pack.design') && (
+          <button
+            className="btn"
+            disabled={p.pack.dieCut !== 'none'}
+            onClick={() => {
+              dispatch({ type: 'requestDieCut', productId: p.id });
+              toast('Die cut demandé au fournisseur');
+            }}
+          >
+            <Scissors size={15} /> Demander le die cut
+          </button>
+        )}
         {!done && pendingStep && auth.allowed({ type: 'validatePack', productId: p.id }) && (
           <button
             className="btn primary"
@@ -884,16 +978,18 @@ function PackPanel({ p }: { p: Product }) {
             <X size={15} /> Refuser
           </button>
         )}
-        {auth.can('pack.design') && <button
-          className="btn primary"
-          disabled={p.pack.validations.moinard.state !== 'done' || p.pack.sentToSupplier}
-          onClick={() => {
-            dispatch({ type: 'forwardPack', productId: p.id });
-            toast(`Pack transmis à ${sup.shortName}`);
-          }}
-        >
-          <Send size={15} /> Forwarder le pack
-        </button>}
+        {auth.can('pack.design') && (
+          <button
+            className="btn primary"
+            disabled={p.pack.validations.moinard.state !== 'done' || p.pack.sentToSupplier}
+            onClick={() => {
+              dispatch({ type: 'forwardPack', productId: p.id });
+              toast(`Pack transmis à ${sup.shortName}`);
+            }}
+          >
+            <Send size={15} /> Forwarder le pack
+          </button>
+        )}
         {auth.can('dev.advance') && (
           <button
             className={`btn ${p.urgent ? 'danger' : ''}`}

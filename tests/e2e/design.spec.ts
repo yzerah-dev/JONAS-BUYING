@@ -92,6 +92,7 @@ test.describe('Espace Designer – réaffectation (administrateur)', () => {
   });
 
   test('tri et regroupement par marque', async ({ page }) => {
+    await page.getByRole('tab', { name: 'Designer × semaine' }).click();
     await page.locator('#pk-sort').selectOption('marque');
     await page.locator('#pk-group').selectOption('marque');
     const groups = (await page.locator('.pk-group-head').allInnerTexts()).map((t) => t.split('\n')[0].trim());
@@ -194,8 +195,13 @@ test('vues par designer (toutes les semaines) et par semaine (tous les designers
   await views.getByRole('tab', { name: 'Par designer' }).click();
   await page.getByLabel('Designer').selectOption('ABIR');
   await expect(page.locator('.pk-scope h2')).toContainText('ABIR · toutes les semaines');
-  await expect(page.locator('.pk-group-head').first()).toContainText('Semaine');
-  expect(await page.locator('.pk-group-head').count()).toBeGreaterThan(1);
+  // Cartes semaine comme la page Proformas : semaine en cours ouverte, les autres se déplient
+  await expect(page.locator('.pk-week').first()).toContainText('Semaine');
+  expect(await page.locator('.pk-week').count()).toBeGreaterThan(1);
+  await expect(page.locator('.pk-week', { hasText: 'en cours' })).toHaveClass(/open/);
+  const closed = page.locator('.pk-week:not(.open)').first();
+  await closed.locator('.pf-week-head').click();
+  await expect(page.locator('.pk-week:not(.open)')).toHaveCount((await page.locator('.pk-week').count()) - (await page.locator('.pk-week.open').count()));
   // Par semaine : tous les designers, rangés designer par designer
   await views.getByRole('tab', { name: 'Par semaine' }).click();
   await expect(page.locator('.pk-scope h2')).toContainText('Toute l’équipe · Semaine');
