@@ -17,7 +17,7 @@ export function TrackRound({ k }: { k: PackTrack | 'diecut' }) {
   return (
     <span className={`trk ${l.cls}`}>
       <span className="trk-round">
-        <l.icon size={14} strokeWidth={2.6} />
+        <l.icon size={20} strokeWidth={2.6} />
       </span>
     </span>
   );
@@ -29,7 +29,7 @@ export function TrackBadge({ k }: { k: PackTrack | 'diecut' }) {
   return (
     <span className={`trk ${l.cls}`} data-k={k}>
       <span className="trk-round">
-        <l.icon size={15} strokeWidth={2.6} />
+        <l.icon size={20} strokeWidth={2.6} />
       </span>
       <span className="trk-label">{l.label}</span>
     </span>

@@ -341,8 +341,10 @@ function DesignPage() {
           <div className="dev-trackbar pk-trackbar" role="group" aria-label="Suivi pack">
             <span className="pk-trackbar-title">Suivi pack</span>
             {TRACK_CHIPS.map(([k, label]) => (
-              <button key={k} type="button" className={`pf-chip ${track === k ? 'active' : ''}`} aria-pressed={track === k} onClick={() => setTrack(k)}>
-                {k !== 'all' && <TrackRound k={k} />} {label} <b>{scope.filter((p) => matchTrack(p, k)).length}</b>
+              <button key={k} type="button" className={`trk-tile ${track === k ? 'active' : ''}`} aria-pressed={track === k} aria-label={`${label} (${scope.filter((p) => matchTrack(p, k)).length})`} onClick={() => setTrack(k)}>
+                {k === 'all' ? <span className="trk-round all">{scope.length}</span> : <TrackRound k={k} />}
+                <span className="trk-tile-label">{label}</span>
+                {k !== 'all' && <b>{scope.filter((p) => matchTrack(p, k)).length}</b>}
               </button>
             ))}
           </div>

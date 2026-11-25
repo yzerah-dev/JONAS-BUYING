@@ -184,8 +184,10 @@ function DevelopmentPage() {
       {/* Suivi du pack : filtre par statut */}
       <div className="dev-trackbar" role="group" aria-label="Suivi pack">
         {TRACK_CHIPS.map(([k, label]) => (
-          <button key={k} type="button" className={`pf-chip ${track === k ? 'active' : ''}`} aria-pressed={track === k} onClick={() => setTrack(k)}>
-            {k !== 'all' && <TrackRound k={k} />} {label} <b>{trackCount(k)}</b>
+          <button key={k} type="button" className={`trk-tile ${track === k ? 'active' : ''}`} aria-pressed={track === k} aria-label={`${label} (${trackCount(k)})`} onClick={() => setTrack(k)}>
+            {k === 'all' ? <span className="trk-round all">{trackCount(k)}</span> : <TrackRound k={k} />}
+            <span className="trk-tile-label">{label}</span>
+            {k !== 'all' && <b>{trackCount(k)}</b>}
           </button>
         ))}
       </div>
