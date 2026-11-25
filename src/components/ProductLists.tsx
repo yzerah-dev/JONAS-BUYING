@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { ListChecks, Lock, Plus, X } from 'lucide-react';
 import { canEditProduct, currentUser, LIST_LABELS, listUsage, listValues, useStore } from '../data/store';
 import type { ListKey } from '../data/types';
@@ -46,7 +47,12 @@ export default function ProductLists() {
           </Pill>
         )}
       </div>
-      <p className="muted small">Valeurs proposées dans les listes déroulantes de la fiche produit. Une valeur utilisée par un produit ne peut pas être retirée.</p>
+      <p className="muted small">
+        Valeurs proposées dans les listes déroulantes de la fiche produit. Une valeur utilisée par un produit ne peut pas être retirée.{' '}
+        <Link to="/listes" className="green bold">
+          Voir toutes les listes en grand (renommer, fusionner, produits concernés) →
+        </Link>
+      </p>
       <div className="seg-tabs row wrap" style={{ gap: 6, margin: '8px 0 12px' }} role="tablist">
         {(['brands', ...KEYS] as const).map((k) => (
           <button key={k} type="button" role="tab" aria-selected={tab === k} className={`btn sm ${tab === k ? 'primary' : ''}`} onClick={() => setTab(k)}>

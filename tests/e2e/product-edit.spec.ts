@@ -162,3 +162,54 @@ test('Paramètres : listes de la fiche produit (marques, rayons…) ajoutées, r
   await expect(page.locator('#pe-packType option', { hasText: 'Filet' })).toHaveCount(1);
   await expect(page.locator('#pe-brand option', { hasText: 'LITTLE MARCEL' })).toHaveCount(1);
 });
+
+test('page « Listes produit » : vision d’ensemble, produits concernés, renommer partout, fusionner', async ({ page }) => {
+  await resetApp(page);
+  await loginAs(page, 'David');
+  await page.getByRole('link', { name: 'Listes produit' }).click();
+  await expect(page.locator('h1')).toContainText('Listes produit');
+  for (const t of ['Marques', 'Rayons', 'Collections', 'Genres', 'Matières', 'Tailles', 'Types de pack']) await expect(page.getByRole('region', { name: t })).toBeVisible();
+
+  const count = (rayon: string) =>
+    page.evaluate((r) => {
+      const k = Object.keys(localStorage).find((x) => x.startsWith('jonas-buying-state'))!;
+      return (JSON.parse(localStorage.getItem(k)!).products as { rayon: string }[]).filter((p) => p.rayon === r).length;
+    }, rayon);
+  const beaute = await count('Beauté');
+  const parfum = await count('Parfumerie');
+  expect(beaute).toBeGreaterThan(0);
+
+  const rayons = page.getByRole('region', { name: 'Rayons' });
+  // Produits concernés : dépliables, avec lien vers la fiche
+  await rayons.locator('.lp-row', { hasText: 'Beauté' }).locator('.lp-count').click();
+  await expect(rayons.locator('.lp-products .ref-tag')).toHaveCount(Math.min(beaute, 30));
+  // Renommer partout
+  await rayons.getByLabel('Renommer Beauté').click();
+  await rayons.getByLabel('Nouveau nom pour Beauté').fill('Beauté & soins');
+  await rayons.getByLabel('Valider').click();
+  await expect(toast(page)).toContainText(`« Beauté » → « Beauté & soins » sur ${beaute} produit(s)`);
+  expect(await count('Beauté & soins')).toBe(beaute);
+  expect(await count('Beauté')).toBe(0);
+  // Fusion avec une valeur existante
+  await rayons.getByLabel('Renommer Beauté & soins').click();
+  await rayons.getByLabel('Nouveau nom pour Beauté & soins').fill('Parfumerie');
+  await rayons.getByLabel('Valider').click();
+  expect(await count('Parfumerie')).toBe(beaute + parfum);
+  await expect(rayons.locator('.lp-row', { hasText: 'Beauté' })).toHaveCount(0);
+  // Recherche sur toutes les listes
+  await page.getByLabel('Chercher une valeur').fill('EVA');
+  await expect(page.getByRole('region', { name: 'Matières' }).locator('.lp-row')).toHaveCount(1);
+  // Une valeur utilisée ne se retire pas ; une valeur ajoutée oui
+  await page.getByLabel('Chercher une valeur').fill('');
+  await expect(rayons.getByLabel('Retirer Parfumerie')).toBeDisabled();
+  await rayons.getByLabel('Ajouter : Rayons').fill('Plein air');
+  await rayons.getByRole('button', { name: 'Ajouter' }).click();
+  await rayons.getByLabel('Retirer Plein air').click();
+  await expect(rayons.locator('.lp-row', { hasText: 'Plein air' })).toHaveCount(0);
+
+  // Designer : lecture seule
+  await loginAs(page, 'ABIR');
+  await go(page, 'listes');
+  await expect(page.getByRole('region', { name: 'Rayons' })).toBeVisible();
+  await expect(page.getByLabel('Renommer Parfumerie')).toHaveCount(0);
+});

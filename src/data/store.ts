@@ -186,6 +186,8 @@ export type Action =
   /** Fiches produit modifiées (formulaire ou import Excel) ; marques créées au passage */
   | { type: 'setList'; key: ListKey; values: string[] }
   | { type: 'setBrands'; brands: Brand[] }
+  /** Renomme une valeur de liste partout (liste et produits qui l'utilisent) ; vers une valeur existante : fusion */
+  | { type: 'renameListValue'; key: ListKey; from: string; to: string }
   | { type: 'updateProducts'; items: { productId: string; patch: ProductPatch }[]; brands?: Brand[]; source?: 'fiche' | 'excel' }
   | { type: 'markDeveloped'; productId: string }
   | { type: 'reassignPack'; productId: string; designer?: string; weekOf?: ISODate }
@@ -310,6 +312,8 @@ export function isAllowed(s: State, a: Action): boolean {
       return canEditProduct(u) && a.items.length > 0 && !productPatchErrors(s, a.items, a.brands).length;
     case 'setList':
       return canEditProduct(u);
+    case 'renameListValue':
+      return canEditProduct(u) && !!a.from.trim() && !!a.to.trim();
     case 'setBrands':
       // Une marque utilisée par un produit ne peut pas être retirée
       return canEditProduct(u) && a.brands.every((b) => b.id && b.name.trim()) && s.products.every((p) => p.brandId === 'jonas' || a.brands.some((b) => b.id === p.brandId) || !s.brands.some((b) => b.id === p.brandId));
@@ -1502,6 +1506,20 @@ function applyAction(s: State, a: Action): State {
     }
     case 'setList':
       return { ...s, settings: { ...s.settings, lists: { ...(s.settings.lists ?? {}), [a.key]: [...new Set(a.values.map((v) => v.trim()).filter(Boolean))] } } };
+    case 'renameListValue': {
+      const from = a.from.trim().toLowerCase();
+      const to = a.to.trim();
+      const values = listValues(s, a.key);
+      const merged = values.some((v) => v.toLowerCase() === to.toLowerCase() && v.toLowerCase() !== from);
+      const list = merged ? values.filter((v) => v.toLowerCase() !== from) : values.map((v) => (v.toLowerCase() === from ? to : v));
+      const same = (v?: string) => v?.trim().toLowerCase() === from;
+      const products = s.products.map((p) => {
+        if (a.key === 'packType') return same(p.pack.type) ? { ...p, pack: { ...p.pack, type: to } } : p;
+        const k = a.key;
+        return same(p[k]) ? { ...p, [k]: to } : p;
+      });
+      return { ...s, products, settings: { ...s.settings, lists: { ...(s.settings.lists ?? {}), [a.key]: list } } };
+    }
     case 'setBrands':
       return { ...s, brands: a.brands.map((b) => ({ ...b, name: b.name.trim(), tagline: b.tagline.trim() })) };
     case 'setProductText':
@@ -1630,6 +1648,8 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
       return { target: a.productId, text: `Désignation et description mises à jour : ${a.name.trim()}` };
     case 'setList':
       return { text: `Liste « ${LIST_LABELS[a.key]} » : ${a.values.length} valeur(s)` };
+    case 'renameListValue':
+      return { text: `${LIST_LABELS[a.key]} : « ${a.from} » renommé en « ${a.to} » (${listUsage(s, a.key, a.from)} produit(s))` };
     case 'setBrands':
       return { text: `Marques : ${a.brands.map((b) => b.name).join(', ') || 'aucune'}` };
     case 'updateProducts': {

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { BarChart3, CalendarCheck, Box, Boxes, Euro, History, Layers, Palette, Search, Settings, Truck } from 'lucide-react';
+import { BarChart3, CalendarCheck, Box, Boxes, Euro, History, Layers, ListChecks, Palette, Search, Settings, Truck } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import SearchPalette from './SearchPalette';
 import { currentUser, useStore } from '../data/store';
@@ -21,6 +21,7 @@ const NAV: { to: string; label: string; icon: typeof Layers; module: Module }[] 
 ];
 const NAV_MORE: typeof NAV = [
   { to: '/produits', label: 'Total – Produits', icon: Boxes, module: 'produits' },
+  { to: '/listes', label: 'Listes produit', icon: ListChecks, module: 'produits' },
   { to: '/design', label: 'Design', icon: Palette, module: 'design' },
   { to: '/fournisseurs', label: 'Fournisseurs', icon: Truck, module: 'fournisseurs' },
   { to: '/finance', label: 'Factures & Finance', icon: Euro, module: 'finance' },
@@ -34,6 +35,7 @@ function moduleOf(path: string): Module {
     performance: 'home',
     proformas: 'proformas',
     produits: 'produits',
+    listes: 'produits',
     developpement: 'developpement',
     design: 'design',
     conteneurs: 'conteneurs',

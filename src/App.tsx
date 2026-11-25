@@ -14,6 +14,7 @@ const Proformas = lazy(() => import('./pages/Proformas'));
 const ProformaDetail = lazy(() => import('./pages/ProformaDetail'));
 const Products = lazy(() => import('./pages/Products'));
 const ProductDetail = lazy(() => import('./pages/ProductDetail'));
+const ProductListsPage = lazy(() => import('./pages/ProductListsPage'));
 const Development = lazy(() => import('./pages/Development'));
 const Design = lazy(() => import('./pages/Design'));
 const Containers = lazy(() => import('./pages/Containers'));
@@ -49,6 +50,7 @@ export default function App() {
             <Route path="proformas" element={page(<Proformas />)} />
             <Route path="proformas/:id" element={page(<ProformaDetail />)} />
             <Route path="produits" element={page(<Products />)} />
+            <Route path="listes" element={page(<ProductListsPage />)} />
             <Route path="produits/:id" element={page(<ProductDetail />)} />
             <Route path="developpement" element={page(<Development />)} />
             <Route path="design" element={page(<Design />)} />
