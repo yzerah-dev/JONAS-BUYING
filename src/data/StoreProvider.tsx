@@ -2,6 +2,10 @@ import { useEffect, useReducer, useRef, useState, type ReactNode } from 'react';
 import { STORAGE_KEY, StoreContext, load, reducer, type Action, type State } from './store';
 import { applyRemoteChange, diffState, fromDocs, remoteEnabled, type Collection } from './remote';
 import { currentMember, loadDocs, pushDocs, subscribeDocs, supabase } from './supabaseSync';
+import { authMessage, cleanAuthUrl, LINK_FAILED, readAuthReturn } from '../lib/authReturn';
+
+// Lu au chargement, avant que le client Supabase n'échange le code et ne nettoie l'adresse
+const authReturn = readAuthReturn(typeof location === 'undefined' ? '' : location.href);
 
 /**
  * Fournit l'état de l'application.
@@ -55,7 +59,12 @@ function RemoteStoreProvider({ children }: { children: ReactNode }) {
   const queue = useRef<Promise<void>>(Promise.resolve());
 
   // Connexion puis chargement de la base visible par cet utilisateur
+  const started = useRef(false);
   const start = async () => {
+    // getSession et l'événement SIGNED_IN arrivent tous deux au retour du lien : un seul chargement
+    if (started.current) return;
+    started.current = true;
+    setError('');
     setPhase('loading');
     try {
       const member = await currentMember();
@@ -67,17 +76,27 @@ function RemoteStoreProvider({ children }: { children: ReactNode }) {
       dispatch({ type: '__replace', state: next });
       setPhase('ready');
     } catch (e) {
+      started.current = false; // nouvelle tentative possible
       setError((e as Error).message);
       setPhase('error');
     }
   };
   useEffect(() => {
+    // getSession attend la fin de l'échange du code (?code=…) par le client
     supabase()
       .auth.getSession()
-      .then(({ data }) => (data.session ? start() : setPhase('auth')));
+      .then(({ data }) => {
+        if (authReturn.hadCode || authReturn.error) history.replaceState(history.state, '', cleanAuthUrl(location.href));
+        if (data.session) return start();
+        if (authReturn.hadCode || authReturn.error) setError(LINK_FAILED);
+        setPhase('auth');
+      });
     const { data: sub } = supabase().auth.onAuthStateChange((ev) => {
       if (ev === 'SIGNED_IN') start();
-      if (ev === 'SIGNED_OUT') setPhase('auth');
+      if (ev === 'SIGNED_OUT') {
+        started.current = false;
+        setPhase('auth');
+      }
     });
     return () => sub.subscription.unsubscribe();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -125,8 +144,14 @@ function AuthScreen({ phase, error }: { phase: string; error: string }) {
     setMsg('');
     const { error: err } = password
       ? await supabase().auth.signInWithPassword({ email, password })
-      : await supabase().auth.signInWithOtp({ email, options: { shouldCreateUser: false, emailRedirectTo: location.href } });
-    setMsg(err ? err.message : password ? '' : 'Lien de connexion envoyé : ouvrez votre e-mail.');
+      : await supabase().auth.signInWithOtp({ email, options: { shouldCreateUser: false, emailRedirectTo: location.origin + '/' } });
+    setMsg(
+      err
+        ? authMessage(err, !!password)
+        : password
+          ? ''
+          : 'Lien de connexion envoyé : ouvrez votre e-mail, dans ce même navigateur.',
+    );
   };
   return (
     <div className="auth-screen">
@@ -146,6 +171,7 @@ function AuthScreen({ phase, error }: { phase: string; error: string }) {
         ) : (
           <>
             {phase === 'error' && <p className="red small">Base inaccessible : {error}</p>}
+            {phase === 'auth' && error && !msg && <p className="red small">{error}</p>}
             <label htmlFor="auth-email">
               E-mail
               <input id="auth-email" className="input" type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />

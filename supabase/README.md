@@ -15,13 +15,24 @@ les modifications en temps réel.
    `npm run seed:supabase -- --members scripts/members.json`
    Comptes créés sans mot de passe : première connexion par lien e-mail, puis menu utilisateur →
    « Définir mon mot de passe ».
-5. **E-mails de connexion** : l'envoi par défaut de Supabase ne sert qu'aux tests (très peu d'e-mails par
-   heure, et seulement vers les membres de l'équipe du projet Supabase). Configurer un SMTP
-   (*Authentication → Emails → SMTP Settings*) et, une fois l'application en ligne, son adresse dans
-   *Authentication → URL Configuration* (Site URL + Redirect URLs).
-4. **Relier l'application** : au build, définir
-   - `VITE_SUPABASE_URL` = `https://ulwsixiywyikyjanbidk.supabase.co`
-   - `VITE_SUPABASE_ANON_KEY` = la clé **publique** du projet (anon / publishable — jamais la clé secrète)
+5. **E-mails de connexion** : SMTP Google Workspace (*Authentication → Emails → SMTP Settings*, expéditeur
+   yzerah@jonas-france.com), modèle « Magic link » en français. L'envoi par défaut de Supabase ne suffit pas.
+
+## En ligne
+
+- **Production** : https://jonas-buying.vercel.app — projet Vercel « jonas-buying » (équipe JONAS PRO),
+  branche `claude/new-session-q87nz8`, configuration dans `vercel.json` (build `npm run build:shared`,
+  sortie `dist`). Aucune variable d'environnement : `.env.supabase` ne contient que l'URL et la clé publique.
+  Chaque push sur la branche redéploie.
+- **Supabase → Authentication → URL Configuration** : Site URL `https://jonas-buying.vercel.app` ;
+  Redirect URLs `https://jonas-buying.vercel.app/**` et `http://localhost:5173/**`.
+- **Connexion** :
+  1. Première fois : saisir son e-mail, laisser le mot de passe vide, « Se connecter » → lien reçu par e-mail.
+  2. **Ouvrir le lien dans le même navigateur** que celui où on l'a demandé (flux PKCE : le code n'est
+     valable qu'avec la clé gardée par ce navigateur). Sinon : « Ouvrez le lien dans le navigateur où vous
+     l'avez demandé, ou redemandez un lien. »
+  3. Menu utilisateur → « Définir mon mot de passe » ; ensuite, connexion par e-mail + mot de passe.
+  - Une adresse sans compte reçoit « Cette adresse n'a pas d'accès à JONAS BUYING » (aucun compte n'est créé).
 
 ## Ce qui change dans l'application reliée
 

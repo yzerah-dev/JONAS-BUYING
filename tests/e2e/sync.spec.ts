@@ -36,3 +36,18 @@ test('journal en ajout seul : jamais de suppression envoyée', () => {
   const trimmed = { ...s, journal: s.journal.slice(1) };
   expect(diffState(s, trimmed).deletes).toEqual([]);
 });
+
+test('retour du lien e-mail : code lu, adresse nettoyée sans casser le HashRouter, messages clairs', async () => {
+  const { authMessage, cleanAuthUrl, readAuthReturn, UNKNOWN_ADDRESS } = await import('../../src/lib/authReturn');
+  expect(readAuthReturn('https://jonas-buying.vercel.app/?code=abc#/')).toEqual({ hadCode: true, error: '' });
+  expect(cleanAuthUrl('https://jonas-buying.vercel.app/?code=abc#/proformas')).toBe('/#/proformas');
+  expect(cleanAuthUrl('https://jonas-buying.vercel.app/?code=abc')).toBe('/');
+  const expired = 'https://jonas-buying.vercel.app/?error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired';
+  expect(readAuthReturn(expired).error).toBe('Email link is invalid or has expired');
+  expect(cleanAuthUrl(expired)).toBe('/');
+  expect(readAuthReturn('https://jonas-buying.vercel.app/#error=access_denied&error_description=expired').error).toBe('expired');
+  expect(readAuthReturn('https://jonas-buying.vercel.app/#/proformas')).toEqual({ hadCode: false, error: '' });
+  expect(authMessage({ code: 'otp_disabled', message: 'Signups not allowed for otp' }, false)).toBe(UNKNOWN_ADDRESS);
+  expect(authMessage({ code: 'invalid_credentials', message: 'Invalid login credentials' }, true)).toMatch(/mot de passe incorrect/);
+  expect(authMessage({ message: 'For security purposes, you can only request this after 42 seconds.', status: 429 }, false)).toMatch(/patientez/);
+});

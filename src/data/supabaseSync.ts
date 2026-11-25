@@ -4,7 +4,10 @@ import { remoteConfig, type Collection, type Doc } from './remote';
 
 let client: SupabaseClient | null = null;
 export function supabase(): SupabaseClient {
-  client ??= createClient(remoteConfig.url, remoteConfig.key, { auth: { persistSession: true, autoRefreshToken: true } });
+  client ??= createClient(remoteConfig.url, remoteConfig.key, {
+    // PKCE : le lien e-mail revient avec ?code=… (compatible HashRouter, qui occupe le « # »)
+    auth: { persistSession: true, autoRefreshToken: true, flowType: 'pkce', detectSessionInUrl: true },
+  });
   return client;
 }
 
