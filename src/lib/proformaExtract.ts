@@ -8,7 +8,10 @@ import type { Product } from '../data/types';
 import { isSheet, readSheet, sheetText } from './excelImport';
 
 export interface ExtractedLine {
+  /** Référence lue (celle du fournisseur, sauf si c'est une référence JONAS existante) */
   ref: string;
+  /** Référence de l'acheteur (JONAS), quand la proforma a les deux colonnes (« buyer » / « ours ») */
+  jonasRef?: string;
   name: string;
   ean?: string;
   qty: number;
@@ -218,6 +221,10 @@ export interface Match {
  * `products` : produits du fournisseur — sa référence fournisseur connue, ou une désignation quasi identique.
  */
 export function matchProduct(l: ExtractedLine, products: Product[], catalog: Product[] = products): Match {
+  if (l.jonasRef) {
+    const jonas = catalog.find((x) => key(x.ref) === key(l.jonasRef!));
+    if (jonas) return { product: jonas, by: 'ref' };
+  }
   if (l.ref) {
     const jonas = catalog.find((x) => key(x.ref) === key(l.ref));
     if (jonas) return { product: jonas, by: 'ref' };

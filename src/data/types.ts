@@ -284,7 +284,8 @@ export interface ProformaDoc {
 export interface ImportLine {
   productId?: string;
   /** Nouveau produit : la référence JONAS et l'EAN JONAS sont attribués à la création */
-  newProduct?: { supplierRef?: string; name: string; pcb: number; cbmCarton: number };
+  /** ref / ean : référence et EAN JONAS déjà portés par la proforma (colonne « buyer », code-barres au préfixe GS1 JONAS) */
+  newProduct?: { supplierRef?: string; ref?: string; ean?: string; name: string; pcb: number; cbmCarton: number };
   qty: number;
   price: number;
 }

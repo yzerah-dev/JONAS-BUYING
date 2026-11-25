@@ -417,6 +417,8 @@ for (const s of suppliers) {
   const dep = pcts.length ? Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length / 5) * 5 : 30;
   s.terms = { currency: 'EUR', depositPct: dep, balanceDays: 7 };
 }
+// NINGBO HOME SOURCING : conditions saisies par JONAS (USD, sans acompte, solde à 145 jours)
+suppliers.find((s) => s.id === 'ningbohome')!.terms = { currency: 'USD', depositPct: 0, balanceDays: 145 };
 
 // ---- Conteneurs -------------------------------------------------------------
 

@@ -7,6 +7,8 @@ export interface EditLine {
   qty: string;
   price: string;
   ref?: string;
+  /** Référence JONAS portée par la proforma (sinon attribuée à la création) */
+  jonasRef?: string;
   name?: string;
   ean?: string;
   pcb?: string;
@@ -28,6 +30,7 @@ export function fromExtraction(lines: ExtractedLine[], products: Product[], cata
           qty: String(l.qty),
           price: String(l.price),
           ref: l.ref,
+          jonasRef: l.jonasRef || undefined,
           name: l.name,
           ean: l.ean,
           pcb: l.pcb ? String(l.pcb) : '',
@@ -59,7 +62,11 @@ export function toImport(lines: EditLine[], catalog: Product[] = []): ImportLine
       const cbm = toNum(l.cbm);
       if (!l.name?.trim() || !(pcb > 0) || !(cbm > 0)) return null;
       // La référence lue sur la proforma est celle du fournisseur ; la référence et l'EAN JONAS sont attribués à la création
-      out.push({ newProduct: { supplierRef: l.ref?.trim().toUpperCase() || undefined, name: l.name.trim(), pcb, cbmCarton: cbm }, qty, price });
+      out.push({
+        newProduct: { supplierRef: l.ref?.trim().toUpperCase() || undefined, ref: l.jonasRef?.trim().toUpperCase() || undefined, ean: l.ean || undefined, name: l.name.trim(), pcb, cbmCarton: cbm },
+        qty,
+        price,
+      });
     }
   }
   return out;

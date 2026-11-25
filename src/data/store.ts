@@ -500,6 +500,7 @@ function importLinesOk(s: State, supplierId: string, lines: ImportLine[]) {
     const n = l.newProduct;
     if (!n || !n.name.trim() || !(n.pcb > 0) || !(n.cbmCarton > 0)) return false;
     // Une référence JONAS existante désigne ce produit : pas de doublon
+    if (n.ref?.trim() && s.products.some((p) => refKey(p.ref) === refKey(n.ref!))) return false;
     if (n.supplierRef?.trim() && s.products.some((p) => refKey(p.ref) === refKey(n.supplierRef!))) return false;
     // Une référence fournisseur ne peut pas désigner deux produits de ce fournisseur
     if (n.supplierRef?.trim()) {
@@ -550,6 +551,28 @@ export function nextJonasCodes(s: State, supplierId: string, n: number): { ref: 
 }
 
 /**
+ * Codes JONAS des nouveaux produits, dans l'ordre : ceux déjà portés par la proforma quand ils sont utilisables
+ * (référence JONAS inédite ; EAN-13 valide au préfixe GS1 JONAS, inédit), sinon les suivants de la série.
+ */
+export function jonasCodesFor(s: State, supplierId: string, given: { ref?: string; ean?: string }[]): { ref: string; ean: string; fromDoc: { ref: boolean; ean: boolean } }[] {
+  const gen = nextJonasCodes(s, supplierId, given.length);
+  const gs1 = (s.settings.company.gs1Prefix || DEFAULT_GS1).replace(/\D/g, '').slice(0, 11);
+  const refs = new Set(s.products.map((p) => refKey(p.ref)));
+  const eans = new Set(s.products.map((p) => p.ean));
+  return given.map((g, i) => {
+    const r = g.ref?.trim().toUpperCase() ?? '';
+    const refOk = !!r && !refs.has(refKey(r));
+    const e = (g.ean ?? '').replace(/\D/g, '');
+    const eanOk = e.length === 13 && e.startsWith(gs1) && eanCheck(e.slice(0, 12)) === e[12] && !eans.has(e);
+    const ref = refOk ? r : gen[i].ref;
+    const ean = eanOk ? e : gen[i].ean;
+    refs.add(refKey(ref));
+    eans.add(ean);
+    return { ref, ean, fromDoc: { ref: refOk, ean: eanOk } };
+  });
+}
+
+/**
  * Transforme les lignes lues sur une proforma en lignes de proforma : crée les nouveaux produits
  * (rayon, marque et designer habituels du fournisseur, pack à définir, à développer).
  */
@@ -561,7 +584,7 @@ function materializeLines(s: State, supplierId: string, lines: ImportLine[], etd
     return [...count.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? fallback;
   };
   const created: Product[] = [];
-  const codes = nextJonasCodes(s, supplierId, lines.filter((l) => !l.productId).length);
+  const codes = jonasCodesFor(s, supplierId, lines.filter((l) => !l.productId).map((l) => ({ ref: l.newProduct?.ref, ean: l.newProduct?.ean })));
   const out: ProformaLine[] = lines.map((l) => {
     if (l.productId) return { productId: l.productId, qty: l.qty, price: l.price };
     const n = l.newProduct!;

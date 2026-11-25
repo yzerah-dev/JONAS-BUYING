@@ -1,6 +1,7 @@
 import { PDFDocument, StandardFonts } from 'pdf-lib';
 import { expect, go, loginAs, resetApp, test, toast } from './fixtures';
 import type { Page } from '@playwright/test';
+import * as XLSX from 'xlsx';
 
 /** Proforma fournisseur en PDF : un tableau Réf. | Désignation | Qté | Prix | Montant */
 async function proformaPdf(rows: [string, string, number, number][]) {
@@ -169,4 +170,61 @@ test.describe('Proforma déposée : lignes lues, produits reconnus ou créés', 
     expect(s.products.length).toBe(n0);
     expect(s.proformas.find((p) => p.id === 'PF-2026-0154')!.lines).toEqual([{ productId: 'JO-R301', qty: 2000, price: 1.9 }]);
   });
+});
+
+/** Proforma Excel (.xls) d'un fournisseur chinois : bloc société, conditions, en-tête sur deux lignes
+ *  (Item No. buyer / ours, Quantity Inner / Outer), code-barres JONAS, CBM par carton et total */
+function luggageXls() {
+  const ws = XLSX.utils.aoa_to_sheet([
+    ['', 'NINGBO HOME SOURCING IMP. & EXP. CO., LTD'],
+    ['', 'RM 1711, NINGBO CHINA'],
+    ['', '', '', 'Tel: 86 574 0000000', 'Fax: 86 574 0000000', '', 'Email: sales@example.com'],
+    ['', '', '', '', 'PROFORMA INVOICE', '', '', '', '', '', '', 'P/I No.:', 'PRIX99001'],
+    ['TO:', 'JONAS FRANCE', '', '', '', '', '', '', '', '', '', 'Date: ', 'NOV.20,2026'],
+    ['', '', '', '', '', '', '', '', '', '', '', 'Order No.:', 'PRIX99001'],
+    ['', '', '', '', '', '', '', '', '', '', '', 'Price Term:', 'FOB NINGBO,CHINA'],
+    [],
+    ['', 'Barcode', 'Item No.', '', 'Description', 'Item Packing', 'Quantity', '', 'CBM', 'CTN', 'Unit Price', 'Quantity', 'Amount ', 'Total', 'Image'],
+    ['', '', 'buyer', 'ours ', '', '', 'Inner', 'Outer', '', '', 'USD ', 'PCS', 'USD', 'CBM'],
+    [1, 3701571431633, 'LTM007', 71726, 'LUGGAGE SET OF 4 PIECE,16/20/24/28INCH, colors: pink,green,blue', 'SWING TAG', 0, 1, 0.10878, 3200, 30.5, 3200, 97600, 348.096],
+    [2, '', '', 71727, 'TROLLEY 20INCH ABS, colors: black,silver', 'POLYBAG', 0, 2, 0.15, 500, 12.8, 1000, 12800, 75],
+    ['', '', '', '', '', '', '', '', 'Total:', 3700, '', 4200, 110400, 423.096],
+    ['1.More or less With 5% Both in Amount & Quantity Allowed.'],
+    ['4. Term of Payment: ', '', '100% T/T 90 DAYS AFTER B/L DATE'],
+  ]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+  return Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'biff8' }));
+}
+
+test('proforma Excel .xls (en-tête sur deux lignes) : produits créés avec la réf. et le code-barres JONAS de la proforma', async ({ page }) => {
+  await resetApp(page);
+  await loginAs(page, 'PEARL');
+  await go(page, 'portail/proformas');
+  await page.getByRole('button', { name: 'Nouvelle proforma' }).click();
+  const dlg = page.getByRole('dialog');
+  await page.locator('#np-title').fill('Bagagerie Little Marcel');
+  await dlg.getByLabel(/Proforma du fournisseur/).setInputFiles({ name: 'PRIX99001 - luggage set of 4.xls', mimeType: 'application/vnd.ms-excel', buffer: luggageXls() });
+  await expect(toast(page)).toContainText('2 ligne(s) lue(s)');
+  // Ligne 1 : réf. acheteur et code-barres JONAS repris ; réf. « ours » = réf. fournisseur ; colisage et volume lus
+  await expect(dlg.locator('.np-line-wrap').nth(0)).toContainText('Nouveau produit');
+  await expect(dlg.getByLabel('Quantité 1')).toHaveValue('3200');
+  await expect(dlg.getByLabel('Prix unitaire 1')).toHaveValue('30.5');
+  await expect(dlg.getByLabel('Réf. fournisseur 1')).toHaveValue('71726');
+  await expect(dlg.getByLabel('Pcs/carton 1')).toHaveValue('1');
+  await expect(dlg.getByLabel('m³/carton 1')).toHaveValue('0.10878');
+  await expect(dlg.locator('.np-codes').nth(0)).toContainText('Réf. JONAS LTM007 · EAN JONAS 3701571431633');
+  // Ligne 2 : sans réf. ni code-barres JONAS → attribués par JONAS
+  await expect(dlg.getByLabel('Quantité 2')).toHaveValue('1000');
+  await expect(dlg.getByLabel('Pcs/carton 2')).toHaveValue('2');
+  await dlg.getByRole('button', { name: 'Envoyer à JONAS' }).click();
+  await expect(toast(page)).toContainText('envoyée à JONAS');
+
+  const s = await state(page);
+  const lug = s.products.find((p) => p.supplierRef === '71726')!;
+  expect(lug).toMatchObject({ ref: 'LTM007', ean: '3701571431633', supplierId: 'ningbohome', pcb: 1 });
+  const trolley = s.products.find((p) => p.supplierRef === '71727')!;
+  expect(trolley.ref).not.toBe('71727');
+  expect(eanOk(trolley.ean)).toBe(true);
+  expect(trolley.ean).not.toBe(lug.ean);
 });

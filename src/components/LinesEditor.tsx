@@ -1,5 +1,5 @@
 import { Plus, Trash2 } from 'lucide-react';
-import { nextJonasCodes, useStore } from '../data/store';
+import { jonasCodesFor, useStore } from '../data/store';
 import { emptyLine, jonasRefClash, toNum, type EditLine } from '../lib/editLines';
 import { useT } from '../i18n';
 import Combobox from './Combobox';
@@ -16,7 +16,7 @@ export default function LinesEditor({ supplierId, currency, lines, setLines }: {
     ...[...products, ...others].map((p) => ({ id: p.id, label: `${p.ref} · ${td(p.name)}`, keywords: `${p.ean} ${p.supplierRef ?? ''}` })),
   ];
   // Codes JONAS qui seront attribués aux nouveaux produits, dans l'ordre des lignes
-  const codes = nextJonasCodes(state, supplierId, lines.filter((l) => l.productId === 'new').length);
+  const codes = jonasCodesFor(state, supplierId, lines.filter((l) => l.productId === 'new').map((l) => ({ ref: l.jonasRef, ean: l.ean })));
   const codeOf = (i: number) => codes[lines.slice(0, i).filter((l) => l.productId === 'new').length];
   const set = (i: number, patch: Partial<EditLine>) => setLines(lines.map((l, j) => (j === i ? { ...l, ...patch } : l)));
   const total = lines.reduce((s, l) => s + (toNum(l.qty) || 0) * (toNum(l.price) || 0), 0);
