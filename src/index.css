@@ -1873,3 +1873,5 @@ select.pi-input { cursor: pointer; }
 .pk-docs .pf-file-name small { font-size: 11px; }
 .pk-docs .ps-inspi { width: 110px; height: 110px; }
 .pk-docs .pf-folder-name { font-size: 12px; }
+.ps-round.over .ps-circle { transform: scale(1.1); box-shadow: 0 0 0 6px rgba(18, 137, 108, 0.35); border-color: var(--green); }
+.ps-round.over { background: var(--green-soft); }

@@ -318,3 +318,32 @@ test('bouton Télécharger sous chaque rond : die cut, pack (dernière version),
   const [pk] = await Promise.all([page.waitForEvent('download'), space.getByRole('button', { name: 'Télécharger : Pack' }).click()]);
   expect(pk.suggestedFilename()).toBe('pack-v2.ai');
 });
+
+test('glisser-déposer un fichier directement sur un rond (die cut, documents, pack)', async ({ page }) => {
+  await resetApp(page);
+  await loginAs(page, 'David');
+  await go(page, 'produits/CP-T001');
+  await page.getByRole('button', { name: 'Design & Pack' }).click();
+  const space = page.locator('.pack-space');
+  const dropOn = async (name: RegExp, fileName: string) => {
+    const dt = await page.evaluateHandle((n) => {
+      const d = new DataTransfer();
+      d.items.add(new File(['contenu'], n, { type: 'application/pdf' }));
+      return d;
+    }, fileName);
+    const round = space.getByRole('tab', { name });
+    await round.dispatchEvent('dragover', { dataTransfer: dt });
+    await expect(round).toHaveClass(/over/);
+    await round.dispatchEvent('drop', { dataTransfer: dt });
+  };
+  await dropOn(/^Die cut :/, 'diecut-glisse.pdf');
+  await expect(toast(page)).toContainText('1 fichier(s) ajouté(s) : Die cut');
+  await expect(space.getByRole('tab', { name: 'Die cut : uploadé' })).toBeVisible();
+  await expect(space.getByRole('region', { name: 'Die cut' })).toContainText('diecut-glisse.pdf');
+  await dropOn(/^Documents :/, 'msds-glisse.pdf');
+  await expect(space.getByRole('tab', { name: 'Documents : uploadé' })).toBeVisible();
+  // Le pack : réservé au designer
+  await dropOn(/^Pack :/, 'pack.ai');
+  await expect(toast(page)).toContainText('Seul le designer du produit dépose le pack');
+  await expect(space.getByRole('tab', { name: 'Pack : à uploader' })).toBeVisible();
+});

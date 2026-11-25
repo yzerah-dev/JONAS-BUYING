@@ -12,6 +12,8 @@ const QUALITY_TYPES = ['MSDS (fiche de sécurité)', 'Fiche composition', 'Certi
 
 export type PackRound = 'diecut' | 'pack' | 'docs';
 type Round = PackRound;
+/** Fichier déposé sur un rond : rubrique d'arrivée */
+const ROUND_KIND: Record<PackRound, PackFileKind> = { diecut: 'diecut', pack: 'pack', docs: 'quality' };
 /** Les trois ronds de l'espace pack */
 const ROUNDS: { id: Round; label: string; icon: typeof Scissors }[] = [
   { id: 'diecut', label: 'Die cut', icon: Scissors },
@@ -112,6 +114,7 @@ export default function PackFiles({ p, round, onRound }: { p: Product; round?: P
   const packs = of('pack').sort((a, b) => (b.version ?? 0) - (a.version ?? 0));
   const [busy, setBusy] = useState<string | null>(null);
   const [over, setOver] = useState<PackFileKind | null>(null);
+  const [overRound, setOverRound] = useState<Round | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [docType, setDocType] = useState(QUALITY_TYPES[0]);
   // Rond ouvert : le designer arrive sur le pack ; les autres sur le premier rond à faire
@@ -354,7 +357,30 @@ export default function PackFiles({ p, round, onRound }: { p: Product; round?: P
           const ok = roundDone(r.id);
           return (
             <div key={r.id} className="ps-round-col">
-              <button type="button" role="tab" aria-selected={open === r.id} aria-label={`${r.label} : ${ok ? 'uploadé' : 'à uploader'}`} className={`ps-round ${ok ? 'ok' : 'todo'} ${open === r.id ? 'open' : ''}`} onClick={() => setOpen(r.id)}>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={open === r.id}
+                aria-label={`${r.label} : ${ok ? 'uploadé' : 'à uploader'}`}
+                className={`ps-round ${ok ? 'ok' : 'todo'} ${open === r.id ? 'open' : ''} ${overRound === r.id ? 'over' : ''}`}
+                onClick={() => setOpen(r.id)}
+                title={can(ROUND_KIND[r.id]) ? `Glissez un fichier ici : ${r.label}` : undefined}
+                onDragOver={(e) => {
+                  if (!e.dataTransfer.types.includes('Files')) return;
+                  e.preventDefault();
+                  setOverRound(r.id);
+                }}
+                onDragLeave={() => setOverRound(null)}
+                onDrop={async (e) => {
+                  if (!e.dataTransfer.types.includes('Files')) return;
+                  e.preventDefault();
+                  setOverRound(null);
+                  setOpen(r.id);
+                  const kind = ROUND_KIND[r.id];
+                  if (!can(kind)) return toast(r.id === 'pack' ? 'Seul le designer du produit dépose le pack' : 'Vous ne pouvez pas déposer ici');
+                  upload(kind, await fromDrop(e.dataTransfer));
+                }}
+              >
                 <span className="ps-circle">{ok ? <Check size={34} strokeWidth={3} /> : <r.icon size={30} />}</span>
                 <b>{r.label}</b>
                 <small>{ok ? roundStatus(r.id) : 'À uploader'}</small>
