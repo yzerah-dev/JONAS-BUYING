@@ -1804,3 +1804,39 @@ select.pi-input { cursor: pointer; }
 .pk-trackbar-title { align-self: center; }
 @media (max-width: 760px) { .trk-label { display: block; } .trk { width: 70px; } .trk-tile { min-width: 90px; } }
 .trk-tile .trk-round { width: 44px !important; height: 44px !important; }
+
+/* Téléphone : le suivi pack passe sur sa propre ligne, ronds compacts avec le texte à côté */
+@media (max-width: 760px) {
+  .dev-line .trk-list { order: 10; flex-basis: 100%; width: auto; flex-direction: row; flex-wrap: wrap; gap: 6px 14px; padding-left: 54px; }
+  .dev-line .trk,
+  .pk-c-val .trk,
+  .pcard .trk { flex-direction: row; width: auto; text-align: left; gap: 6px; font-size: 12px; }
+  .dev-line .trk-round,
+  .pk-c-val .trk-round,
+  .pcard .trk-round { width: 26px; height: 26px; }
+  .dev-line .trk-round svg,
+  .pk-c-val .trk-round svg,
+  .pcard .trk-round svg { width: 15px; height: 15px; }
+  .trk-label { display: inline; }
+  .pk-c-val .trk-list { flex-direction: column; gap: 4px; }
+  .dev-trackbar { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; }
+  .trk-tile { flex: none; min-width: 96px; }
+}
+/* Téléphone / tablette étroite : la ligne Développement passe sur deux rangées, le suivi pack en dessous */
+@media (max-width: 820px) {
+  .dev-line { flex-wrap: wrap; row-gap: 6px; }
+  .dev-line .dev-id { flex: 1 1 0; min-width: 0; }
+  .dev-line .trk-list { order: 10; flex: 1 1 100%; width: auto; flex-direction: row; flex-wrap: wrap; gap: 6px 14px; padding-left: 44px; }
+  .dev-line .trk { flex-direction: row; width: auto; text-align: left; gap: 6px; font-size: 12px; }
+  .dev-line .trk-round { width: 26px; height: 26px; }
+  .dev-line .trk-round svg { width: 15px; height: 15px; }
+}
+/* Espace Designer sur téléphone : suivi pack sur une seconde rangée, sous le produit */
+@media (max-width: 1000px) {
+  .pk-row .pk-c-val { grid-column: 2 / -1; grid-row: 2; padding-bottom: 6px; overflow: visible; }
+  .pk-row .pk-c-val .trk-list { flex-direction: row; flex-wrap: wrap; gap: 6px 14px; padding: 0; }
+  .pk-row .pk-c-val .trk { flex-direction: row; width: auto; text-align: left; gap: 6px; font-size: 12px; }
+  .pk-row .pk-c-val .trk-round { width: 26px; height: 26px; }
+  .pk-row .pk-c-val .trk-round svg { width: 15px; height: 15px; }
+  .pk-head .pk-c-val { display: none; }
+}
