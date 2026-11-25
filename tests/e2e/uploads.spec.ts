@@ -64,9 +64,9 @@ test('upload du pack (versions) et du dossier créa, téléchargements et persis
   const files = makeFixtures(tmp);
 
   await resetApp(page);
-  await loginAs(page, 'Léa');
+  await loginAs(page, 'ABIR');
   await go(page, 'design');
-  const cell = await planCell(page, 'Léa', 'S48');
+  const cell = await planCell(page, 'ABIR', 'S48');
   await cell.click();
   const row = page.locator('.pk-row').first();
   const ref = await packRef(row);
@@ -113,15 +113,15 @@ test('upload du pack (versions) et du dossier créa, téléchargements et persis
 
   // Persistance après rechargement
   await page.reload();
-  await (await planCell(page, 'Léa', 'S48')).click();
+  await (await planCell(page, 'ABIR', 'S48')).click();
   await page.locator('.pk-row', { hasText: ref }).click();
   await expect(page.locator('.pf-file')).toHaveCount(6);
   await expect(page.locator('.pf-file-thumb')).toHaveCount(2);
 
   // Une autre designer : lecture seule (téléchargement possible)
-  await loginAs(page, 'Sarah');
+  await loginAs(page, 'ALEX PANDA');
   await go(page, 'design');
-  await (await planCell(page, 'Léa', 'S48')).click();
+  await (await planCell(page, 'ABIR', 'S48')).click();
   await page.locator('.pk-row', { hasText: ref }).click();
   await expect(panel.locator('[title=Télécharger]')).toHaveCount(6);
   await expect(panel.locator('.btn', { hasText: /Uploader|Nouvelle version|Ajouter/ })).toHaveCount(0);

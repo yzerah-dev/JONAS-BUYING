@@ -21,11 +21,11 @@ test.describe('Développement', () => {
   test('l’administrateur glisse un produit sur un designer', async ({ page }) => {
     const line = page.locator('.dev-line.draggable').first();
     const ref = (await line.locator('.dev-id b').innerText()).trim();
-    const hugo = page.locator('.dev-designers .pf-chip', { hasText: 'Hugo' });
+    const hugo = page.locator('.dev-designers .pf-chip', { hasText: 'ROLAND' });
     const h0 = lastInt(await hugo.innerText());
 
     await line.dragTo(hugo);
-    await expect(toast(page)).toHaveText(`${ref} → Hugo`);
+    await expect(toast(page)).toHaveText(`${ref} → ROLAND`);
     await expect.poll(async () => lastInt(await hugo.innerText())).toBe(h0 + 1);
   });
 
@@ -36,10 +36,10 @@ test.describe('Développement', () => {
   });
 
   test('le designer voit ses produits par défaut, sans actions', async ({ page }) => {
-    await loginAs(page, 'Léa');
+    await loginAs(page, 'ABIR');
     expect(await sidebarItems(page)).toContain('Développement');
     await go(page, 'developpement');
-    await expect(page.locator('.dev-designers .pf-chip.active')).toContainText('Léa');
+    await expect(page.locator('.dev-designers .pf-chip.active')).toContainText('ABIR');
     await expect(page.locator('.dev-line').first()).toBeVisible();
     await expect(page.locator('.dev-actions button')).toHaveCount(0);
     await expect(page.locator('.dev-line.draggable')).toHaveCount(0);

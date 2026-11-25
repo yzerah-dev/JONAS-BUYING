@@ -58,7 +58,7 @@ export default function UserSwitcher() {
           {t(`role.${me.role}`)} <ChevronDown size={18} />
         </button>
         <button className="avatar avatar-lg" onClick={() => setOpen(!open)} title={me.name}>
-          {initials(me.name === 'Yzerah' ? 'Y Z' : me.name)}
+          {initials(me.name)}
         </button>
       </div>
       {open && remoteEnabled() && (

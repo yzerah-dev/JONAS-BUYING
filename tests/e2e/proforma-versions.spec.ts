@@ -85,7 +85,7 @@ test.describe('Proforma déposée par le fournisseur', () => {
   });
 
   test('demande de modification : la Direction signe la nouvelle version, qui annule l’ancienne', async ({ page }) => {
-    await loginAs(page, 'Yoni Zerah');
+    await loginAs(page, 'Rudy Zerah');
     await go(page, 'proformas/PF-2026-0151');
     await page.locator('.page-head').getByRole('button', { name: 'Signer la modification v2' }).click();
     await expect(page.getByRole('dialog')).toContainText('Annule et remplace la proforma v1');
@@ -115,7 +115,7 @@ test.describe('Proforma déposée par le fournisseur', () => {
     await expect(toast(page)).toContainText('Proforma v2 déposée');
     await expect(page.locator('.pv-row', { hasText: 'v2' })).toContainText('Couleur des tongs changée');
 
-    await loginAs(page, 'Yoni Zerah');
+    await loginAs(page, 'Rudy Zerah');
     await go(page, 'proformas/PF-2026-0141');
     await page.getByRole('button', { name: /^Documents/ }).click();
     await page.locator('.pv-alert').getByRole('button', { name: 'Refuser' }).click();

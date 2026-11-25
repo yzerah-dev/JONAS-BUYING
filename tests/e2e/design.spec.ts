@@ -10,7 +10,7 @@ test.describe('Espace Designer – planning et validation', () => {
     const heads = await page.locator('.pk-plan thead th').allInnerTexts();
     expect(heads[0]).toContain('Designer');
     expect(heads.some((h) => h.includes('S47'))).toBe(true);
-    for (const who of ['Léa', 'Sarah', 'Hugo']) {
+    for (const who of ['ABIR', 'ALEX PANDA', 'ROLAND']) {
       await expect(page.locator('.pk-plan tbody tr', { hasText: who })).toHaveCount(1);
     }
     await expect(page.locator('.pk-plan tbody tr.total')).toContainText('Équipe');
@@ -19,7 +19,7 @@ test.describe('Espace Designer – planning et validation', () => {
   test('validation groupée des packs « À valider » (David)', async ({ page }) => {
     await loginAs(page, 'David');
     await go(page, 'design');
-    await (await planCell(page, 'Léa', 'S47')).click();
+    await (await planCell(page, 'ABIR', 'S47')).click();
     await page.locator('.pk-chip', { hasText: 'À valider' }).click();
     const n = await page.locator('.pk-row').count();
     expect(n).toBeGreaterThan(0);
@@ -41,8 +41,8 @@ test.describe('Espace Designer – réaffectation (administrateur)', () => {
   });
 
   test('glisser un pack sur une case du planning change designer et semaine', async ({ page }) => {
-    const lea47 = await planCell(page, 'Léa', 'S47');
-    const hugo48 = await planCell(page, 'Hugo', 'S48');
+    const lea47 = await planCell(page, 'ABIR', 'S47');
+    const hugo48 = await planCell(page, 'ROLAND', 'S48');
     await lea47.click();
     const [l0, h0] = [await planTotal(lea47), await planTotal(hugo48)];
     const row = page.locator('.pk-row').first();
@@ -50,15 +50,15 @@ test.describe('Espace Designer – réaffectation (administrateur)', () => {
 
     await hugo48.scrollIntoViewIfNeeded();
     await row.dragTo(hugo48);
-    await expect(toast(page)).toHaveText('1 pack déplacé → Hugo · semaine S48');
+    await expect(toast(page)).toHaveText('1 pack déplacé → ROLAND · semaine S48');
     await expect.poll(() => planTotal(lea47)).toBe(l0 - 1);
     await expect.poll(() => planTotal(hugo48)).toBe(h0 + 1);
     await expect(page.locator('.pk-row', { hasText: ref })).toHaveCount(0);
   });
 
   test('glisser une sélection sur un nom de designer ne change que le designer', async ({ page }) => {
-    const lea47 = await planCell(page, 'Léa', 'S47');
-    const sarah47 = await planCell(page, 'Sarah', 'S47');
+    const lea47 = await planCell(page, 'ABIR', 'S47');
+    const sarah47 = await planCell(page, 'ALEX PANDA', 'S47');
     await lea47.click();
     const [l0, s0] = [await planTotal(lea47), await planTotal(sarah47)];
     for (let i = 0; i < 3; i++) await page.locator('.pk-row input').nth(i).check();
@@ -67,15 +67,15 @@ test.describe('Espace Designer – réaffectation (administrateur)', () => {
     // on agrandit la fenêtre et on remonte en haut pour que source et cible soient visibles.
     await page.setViewportSize({ width: 1540, height: 1600 });
     await page.evaluate(() => window.scrollTo(0, 0));
-    const sarahName = page.locator('.pk-plan tbody tr', { hasText: 'Sarah' }).locator('th');
+    const sarahName = page.locator('.pk-plan tbody tr', { hasText: 'ALEX PANDA' }).locator('th');
     await page.locator('.pk-row').nth(1).dragTo(sarahName);
-    await expect(toast(page)).toHaveText('3 packs déplacés → Sarah');
+    await expect(toast(page)).toHaveText('3 packs déplacés → ALEX PANDA');
     await expect.poll(() => planTotal(lea47)).toBe(l0 - 3);
     await expect.poll(() => planTotal(sarah47)).toBe(s0 + 3);
   });
 
   test('« Déplacer vers » une autre semaine', async ({ page }) => {
-    await (await planCell(page, 'Léa', 'S47')).click();
+    await (await planCell(page, 'ABIR', 'S47')).click();
     await page.locator('.pk-row input').first().check();
     await page.getByLabel('Semaine cible').selectOption({ label: 'S49' });
     await page.locator('.pk-move').getByRole('button', { name: 'Déplacer' }).click();
@@ -83,7 +83,7 @@ test.describe('Espace Designer – réaffectation (administrateur)', () => {
   });
 
   test('push urgent en un clic', async ({ page }) => {
-    await (await planCell(page, 'Léa', 'S47')).click();
+    await (await planCell(page, 'ABIR', 'S47')).click();
     const row = page.locator('.pk-row').first();
     const ref = await packRef(row);
     await row.locator('.pk-urgent').click();
@@ -100,7 +100,7 @@ test.describe('Espace Designer – réaffectation (administrateur)', () => {
   });
 
   test('le designer peut trier mais ni glisser ni pousser en urgent', async ({ page }) => {
-    await loginAs(page, 'Léa');
+    await loginAs(page, 'ABIR');
     await go(page, 'design');
     await expect(page.locator('.pk-plan')).toBeVisible({ timeout: 15000 });
     await expect(page.locator('#pk-sort option')).toContainText(['Priorité', 'Marque', 'Collection', 'Type de pack', 'Échéance']);
@@ -113,13 +113,13 @@ test.describe('Espace Designer – réaffectation (administrateur)', () => {
 test.describe('Espace Designer – démarrage des packs', () => {
   test.beforeEach(async ({ page }) => {
     await resetApp(page);
-    await loginAs(page, 'Léa');
+    await loginAs(page, 'ABIR');
     await go(page, 'design');
     await expect(page.locator('.pk-plan')).toBeVisible();
   });
 
   test('« Commencer » un pack puis démarrage groupé', async ({ page }) => {
-    await (await planCell(page, 'Léa', 'S47')).click();
+    await (await planCell(page, 'ABIR', 'S47')).click();
     const notStarted = await chipCount(page, 'Pas commencés');
     const inCreation = await chipCount(page, 'En création');
     expect(notStarted).toBeGreaterThan(1);
@@ -138,23 +138,23 @@ test.describe('Espace Designer – démarrage des packs', () => {
     await expect(toast(page)).toHaveText(`${notStarted - 1} pack(s) commencé(s)`);
     await expect.poll(() => chipCount(page, 'En création')).toBe(inCreation + notStarted);
 
-    // Un autre designer ne peut pas commencer les packs de Léa
-    await loginAs(page, 'Sarah');
+    // Un autre designer ne peut pas commencer les packs de ABIR
+    await loginAs(page, 'ALEX PANDA');
     await go(page, 'design');
-    await (await planCell(page, 'Léa', 'S47')).click();
+    await (await planCell(page, 'ABIR', 'S47')).click();
     await expect(page.locator('.pk-row').first()).toBeVisible();
     await expect(page.locator('.pk-start')).toHaveCount(0);
 
     // Le pilote voit qui a commencé
-    await loginAs(page, 'Yzerah');
+    await loginAs(page, 'Yoni Zerah');
     await go(page, 'design');
-    await (await planCell(page, 'Léa', 'S47')).click();
+    await (await planCell(page, 'ABIR', 'S47')).click();
     await page.locator('.pk-row', { hasText: ref }).click();
-    await expect(page.locator('.pk-startbox')).toContainText('Commencé par Léa');
+    await expect(page.locator('.pk-startbox')).toContainText('Commencé par ABIR');
   });
 
   test('date de début prévue depuis le panneau', async ({ page }) => {
-    await (await planCell(page, 'Léa', 'S48')).click();
+    await (await planCell(page, 'ABIR', 'S48')).click();
     await page.locator('.pk-chip', { hasText: 'Pas commencés' }).click();
     const row = page.locator('.pk-row').first();
     const ref = await packRef(row);

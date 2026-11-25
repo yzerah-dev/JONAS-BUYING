@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test:e2e": "playwright test",
     "build:shared": "tsc -b && vite build --mode supabase",
-    "dev:shared": "vite --mode supabase"
+    "dev:shared": "vite --mode supabase",
+    "seed:supabase": "NODE_USE_ENV_PROXY=1 tsx scripts/seed-supabase.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.4",

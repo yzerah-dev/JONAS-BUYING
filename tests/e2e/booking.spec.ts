@@ -146,7 +146,7 @@ test.describe('Booking', () => {
     for (const [who, visible] of [
       ['Logistique', true],
       ['Finance', false],
-      ['Léa', false],
+      ['ABIR', false],
     ] as const) {
       await loginAs(page, who);
       expect((await sidebarItems(page)).includes('Booking')).toBe(visible);

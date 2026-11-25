@@ -64,7 +64,7 @@ const withDefaults = (def: Company, saved?: Partial<Company>): Company => ({
   gs1Prefix: saved?.gs1Prefix || def.gs1Prefix,
 });
 
-export const STORAGE_KEY = 'jonas-buying-state-v17';
+export const STORAGE_KEY = 'jonas-buying-state-v18';
 
 export const currentUser = (s: State): User => s.users.find((u) => u.id === s.currentUserId) ?? s.users[0];
 
@@ -592,7 +592,7 @@ function materializeLines(s: State, supplierId: string, lines: ImportLine[], etd
       targetQty: l.qty,
       pack: {
         type: 'À définir',
-        designer: most('pack', mine[0]?.pack ?? ({ designer: 'Léa' } as Product['pack'])).designer,
+        designer: most('pack', mine[0]?.pack ?? ({ designer: 'ABIR' } as Product['pack'])).designer,
         artworkDeadline: deadline,
         validations: { david: { state: 'pending' }, direction: { state: 'todo' }, moinard: { state: 'todo' }, fournisseur: { state: 'todo' } },
         dieCut: 'none',

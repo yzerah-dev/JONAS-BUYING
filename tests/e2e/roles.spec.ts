@@ -6,7 +6,7 @@ test.describe('Rôles et visibilité des modules', () => {
   });
 
   test('le designer ne voit que ses modules et est bloqué hors périmètre', async ({ page }) => {
-    await loginAs(page, 'Léa');
+    await loginAs(page, 'ABIR');
     const nav = await sidebarItems(page);
     expect(nav).toEqual(expect.arrayContaining(['Développement', 'Design', 'Performance', 'Paramètres']));
     expect(nav).not.toContain('Proformas');
@@ -65,7 +65,7 @@ test.describe('Rôles et visibilité des modules', () => {
   });
 
   test('le pilote accède aux paramètres', async ({ page }) => {
-    await loginAs(page, 'Yzerah');
+    await loginAs(page, 'Yoni Zerah');
     await go(page, 'parametres');
     await expect(page.locator('main')).not.toContainText('Accès non autorisé');
     await expect(page.locator('main h1').first()).toBeVisible();
@@ -81,10 +81,10 @@ test('fournisseur : validation du pack forwardé dans le portail', async ({ page
     await page.getByRole('button', { name: 'Design & Pack' }).click();
     await page.getByRole('button', { name: /Valider l’étape en cours/ }).click();
   }
-  // Forward par la designer (Léa) depuis l'Espace Designer, semaine S01
-  await loginAs(page, 'Léa');
+  // Forward par la designer (ABIR) depuis l'Espace Designer, semaine S01
+  await loginAs(page, 'ABIR');
   await go(page, 'design');
-  await (await planCell(page, 'Léa', 'S01')).click();
+  await (await planCell(page, 'ABIR', 'S01')).click();
   await page.locator('.pk-row', { hasText: 'CP-C042' }).click();
   await page.getByRole('button', { name: 'Forwarder le pack' }).click();
   await expect(page.getByRole('button', { name: /^Valider \(/ })).toHaveCount(0);

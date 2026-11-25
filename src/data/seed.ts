@@ -42,6 +42,8 @@ export const suppliers: Supplier[] = [
     contact: { name: 'Ms. Huang Fang', role: 'Sales', phone: '+86 134 9999 0000', email: 'huang@yiwubag.com' } },
   { id: 'gzbeauty', name: 'Guangzhou Beauty', shortName: 'Guangzhou Beauty', country: 'Chine', flag: '🇨🇳', city: 'Guangzhou', port: 'Nansha', color: '#7b2cbf', active: true,
     contact: { name: 'Mr. Zhou Bin', role: 'Export Manager', phone: '+86 133 2222 1111', email: 'zhou@gzbeauty.cn' } },
+  { id: 'ningbohome', name: 'NINGBO HOME SOURCING', shortName: 'Ningbo Home Sourcing', country: 'Chine', flag: '🇨🇳', city: 'Ningbo', port: 'Ningbo', color: '#0f766e', active: true,
+    contact: { name: 'PEARL', role: 'Sales', phone: '', email: '' } },
   { id: 'seoul', name: 'Seoul Cosmetic', shortName: 'Seoul Cosmetic', country: 'Corée du Sud', flag: '🇰🇷', city: 'Séoul', port: 'Busan', color: '#0081a7', active: true,
     contact: { name: 'Ms. Park Ji-yeon', role: 'Overseas Sales', phone: '+82 10 1234 5678', email: 'park@seoulcosmetic.kr' } },
 ];
@@ -63,58 +65,58 @@ type P = [ref: string, name: string, brand: string, supplier: string, rayon: str
 
 const productDefs: P[] = [
   // Jinfa Shoes
-  ['AB-M026', 'Mocassins été', 'bellami', 'jinfa', 'Chaussures', '👞', '#f3e3d3', 9.9, 24, 0.086, 'Boîte + papier de soie', 'Léa'],
-  ['CP-C015', 'Claquettes paillettes', 'camille', 'jinfa', 'Chaussures', '🩴', '#fde2ec', 3.2, 36, 0.2, 'Carte + crochet', 'Léa'],
-  ['CP-A001', 'Chapeau paille', 'camille', 'jinfa', 'Accessoires', '👒', '#f6ecd0', 4.5, 24, 0.138, 'Étiquette + boîte', 'Hugo'],
-  ['AB-M030', 'Derby toile légère', 'bellami', 'jinfa', 'Chaussures', '👟', '#e4ecf7', 8.4, 12, 0.07, 'Boîte + papier', 'Léa', false],
-  ['CP-S050', 'Sandale tressée', 'camille', 'jinfa', 'Chaussures', '👡', '#f8e5d6', 5.6, 24, 0.12, 'Boîte + étiquette', 'Hugo', false],
-  ['YD-B012', 'Basket légère homme', 'dorsey', 'jinfa', 'Chaussures', '👟', '#e3f0ea', 11.2, 12, 0.09, 'Boîte', 'Sarah', false],
+  ['AB-M026', 'Mocassins été', 'bellami', 'jinfa', 'Chaussures', '👞', '#f3e3d3', 9.9, 24, 0.086, 'Boîte + papier de soie', 'ABIR'],
+  ['CP-C015', 'Claquettes paillettes', 'camille', 'jinfa', 'Chaussures', '🩴', '#fde2ec', 3.2, 36, 0.2, 'Carte + crochet', 'ABIR'],
+  ['CP-A001', 'Chapeau paille', 'camille', 'jinfa', 'Accessoires', '👒', '#f6ecd0', 4.5, 24, 0.138, 'Étiquette + boîte', 'ROLAND'],
+  ['AB-M030', 'Derby toile légère', 'bellami', 'jinfa', 'Chaussures', '👟', '#e4ecf7', 8.4, 12, 0.07, 'Boîte + papier', 'ABIR', false],
+  ['CP-S050', 'Sandale tressée', 'camille', 'jinfa', 'Chaussures', '👡', '#f8e5d6', 5.6, 24, 0.12, 'Boîte + étiquette', 'ROLAND', false],
+  ['YD-B012', 'Basket légère homme', 'dorsey', 'jinfa', 'Chaussures', '👟', '#e3f0ea', 11.2, 12, 0.09, 'Boîte', 'ALEX PANDA', false],
   // Xiamen Tide Living
-  ['CP-T001', 'Tong femme paillettes', 'camille', 'tide', 'Chaussures', '🩴', '#ffd6e8', 2.9, 24, 0.09, 'Carte + crochet', 'Léa'],
-  ['CP-C042', 'Claquettes EVA femme', 'camille', 'tide', 'Chaussures', '🩴', '#ffe5c7', 3.2, 24, 0.07, 'Carte + crochet', 'Léa'],
-  ['YD-H008', 'Claquette homme bouclée', 'dorsey', 'tide', 'Chaussures', '👡', '#f2dcc8', 4.9, 12, 0.043, 'Bandeau + cintre', 'Sarah'],
-  ['AB-M025', 'Mocassin été premium', 'bellami', 'tide', 'Chaussures', '👞', '#dfe6f2', 12.5, 12, 0.052, 'Boîte + papier', 'Léa'],
-  ['ORA-C006', 'Sabot mixte ultra léger', 'ora', 'tide', 'Chaussures', '🥿', '#ffe3cc', 4.2, 24, 0.096, 'Hangtag + étiquette', 'Hugo'],
-  ['CP-E021', 'Éventail XXL à paillettes', 'camille', 'tide', 'Accessoires', '🪭', '#ffd9ea', 1.9, 48, 0.028, 'Carte + blister', 'Hugo'],
-  ['JO-P100', 'Eau de parfum 100 ml', 'jardin', 'tide', 'Parfumerie', '🧴', '#fbe1e6', 2.95, 12, 0.012, 'Étui + coffret', 'Sarah'],
-  ['JO-T035', 'Serviettes microfibre 35×75', 'jonas', 'tide', 'Maison', '🧻', '#ffe0ef', 3.5, 12, 0.018, 'Bandeau', 'Hugo'],
+  ['CP-T001', 'Tong femme paillettes', 'camille', 'tide', 'Chaussures', '🩴', '#ffd6e8', 2.9, 24, 0.09, 'Carte + crochet', 'ABIR'],
+  ['CP-C042', 'Claquettes EVA femme', 'camille', 'tide', 'Chaussures', '🩴', '#ffe5c7', 3.2, 24, 0.07, 'Carte + crochet', 'ABIR'],
+  ['YD-H008', 'Claquette homme bouclée', 'dorsey', 'tide', 'Chaussures', '👡', '#f2dcc8', 4.9, 12, 0.043, 'Bandeau + cintre', 'ALEX PANDA'],
+  ['AB-M025', 'Mocassin été premium', 'bellami', 'tide', 'Chaussures', '👞', '#dfe6f2', 12.5, 12, 0.052, 'Boîte + papier', 'ABIR'],
+  ['ORA-C006', 'Sabot mixte ultra léger', 'ora', 'tide', 'Chaussures', '🥿', '#ffe3cc', 4.2, 24, 0.096, 'Hangtag + étiquette', 'ROLAND'],
+  ['CP-E021', 'Éventail XXL à paillettes', 'camille', 'tide', 'Accessoires', '🪭', '#ffd9ea', 1.9, 48, 0.028, 'Carte + blister', 'ROLAND'],
+  ['JO-P100', 'Eau de parfum 100 ml', 'jardin', 'tide', 'Parfumerie', '🧴', '#fbe1e6', 2.95, 12, 0.012, 'Étui + coffret', 'ALEX PANDA'],
+  ['JO-T035', 'Serviettes microfibre 35×75', 'jonas', 'tide', 'Maison', '🧻', '#ffe0ef', 3.5, 12, 0.018, 'Bandeau', 'ROLAND'],
   // Shenzhen Nova Beauty
-  ['CP-B110', 'Brume corps vanille', 'camille', 'nova', 'Beauté', '🧴', '#fff0d9', 1.6, 48, 0.035, 'Étui', 'Sarah'],
-  ['CP-B112', 'Brume corps coco', 'camille', 'nova', 'Beauté', '🥥', '#f3efe6', 1.6, 48, 0.035, 'Étui', 'Sarah'],
-  ['PF-P014', 'Collection parfum', 'perfumo', 'nova', 'Parfumerie', '💐', '#f8dcef', 3.8, 24, 0.04, 'Étui + coffret', 'Sarah'],
+  ['CP-B110', 'Brume corps vanille', 'camille', 'nova', 'Beauté', '🧴', '#fff0d9', 1.6, 48, 0.035, 'Étui', 'ALEX PANDA'],
+  ['CP-B112', 'Brume corps coco', 'camille', 'nova', 'Beauté', '🥥', '#f3efe6', 1.6, 48, 0.035, 'Étui', 'ALEX PANDA'],
+  ['PF-P014', 'Collection parfum', 'perfumo', 'nova', 'Parfumerie', '💐', '#f8dcef', 3.8, 24, 0.04, 'Étui + coffret', 'ALEX PANDA'],
   // Ningbo Horizon Home
-  ['JO-J201', 'Salon de jardin 4 pièces', 'jonas', 'horizon', 'Jardin', '🪑', '#e2efe2', 48, 1, 0.42, 'Carton imprimé', 'Hugo'],
-  ['JO-J205', 'Transat pliable', 'jonas', 'horizon', 'Jardin', '🏖️', '#e6f4f1', 14.5, 2, 0.11, 'Carton imprimé', 'Hugo'],
-  ['JO-J210', 'Parasol 3 m inclinable', 'jonas', 'horizon', 'Jardin', '⛱️', '#fff4d6', 11.9, 4, 0.09, 'Housse + étiquette', 'Hugo'],
+  ['JO-J201', 'Salon de jardin 4 pièces', 'jonas', 'horizon', 'Jardin', '🪑', '#e2efe2', 48, 1, 0.42, 'Carton imprimé', 'ROLAND'],
+  ['JO-J205', 'Transat pliable', 'jonas', 'horizon', 'Jardin', '🏖️', '#e6f4f1', 14.5, 2, 0.11, 'Carton imprimé', 'ROLAND'],
+  ['JO-J210', 'Parasol 3 m inclinable', 'jonas', 'horizon', 'Jardin', '⛱️', '#fff4d6', 11.9, 4, 0.09, 'Housse + étiquette', 'ROLAND'],
   // Qingdao Northbay
-  ['JO-R301', 'Boîte de rangement 30 L', 'jonas', 'northbay', 'Maison', '📦', '#ecebf8', 2.1, 12, 0.11, 'Étiquette', 'Hugo'],
-  ['JO-R305', 'Panier tissé', 'jonas', 'northbay', 'Maison', '🧺', '#f5ead9', 3.4, 12, 0.13, 'Hangtag', 'Hugo'],
-  ['JO-R310', 'Étagère bambou 4 niveaux', 'jonas', 'northbay', 'Maison', '🪵', '#efe3cf', 9.8, 2, 0.06, 'Carton imprimé', 'Hugo'],
+  ['JO-R301', 'Boîte de rangement 30 L', 'jonas', 'northbay', 'Maison', '📦', '#ecebf8', 2.1, 12, 0.11, 'Étiquette', 'ROLAND'],
+  ['JO-R305', 'Panier tissé', 'jonas', 'northbay', 'Maison', '🧺', '#f5ead9', 3.4, 12, 0.13, 'Hangtag', 'ROLAND'],
+  ['JO-R310', 'Étagère bambou 4 niveaux', 'jonas', 'northbay', 'Maison', '🪵', '#efe3cf', 9.8, 2, 0.06, 'Carton imprimé', 'ROLAND'],
   // Wenzhou Tex
-  ['CP-PL03', 'Plateforme', 'camille', 'wenzhoutex', 'Chaussures', '👡', '#f5e1cf', 6.4, 12, 0.07, 'Boîte + étiquette', 'Léa'],
-  ['YD-C003', 'Claquettes homme', 'dorsey', 'wenzhoutex', 'Chaussures', '🩴', '#dde3ec', 3.6, 24, 0.09, 'Bandeau + cintre', 'Sarah'],
-  ['JO-T040', 'Drap de plage XXL', 'jonas', 'wenzhoutex', 'Maison', '🏝️', '#d9f0f4', 4.2, 24, 0.09, 'Bandeau', 'Hugo'],
+  ['CP-PL03', 'Plateforme', 'camille', 'wenzhoutex', 'Chaussures', '👡', '#f5e1cf', 6.4, 12, 0.07, 'Boîte + étiquette', 'ABIR'],
+  ['YD-C003', 'Claquettes homme', 'dorsey', 'wenzhoutex', 'Chaussures', '🩴', '#dde3ec', 3.6, 24, 0.09, 'Bandeau + cintre', 'ALEX PANDA'],
+  ['JO-T040', 'Drap de plage XXL', 'jonas', 'wenzhoutex', 'Maison', '🏝️', '#d9f0f4', 4.2, 24, 0.09, 'Bandeau', 'ROLAND'],
   // Yiwu Bag Co.
-  ['TR-B002', 'Sac de plage', 'tropaya', 'yiwu', 'Bagagerie', '👜', '#fbecc9', 3.9, 24, 0.12, 'Hangtag + étiquette', 'Hugo'],
-  ['TR-T001', 'Tongs îles', 'tropaya', 'yiwu', 'Chaussures', '🩴', '#ffe0d6', 1.4, 48, 0.12, 'Carte + crochet', 'Léa'],
-  ['CP-EV01', 'Éventail pailleté', 'camille', 'yiwu', 'Accessoires', '🪭', '#ffe1f0', 1.5, 48, 0.03, 'Carte + blister', 'Hugo'],
+  ['TR-B002', 'Sac de plage', 'tropaya', 'yiwu', 'Bagagerie', '👜', '#fbecc9', 3.9, 24, 0.12, 'Hangtag + étiquette', 'ROLAND'],
+  ['TR-T001', 'Tongs îles', 'tropaya', 'yiwu', 'Chaussures', '🩴', '#ffe0d6', 1.4, 48, 0.12, 'Carte + crochet', 'ABIR'],
+  ['CP-EV01', 'Éventail pailleté', 'camille', 'yiwu', 'Accessoires', '🪭', '#ffe1f0', 1.5, 48, 0.03, 'Carte + blister', 'ROLAND'],
   // Guangzhou Beauty
-  ['PF-P020', 'Coffret parfum duo', 'perfumo', 'gzbeauty', 'Parfumerie', '🎁', '#f3e2f6', 4.6, 12, 0.03, 'Coffret rigide', 'Sarah'],
-  ['JB-T010', 'Trousse maquillage', 'jbeauty', 'gzbeauty', 'Beauté', '💄', '#fde4e4', 2.2, 48, 0.07, 'Hangtag', 'Sarah'],
+  ['PF-P020', 'Coffret parfum duo', 'perfumo', 'gzbeauty', 'Parfumerie', '🎁', '#f3e2f6', 4.6, 12, 0.03, 'Coffret rigide', 'ALEX PANDA'],
+  ['JB-T010', 'Trousse maquillage', 'jbeauty', 'gzbeauty', 'Beauté', '💄', '#fde4e4', 2.2, 48, 0.07, 'Hangtag', 'ALEX PANDA'],
   // Seoul Cosmetic
-  ['JB-K001', 'K-Beauty coffret', 'jbeauty', 'seoul', 'Beauté', '🎀', '#fde3ea', 5.9, 24, 0.06, 'Coffret rigide', 'Sarah'],
-  ['JB-K005', 'Masques tissu ×10', 'jbeauty', 'seoul', 'Beauté', '🧖', '#e2f1f8', 2.4, 48, 0.04, 'Étui', 'Sarah', false],
+  ['JB-K001', 'K-Beauty coffret', 'jbeauty', 'seoul', 'Beauté', '🎀', '#fde3ea', 5.9, 24, 0.06, 'Coffret rigide', 'ALEX PANDA'],
+  ['JB-K005', 'Masques tissu ×10', 'jbeauty', 'seoul', 'Beauté', '🧖', '#e2f1f8', 2.4, 48, 0.04, 'Étui', 'ALEX PANDA', false],
   // Produits à développer (répartis entre les designers)
-  ['CP-S055', 'Sandale corde femme', 'camille', 'jinfa', 'Chaussures', '👡', '#f6e7d4', 5.9, 24, 0.12, 'Boîte + étiquette', 'Léa', false],
-  ['CP-T010', 'Tong strass', 'camille', 'tide', 'Chaussures', '🩴', '#fde1ef', 2.4, 48, 0.12, 'Carte + crochet', 'Léa', false],
-  ['AB-M040', 'Mocassin cuir velours', 'bellami', 'jinfa', 'Chaussures', '👞', '#e9ddd0', 13.9, 12, 0.06, 'Boîte + papier de soie', 'Léa', false],
-  ['YD-S020', 'Sneaker toile homme', 'dorsey', 'wenzhoutex', 'Chaussures', '👟', '#e1e8f0', 7.8, 12, 0.08, 'Boîte', 'Sarah', false],
-  ['PF-P030', 'Eau de toilette agrumes', 'perfumo', 'nova', 'Parfumerie', '🍋', '#fff5cc', 3.2, 24, 0.035, 'Étui + coffret', 'Sarah', false],
-  ['JB-K010', 'Patchs yeux hydrogel', 'jbeauty', 'seoul', 'Beauté', '👁️', '#e5f3fb', 1.9, 48, 0.03, 'Étui', 'Sarah', false],
-  ['JO-J220', 'Hamac XXL', 'jonas', 'horizon', 'Jardin', '🏝️', '#e3f2e5', 16.5, 4, 0.08, 'Housse + étiquette', 'Hugo', false],
-  ['JO-R320', 'Paniers jacinthe ×3', 'jonas', 'northbay', 'Maison', '🧺', '#f1e6d2', 8.9, 4, 0.12, 'Hangtag', 'Hugo', false],
-  ['TR-B010', 'Cabas paille', 'tropaya', 'yiwu', 'Bagagerie', '👜', '#f7ebcf', 4.6, 24, 0.14, 'Hangtag + étiquette', 'Hugo', false],
-  ['JO-T050', 'Fouta rayée', 'jonas', 'wenzhoutex', 'Maison', '🧣', '#dff0f3', 3.8, 24, 0.07, 'Bandeau', 'Hugo', false],
+  ['CP-S055', 'Sandale corde femme', 'camille', 'jinfa', 'Chaussures', '👡', '#f6e7d4', 5.9, 24, 0.12, 'Boîte + étiquette', 'ABIR', false],
+  ['CP-T010', 'Tong strass', 'camille', 'tide', 'Chaussures', '🩴', '#fde1ef', 2.4, 48, 0.12, 'Carte + crochet', 'ABIR', false],
+  ['AB-M040', 'Mocassin cuir velours', 'bellami', 'jinfa', 'Chaussures', '👞', '#e9ddd0', 13.9, 12, 0.06, 'Boîte + papier de soie', 'ABIR', false],
+  ['YD-S020', 'Sneaker toile homme', 'dorsey', 'wenzhoutex', 'Chaussures', '👟', '#e1e8f0', 7.8, 12, 0.08, 'Boîte', 'ALEX PANDA', false],
+  ['PF-P030', 'Eau de toilette agrumes', 'perfumo', 'nova', 'Parfumerie', '🍋', '#fff5cc', 3.2, 24, 0.035, 'Étui + coffret', 'ALEX PANDA', false],
+  ['JB-K010', 'Patchs yeux hydrogel', 'jbeauty', 'seoul', 'Beauté', '👁️', '#e5f3fb', 1.9, 48, 0.03, 'Étui', 'ALEX PANDA', false],
+  ['JO-J220', 'Hamac XXL', 'jonas', 'horizon', 'Jardin', '🏝️', '#e3f2e5', 16.5, 4, 0.08, 'Housse + étiquette', 'ROLAND', false],
+  ['JO-R320', 'Paniers jacinthe ×3', 'jonas', 'northbay', 'Maison', '🧺', '#f1e6d2', 8.9, 4, 0.12, 'Hangtag', 'ROLAND', false],
+  ['TR-B010', 'Cabas paille', 'tropaya', 'yiwu', 'Bagagerie', '👜', '#f7ebcf', 4.6, 24, 0.14, 'Hangtag + étiquette', 'ROLAND', false],
+  ['JO-T050', 'Fouta rayée', 'jonas', 'wenzhoutex', 'Maison', '🧣', '#dff0f3', 3.8, 24, 0.07, 'Bandeau', 'ROLAND', false],
 ];
 
 function ean(i: number) {
@@ -207,9 +209,9 @@ export const products: Product[] = productDefs.map((d, i) => {
 });
 
 // ---- Volume réaliste : ~40 packs par designer et par semaine ------------------
-// Produits de collection générés (photo = pictogramme), répartis entre Léa, Sarah et Hugo.
+// Produits de collection générés (photo = pictogramme), répartis entre ABIR, ALEX PANDA et ROLAND.
 const GEN_WEEKS = ['2026-11-02', '2026-11-09', '2026-11-16', '2026-11-23', '2026-11-30', '2026-12-07'];
-const GEN_DESIGNERS = ['Léa', 'Sarah', 'Hugo'];
+const GEN_DESIGNERS = ['ABIR', 'ALEX PANDA', 'ROLAND'];
 type Family = { rayon: string; items: [string, string][]; variants: string[]; suppliers: string[]; brands: [string, string][]; packs: string[]; tints: string[] };
 const FAMILIES: Family[] = [
   {
@@ -373,10 +375,10 @@ const docsFor = (st: ProformaStatus) => {
 
 export const proformas: Proforma[] = pfDefs.map((d, i) => {
   const date = addDays(d.etd, -56);
-  const history = [{ date, user: 'Yzerah', text: 'Proforma créée' }];
+  const history = [{ date, user: 'Yoni Zerah', text: 'Proforma créée' }];
   if (d.status !== 'a_signer') history.push({ date: addDays(date, 2), user: 'Rudy Zerah', text: 'Proforma signée' });
   if (d.paid) history.push({ date: addDays(date, 6), user: 'Finance', text: 'Acompte versé' });
-  if (['booke', 'en_transit', 'arrive'].includes(d.status)) history.push({ date: addDays(d.etd, -14), user: 'Logistique', text: 'Booking confirmé' });
+  if (['booke', 'en_transit', 'arrive'].includes(d.status)) history.push({ date: addDays(d.etd, -14), user: 'ERIC JALLON', text: 'Booking confirmé' });
   const lines = d.lines.map(([ref, cbm, amount]) => {
     const p = products.find((x) => x.id === pid(ref))!;
     const qty = Math.max(1, Math.round(cbm / p.cbmCarton)) * p.pcb;
@@ -530,7 +532,7 @@ export const containers: Container[] = containerPlan.flatMap(([pfId, cov, st]) =
   containers.forEach((c, i) => {
     if (c.status === 'a_booker') return;
     const requested = clamp(addDays(c.etdPlanned, -24));
-    c.booking = { requestedAt: `${requested}T${9 + (i % 6)}:30`, requestedBy: 'Logistique', etdWanted: c.etdPlanned, reminders: [] };
+    c.booking = { requestedAt: `${requested}T${9 + (i % 6)}:30`, requestedBy: 'ERIC JALLON', etdWanted: c.etdPlanned, reminders: [] };
     if (c.status === 'booking_demande') {
       // Une demande ancienne déjà relancée, une récente
       if (i % 2 === 0) {
@@ -552,7 +554,7 @@ containers
   .forEach((c, i) => {
     c.reception = {
       at: `${c.receivedOn ?? c.etaPlanned}T09:30`,
-      by: 'Logistique',
+      by: 'ERIC JALLON',
       lines: c.allocations.map((a, j) => ({
         proformaId: a.proformaId,
         productId: a.productId,
@@ -575,16 +577,16 @@ products.find((p) => p.id === 'AB-M026')!.stock.Meaux = 1800;
 // ---- Utilisateurs (démo) ------------------------------------------------------
 // Équipe JONAS + un compte portail par fournisseur.
 export const users: User[] = [
-  { id: 'yzerah', name: 'Yzerah', email: 'yzerah@jonas.example', role: 'pilote', title: 'Pilote achats', active: true },
+  { id: 'yzerah', name: 'Yoni Zerah', email: 'yzerah@jonas.example', role: 'pilote', title: 'Pilote achats', active: true },
   { id: 'david', name: 'David', email: 'david@jonas.example', role: 'acheteur', title: 'Chef de produit', validationStep: 'david', active: true },
   { id: 'direction', name: 'Rudy Zerah', email: 'rudy@jonas.example', role: 'direction', title: 'Direction générale', validationStep: 'direction', active: true },
-  { id: 'direction-yoni', name: 'Yoni Zerah', email: 'yoni@jonas.example', role: 'direction', title: 'Direction générale', validationStep: 'direction', active: true },
+  { id: 'direction-yoni', name: 'Yoni Zerah', email: 'yoni@jonas.example', role: 'direction', title: 'Direction générale', validationStep: 'direction', active: false }, // Yoni utilise le compte Pilote
   { id: 'moinard', name: 'Moinard', email: 'moinard@jonas.example', role: 'validateur', title: 'Validation pack', validationStep: 'moinard', active: true },
-  { id: 'lea', name: 'Léa', email: 'lea@jonas.example', role: 'designer', title: 'Designer packaging', designerName: 'Léa', active: true },
-  { id: 'sarah', name: 'Sarah', email: 'sarah@jonas.example', role: 'designer', title: 'Designer packaging', designerName: 'Sarah', active: true },
-  { id: 'hugo', name: 'Hugo', email: 'hugo@jonas.example', role: 'designer', title: 'Designer packaging', designerName: 'Hugo', active: true },
+  { id: 'lea', name: 'ABIR', email: 'lea@jonas.example', role: 'designer', title: 'Designer packaging', designerName: 'ABIR', active: true },
+  { id: 'sarah', name: 'ALEX PANDA', email: 'sarah@jonas.example', role: 'designer', title: 'Designer packaging', designerName: 'ALEX PANDA', active: true },
+  { id: 'hugo', name: 'ROLAND', email: 'hugo@jonas.example', role: 'designer', title: 'Designer packaging', designerName: 'ROLAND', active: true },
   { id: 'finance', name: 'Finance', email: 'finance@jonas.example', role: 'finance', title: 'Comptabilité fournisseurs', active: true },
-  { id: 'logistique', name: 'Logistique', email: 'logistique@jonas.example', role: 'logistique', title: 'Transport & réception', active: true },
+  { id: 'logistique', name: 'ERIC JALLON', email: 'logistique@jonas.example', role: 'logistique', title: 'Transport & réception', active: true },
   ...suppliers.map<User>((s) => ({
     id: `sup-${s.id}`,
     name: s.contact.name,
@@ -608,7 +610,7 @@ export const users: User[] = [
     const st = cs[0].status;
     if (st === 'a_booker') continue;
     const reqDay = addDays(pf.etd, -26) < '2026-11-14' ? addDays(pf.etd, -26) : '2026-11-06';
-    pf.booking = { requestedAt: `${reqDay}T09:30`, requestedBy: 'Logistique', containers: cs.length, dateWanted: addDays(pf.etd, -5), reminders: [] };
+    pf.booking = { requestedAt: `${reqDay}T09:30`, requestedBy: 'ERIC JALLON', containers: cs.length, dateWanted: addDays(pf.etd, -5), reminders: [] };
     const fwd = cs[0].forwarder ?? 'Logfret';
     const fwdUser = fwd === 'Logfret' ? 'Julien Morel' : 'Anna Weber';
     if (st === 'booking_demande') {
@@ -655,7 +657,7 @@ export const users: User[] = [
   const seoul = proformas.find((p) => p.id === 'PF-2026-0143')!;
   seoul.booking = {
     requestedAt: '2026-11-12T15:40',
-    requestedBy: 'Logistique',
+    requestedBy: 'ERIC JALLON',
     containers: 1,
     dateWanted: addDays(seoul.etd, -5),
     forwarder: 'Kuehne + Nagel',
@@ -761,8 +763,8 @@ export const users: User[] = [
     };
     proformas.splice(proformas.indexOf(pf) + 1, 0, child);
   };
-  reliquat('PF-2026-0136', 0.25, 28, 'Rupture de tissu imprimé chez le sous-traitant', 'Logistique');
-  reliquat('PF-2026-0139', 0.3, 14, 'Semelles en retard : contrôle qualité refusé', 'Logistique');
+  reliquat('PF-2026-0136', 0.25, 28, 'Rupture de tissu imprimé chez le sous-traitant', 'ERIC JALLON');
+  reliquat('PF-2026-0139', 0.3, 14, 'Semelles en retard : contrôle qualité refusé', 'ERIC JALLON');
 }
 
 // Northbay : problème usine sur l'étagère bambou, demande d'expédition partielle à accepter par JONAS
