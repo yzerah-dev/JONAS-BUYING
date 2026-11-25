@@ -16,6 +16,7 @@ import type {
   CustomsStatus,
   Product,
   ProductPhoto,
+  ProductPatch,
   Proforma,
   Forwarder,
   JournalEntry,
@@ -181,6 +182,8 @@ export type Action =
   | { type: 'addProductPhotos'; items: { productId: string; photos: ProductPhoto[] }[] }
   /** Désignation (français, courte) et description (anglais du fournisseur / français JONAS) */
   | { type: 'setProductText'; productId: string; name: string; description: { en?: string; fr?: string } }
+  /** Fiches produit modifiées (formulaire ou import Excel) ; marques créées au passage */
+  | { type: 'updateProducts'; items: { productId: string; patch: ProductPatch }[]; brands?: Brand[]; source?: 'fiche' | 'excel' }
   | { type: 'markDeveloped'; productId: string }
   | { type: 'reassignPack'; productId: string; designer?: string; weekOf?: ISODate }
   | { type: 'startPack'; productId: string }
@@ -299,8 +302,9 @@ export function isAllowed(s: State, a: Action): boolean {
     case 'addProductPhotos':
       return a.items.length > 0 && a.items.every((i) => canEditPhotos(s, u, i.productId));
     case 'setProductText':
-      // Fiche produit : équipe JONAS (hors finance, logistique et transitaires)
-      return !!a.name.trim() && !isSupplier(u) && u.active && !['transitaire', 'finance', 'logistique'].includes(u.role) && s.products.some((p) => p.id === a.productId);
+      return !!a.name.trim() && canEditProduct(u) && s.products.some((p) => p.id === a.productId);
+    case 'updateProducts':
+      return canEditProduct(u) && a.items.length > 0 && !productPatchErrors(s, a.items, a.brands).length;
     case 'addPackFiles':
     case 'removePackFile':
     case 'startPack':
@@ -602,10 +606,13 @@ function materializeLines(s: State, supplierId: string, lines: ImportLine[], etd
   const created: Product[] = [];
   // Produits existants sans photo : photo lue sur la proforma
   const photos = new Map<string, ProductPhoto>();
+  // PA de la fiche : celui de cette proforma (devise du fournisseur)
+  const prices = new Map<string, { price: number; currency: Currency }>();
   const codes = jonasCodesFor(s, supplierId, lines.filter((l) => !l.productId).map((l) => ({ ref: l.newProduct?.ref, ean: l.newProduct?.ean })));
   const out: ProformaLine[] = lines.map((l) => {
     if (l.productId) {
       if (l.photo) photos.set(l.productId, l.photo);
+      prices.set(l.productId, { price: l.price, currency });
       return { productId: l.productId, qty: l.qty, price: l.price };
     }
     const n = l.newProduct!;
@@ -652,12 +659,17 @@ function materializeLines(s: State, supplierId: string, lines: ImportLine[], etd
     created.push(p);
     return { productId: p.id, qty: l.qty, price: l.price };
   });
-  return { lines: out, created, photos };
+  return { lines: out, created, photos, prices, fx };
 }
 
 /** Catalogue après une proforma lue : nouveaux produits, et photos des produits existants qui n'en avaient pas */
-function withMaterialized(products: Product[], mat: { created: Product[]; photos: Map<string, ProductPhoto> }) {
-  const out = mat.photos.size ? products.map((p) => (!p.photo && mat.photos.has(p.id) ? { ...p, photo: mat.photos.get(p.id) } : p)) : products;
+function withMaterialized(products: Product[], mat: { created: Product[]; photos: Map<string, ProductPhoto>; prices: Map<string, { price: number; currency: Currency }>; fx: number }) {
+  const out = products.map((p) => {
+    const photo = !p.photo && mat.photos.get(p.id);
+    const pa = mat.prices.get(p.id);
+    if (!photo && !pa) return p;
+    return { ...p, ...(photo ? { photo } : {}), ...(pa ? { paSupplier: pa, pa: Math.round(pa.price * mat.fx * 100) / 100 } : {}) };
+  });
   return [...out, ...mat.created];
 }
 
@@ -666,10 +678,12 @@ function withMaterialized(products: Product[], mat: { created: Product[]; photos
  * converti dans la devise donnée. À défaut, le prix d'achat de la fiche produit.
  */
 /**
- * PA affiché : prix de la ligne de la dernière proforma (signée de préférence), dans la devise de cette proforma,
- * sans conversion. À défaut, le prix d'achat d'origine du produit, puis le PA en euros de la fiche.
+ * PA affiché, dans la devise du fournisseur et sans conversion : celui de la fiche (saisi par JONAS, ou repris de la
+ * dernière proforma enregistrée) ; à défaut, la ligne de la dernière proforma ; à défaut, le PA en euros.
  */
 export function purchasePrice(s: State, productId: string): { price: number; currency: Currency; from?: string } {
+  const prod = s.products.find((x) => x.id === productId);
+  if (prod?.paSupplier) return { ...prod.paSupplier };
   const withLine = s.proformas.filter((p) => p.lines.some((l) => l.productId === productId)).sort((a, b) => b.date.localeCompare(a.date));
   const pf = withLine.find((p) => p.status !== 'a_signer') ?? withLine[0];
   if (pf) return { price: pf.lines.find((x) => x.productId === productId)!.price, currency: pf.currency ?? supplierTerms(s, pf.supplierId).currency, from: pf.id };
@@ -974,11 +988,21 @@ function applyAction(s: State, a: Action): State {
           lines: mat && !signed ? mat.lines : pf.lines,
         };
       });
+      // Demande de modification : le PA de la fiche ne change qu'à la signature de la nouvelle version
+      if (mat && signedVersion(pf0)) mat.prices.clear();
       return mat ? { ...next, products: withMaterialized(next.products, mat) } : next;
     }
     case 'signProforma': {
       const u = currentUser(s);
       const at = nowStamp();
+      // Modification signée : le PA des fiches devient celui de la nouvelle version
+      const pf1 = s.proformas.find((x) => x.id === a.id);
+      const doc1 = pf1 && pendingVersion(pf1);
+      if (pf1 && doc1?.lines?.length && signedVersion(pf1)) {
+        const cur = pf1.currency ?? 'EUR';
+        const price = new Map(doc1.lines.map((l) => [l.productId, l.price]));
+        s = { ...s, products: s.products.map((p) => (price.has(p.id) ? { ...p, paSupplier: { price: price.get(p.id)!, currency: cur }, pa: Math.round(price.get(p.id)! * fxRate(s, cur) * 100) / 100 } : p)) };
+      }
       return mapPF(s, a.id, (pf) => {
         const doc = pendingVersion(pf)!;
         const prev = signedVersion(pf);
@@ -1431,6 +1455,28 @@ function applyAction(s: State, a: Action): State {
       return mapP(s, a.productId, (p) => withPhotos(p, a.photo ? [a.photo, ...allPhotos(p).slice(1)] : allPhotos(p).slice(1)));
     case 'setProductPhotos':
       return mapP(s, a.productId, (p) => withPhotos(p, a.photos));
+    case 'updateProducts': {
+      const brands = [...s.brands, ...(a.brands ?? []).filter((b) => !s.brands.some((x) => x.id === b.id))];
+      const patches = new Map(a.items.map((i) => [i.productId, i.patch]));
+      return {
+        ...s,
+        brands,
+        products: s.products.map((p) => {
+          const patch = patches.get(p.id);
+          if (!patch) return p;
+          const next: Product = { ...p, ...patch };
+          if (patch.paSupplier) next.pa = Math.round(patch.paSupplier.price * fxRate(s, patch.paSupplier.currency) * 100) / 100;
+          if (patch.description) {
+            const en = patch.description.en?.trim();
+            const fr = patch.description.fr?.trim();
+            next.description = en || fr ? { ...(en ? { en } : {}), ...(fr ? { fr } : {}) } : undefined;
+          }
+          if (patch.supplierRef !== undefined) next.supplierRef = patch.supplierRef.trim() || undefined;
+          if (patch.sizes !== undefined) next.sizes = patch.sizes.trim() || undefined;
+          return next;
+        }),
+      };
+    }
     case 'setProductText':
       return mapP(s, a.productId, (p) => {
         const en = a.description.en?.trim();
@@ -1555,6 +1601,13 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
       return { target: a.productId, text: `Photos du produit : ${a.photos.length}` };
     case 'setProductText':
       return { target: a.productId, text: `Désignation et description mises à jour : ${a.name.trim()}` };
+    case 'updateProducts': {
+      if (a.items.length === 1) {
+        const fields = Object.keys(a.items[0].patch).map((k) => PATCH_LABELS[k as keyof ProductPatch] ?? k);
+        return { target: a.items[0].productId, text: `Fiche produit modifiée${a.source === 'excel' ? ' (import Excel)' : ''} : ${fields.join(', ')}` };
+      }
+      return { text: `${a.items.length} fiches produit mises à jour${a.source === 'excel' ? ' par import Excel' : ''}` };
+    }
     case 'addProductPhotos': {
       const n = a.items.reduce((t, i) => t + i.photos.length, 0);
       return { target: a.items.length === 1 ? a.items[0].productId : undefined, text: `${n} photo(s) importée(s) pour ${a.items.length} produit(s)` };
@@ -1730,6 +1783,69 @@ export const CONTAINER_STATUS_LABEL: Record<ContainerStatus, string> = {
 
 // ---------------------------------------------------------------------------
 // Sélecteurs / règles de calcul
+
+/** Fiches produit : Pilote, Direction et acheteurs */
+export const canEditProduct = (u: User) => u.active && ['pilote', 'direction', 'acheteur'].includes(u.role);
+
+export const PATCH_LABELS: Record<keyof ProductPatch, string> = {
+  ref: 'Réf. interne',
+  ean: 'EAN',
+  supplierRef: 'Réf. fournisseur',
+  name: 'Désignation',
+  brandId: 'Marque',
+  supplierId: 'Fournisseur',
+  rayon: 'Rayon',
+  collection: 'Collection',
+  gender: 'Genre',
+  material: 'Matière',
+  sizes: 'Tailles',
+  paSupplier: 'PA unitaire',
+  pcb: 'PCB',
+  weight: 'Poids unitaire',
+  cbmCarton: 'CBM carton',
+  description: 'Description',
+};
+
+/**
+ * Contrôle de modifications de fiches : réf. et EAN uniques (EAN-13 valide), désignation non vide,
+ * nombres positifs, fournisseur et marque connus. Rend la liste des erreurs (vide si tout est bon).
+ */
+export function productPatchErrors(s: State, items: { productId: string; patch: ProductPatch }[], newBrands: Brand[] = []): string[] {
+  const errs: string[] = [];
+  const ids = new Set(items.map((i) => i.productId));
+  const patchOf = new Map(items.map((i) => [i.productId, i.patch]));
+  // Réf. et EAN après modification, pour vérifier l'unicité sur tout le catalogue
+  const refs = new Map<string, string>();
+  const eans = new Map<string, string>();
+  for (const p of s.products) {
+    const patch = patchOf.get(p.id);
+    const ref = refKey(patch?.ref ?? p.ref);
+    const ean = patch?.ean ?? p.ean;
+    if (refs.has(ref) && (ids.has(p.id) || ids.has(refs.get(ref)!))) errs.push(`Réf. ${patch?.ref ?? p.ref} : déjà utilisée par ${refs.get(ref)}`);
+    else refs.set(ref, p.id);
+    if (ean && eans.has(ean) && (ids.has(p.id) || ids.has(eans.get(ean)!))) errs.push(`EAN ${ean} : déjà utilisé par ${eans.get(ean)}`);
+    else if (ean) eans.set(ean, p.id);
+  }
+  const brands = new Set([...s.brands.map((b) => b.id), ...newBrands.map((b) => b.id), ...s.products.map((p) => p.brandId)]);
+  for (const { productId, patch } of items) {
+    const p = s.products.find((x) => x.id === productId);
+    if (!p) {
+      errs.push(`${productId} : produit inconnu`);
+      continue;
+    }
+    const tag = patch.ref ?? p.ref;
+    if (patch.ref !== undefined && !patch.ref.trim()) errs.push(`${tag} : réf. interne vide`);
+    if (patch.name !== undefined && !patch.name.trim()) errs.push(`${tag} : désignation vide`);
+    if (patch.ean !== undefined && !(/^\d{13}$/.test(patch.ean) && eanCheck(patch.ean.slice(0, 12)) === patch.ean[12])) errs.push(`${tag} : EAN ${patch.ean} invalide (13 chiffres, clé de contrôle)`);
+    if (patch.supplierId !== undefined && !s.suppliers.some((x) => x.id === patch.supplierId)) errs.push(`${tag} : fournisseur inconnu`);
+    if (patch.brandId !== undefined && !brands.has(patch.brandId)) errs.push(`${tag} : marque inconnue`);
+    if (patch.pcb !== undefined && !(Number.isInteger(patch.pcb) && patch.pcb > 0)) errs.push(`${tag} : PCB invalide`);
+    if (patch.cbmCarton !== undefined && !(patch.cbmCarton > 0)) errs.push(`${tag} : CBM carton invalide`);
+    if (patch.weight !== undefined && !(patch.weight >= 0)) errs.push(`${tag} : poids invalide`);
+    if (patch.paSupplier && !(patch.paSupplier.price >= 0 && ['EUR', 'USD', 'CNY'].includes(patch.paSupplier.currency))) errs.push(`${tag} : PA invalide`);
+  }
+  return errs;
+}
 
 /** Photos d'un produit, la principale en premier */
 export const allPhotos = (p: Pick<Product, 'photo' | 'photos'>): ProductPhoto[] => [...(p.photo ? [p.photo] : []), ...(p.photos ?? [])];

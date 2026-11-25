@@ -104,6 +104,26 @@ export const DEV_STAGES = [
   'Production',
 ] as const;
 
+/** Modification d'une fiche produit (formulaire de la fiche ou import Excel) : seuls les champs présents changent */
+export interface ProductPatch {
+  ref?: string;
+  ean?: string;
+  supplierRef?: string;
+  name?: string;
+  brandId?: string;
+  supplierId?: string;
+  rayon?: string;
+  collection?: string;
+  gender?: string;
+  material?: string;
+  sizes?: string;
+  paSupplier?: { price: number; currency: Currency };
+  pcb?: number;
+  weight?: number;
+  cbmCarton?: number;
+  description?: { en?: string; fr?: string };
+}
+
 export interface Product {
   id: string;
   /** Référence JONAS */

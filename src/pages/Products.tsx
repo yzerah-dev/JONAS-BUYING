@@ -6,6 +6,7 @@ import { BrandLogo, ProductPic, PackPill, Pill, ProductThumb, Seg, PA } from '..
 import { num, weekLabel } from '../lib/format';
 import Combobox from '../components/Combobox';
 import PhotoImport from '../components/PhotoImport';
+import ProductSheetImport from '../components/ProductSheetImport';
 
 export default function Products() {
   const { state } = useStore();
@@ -41,6 +42,7 @@ export default function Products() {
         <h1>Total – Tous les produits</h1>
         <span className="pill green">{state.products.length} références</span>
         <div className="grow" />
+        <ProductSheetImport products={state.products} />
         <PhotoImport products={state.products} />
         <Seg
           value={mode}

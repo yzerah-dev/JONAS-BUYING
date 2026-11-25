@@ -37,6 +37,7 @@ import { SITES } from '../data/seed';
 import PackFiles from '../components/PackFiles';
 import ProductGallery from '../components/ProductGallery';
 import ProductDescription from '../components/ProductDescription';
+import ProductEdit from '../components/ProductEdit';
 import { BrandLogo, ProductPic, ContainerStatusPill, PackPill, Pill, ProformaStatusPill, Progress, Tabs, ValidationCircuit, PA } from '../components/ui';
 import { toast } from '../components/ui-shared';
 import { dec, eur, fdate, fshort, money, num, weekLabel } from '../lib/format';
@@ -179,7 +180,7 @@ function Card({ title, icon, children, action }: { title: string; icon: ReactNod
 
 function InfoCard({ p, state }: { p: Product; state: State }) {
   return (
-    <Card title="Informations produit" icon={<Tag size={18} className="green" />}>
+    <Card title="Informations produit" icon={<Tag size={18} className="green" />} action={<ProductEdit product={p} />}>
       <dl className="kv">
         <dt>Marque</dt>
         <dd>{brandOf(state.brands, p.brandId).name}</dd>
@@ -223,7 +224,7 @@ function InfoCard({ p, state }: { p: Product; state: State }) {
 function PriceCard({ p, q }: { p: Product; q: number }) {
   const cbmPiece = p.cbmCarton / p.pcb;
   return (
-    <Card title="Prix & conditionnement" icon={<Boxes size={18} className="green" />}>
+    <Card title="Prix & conditionnement" icon={<Boxes size={18} className="green" />} action={<ProductEdit product={p} />}>
       <dl className="kv">
         <dt>PA unitaire</dt>
         <dd><PA product={p} /></dd>
