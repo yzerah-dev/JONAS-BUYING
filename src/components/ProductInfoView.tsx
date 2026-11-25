@@ -220,8 +220,11 @@ export default function ProductInfoView({ product: p }: { product: Product }) {
               onSave={(v) => save('Fournisseur', { supplierId: v })}
             />
           )}
+        </Block>
+
+        <Block title="Classement" icon={<Tags size={20} />}>
           {ro ? (
-            <Field label="Marque" value={brand.tagline ? `${brand.name} ${brand.tagline}` : brand.name} />
+            <Field label="Marque" value={brand.tagline ? `${brand.name} ${brand.tagline}` : brand.name} big />
           ) : (
             <Edit
               id="pi-brand"
@@ -233,11 +236,9 @@ export default function ProductInfoView({ product: p }: { product: Product }) {
                 const b = brandFor(state.brands, v);
                 return save('Marque', { brandId: b.id }, state.brands.some((x) => x.id === b.id) || b.id === 'jonas' ? [] : [b]);
               }}
+              big
             />
           )}
-        </Block>
-
-        <Block title="Classement" icon={<Tags size={20} />}>
           {(
             [
               ['rayon', 'Rayon', p.rayon],
