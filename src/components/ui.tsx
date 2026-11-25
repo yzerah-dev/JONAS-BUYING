@@ -6,6 +6,7 @@ import { VALIDATION_STEPS } from '../data/types';
 import { packLate, packState, type PackState } from '../data/store';
 import { initials } from '../lib/format';
 import { useT } from '../i18n/context';
+import { useBlobUrl } from '../lib/blobUrl';
 
 export function Pill({ color, children, icon }: { color: string; children: ReactNode; icon?: ReactNode }) {
   return (
@@ -74,9 +75,15 @@ export function PackPill({ product, prefix }: { product: Product; prefix?: boole
 export function ProductThumb({ product, size = 44 }: { product: Product; size?: number }) {
   return (
     <div className="thumb" style={{ width: size, height: size, background: product.tint, fontSize: size * 0.6 }}>
-      {product.emoji}
+      <ProductPic product={product} />
     </div>
   );
+}
+
+/** Photo du produit (remplit son cadre), ou son pictogramme tant qu'il n'a pas de photo */
+export function ProductPic({ product, src }: { product: Pick<Product, 'emoji' | 'photo' | 'name'>; src?: Blob }) {
+  const url = useBlobUrl(src ?? product.photo?.fileId);
+  return url ? <img className="product-pic" src={url} alt={product.name} /> : <>{product.emoji}</>;
 }
 
 export function BrandLogo({ brand, size = 11 }: { brand: Brand; size?: number }) {

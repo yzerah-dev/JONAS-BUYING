@@ -28,6 +28,12 @@ export interface Supplier {
   terms?: SupplierTerms;
 }
 
+/** Photo d'un produit : fichier dans le stockage (navigateur + bucket « files ») */
+export interface ProductPhoto {
+  fileId: string;
+  mime: string;
+}
+
 export interface SupplierTerms {
   currency: Currency;
   /** Acompte à la commande (% du montant) */
@@ -115,6 +121,8 @@ export interface Product {
   material: string;
   sizes?: string;
   emoji: string;
+  /** Photo du produit (stockage des fichiers) ; à défaut, le pictogramme */
+  photo?: ProductPhoto;
   tint: string;
   pa: number; // prix d'achat unitaire €
   pcb: number; // pièces par carton
@@ -288,6 +296,8 @@ export interface ImportLine {
   newProduct?: { supplierRef?: string; ref?: string; ean?: string; name: string; pcb: number; cbmCarton: number };
   qty: number;
   price: number;
+  /** Photo lue sur la proforma (image d'un Excel) : celle du nouveau produit, ou d'un produit existant qui n'en a pas */
+  photo?: ProductPhoto;
 }
 
 export interface ProformaSignature {

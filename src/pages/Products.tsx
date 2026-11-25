@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LayoutGrid, List, Search } from 'lucide-react';
 import { brandOf, byId, packState, productQuantities, useStore } from '../data/store';
-import { BrandLogo, PackPill, Pill, ProductThumb, Seg } from '../components/ui';
+import { BrandLogo, ProductPic, PackPill, Pill, ProductThumb, Seg } from '../components/ui';
 import { eur2, num, weekLabel } from '../lib/format';
 import Combobox from '../components/Combobox';
 
@@ -108,7 +108,7 @@ export default function Products() {
           {rows.slice(0, limit).map(({ p, qty }) => (
             <div key={p.id} className="pcard" onClick={() => navigate(`/produits/${p.id}`)}>
               <div className="photo" style={{ background: p.tint }}>
-                {p.emoji}
+                <ProductPic product={p} />
               </div>
               <div className="row">
                 <BrandLogo brand={brandOf(state.brands, p.brandId)} size={10} />

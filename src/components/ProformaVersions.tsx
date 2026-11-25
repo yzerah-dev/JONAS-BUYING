@@ -10,7 +10,7 @@ import { useT } from '../i18n';
 import { toast } from './ui-shared';
 import FileDrop from './FileDrop';
 import LinesEditor from './LinesEditor';
-import { fromExtraction, toImport, type EditLine } from '../lib/editLines';
+import { fromExtraction, toImport, withLinePhotos, type EditLine } from '../lib/editLines';
 import { extractProforma } from '../lib/proformaExtract';
 import { isSheet, sheetMime, SHEET_ACCEPT } from '../lib/excelImport';
 
@@ -246,10 +246,10 @@ function UploadBox({ pf, revision, hasPending, open, setOpen }: { pf: Proforma; 
               <button
                 type="button"
                 className="btn primary"
-                onClick={() => {
+                onClick={async () => {
                   const ls = toImport(review.lines, state.products);
                   if (!ls) return toast(t('ex.invalid'));
-                  send(review.file, ls);
+                  send(review.file, await withLinePhotos(review.lines, ls, pf.supplierId, pf.id));
                 }}
               >
                 <Upload size={16} /> {t('ex.save')}

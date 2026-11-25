@@ -21,6 +21,7 @@ import {
   proformaTotals,
   brandOf,
 } from '../data/store';
+import ProductPhotoEdit from '../components/ProductPhotoEdit';
 import { BrandLogo, ContainerStatusPill, Kpi, PackPill, Pill, ProductThumb, ProformaStatusPill, Ring, Seg, ValidationCircuit } from '../components/ui';
 import { toast } from '../components/ui-shared';
 import type { Proforma } from '../data/types';
@@ -177,7 +178,10 @@ export function PortalProducts() {
               <tr key={p.id}>
                 <td className="bold">{p.ref}</td>
                 <td>
-                  <ProductThumb product={p} size={40} />
+                  <div className="row" style={{ gap: 6 }}>
+                    <ProductThumb product={p} size={40} />
+                    <ProductPhotoEdit product={p} compact />
+                  </div>
                 </td>
                 <td>{p.name}</td>
                 <td>

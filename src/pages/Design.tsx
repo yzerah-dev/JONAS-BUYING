@@ -6,7 +6,7 @@ import { pressable } from '../lib/a11y';
 import { brandOf, byId, capacityOf, packDone, packLate, useAuth, useStore, type State } from '../data/store';
 import type { Product } from '../data/types';
 import { VALIDATION_LABELS, VALIDATION_STEPS } from '../data/types';
-import { BrandLogo, Pill, ProductThumb, Tabs, ValidationCircuit, ValidationDot } from '../components/ui';
+import { BrandLogo, ProductPic, Pill, ProductThumb, Tabs, ValidationCircuit, ValidationDot } from '../components/ui';
 import { designerColor, toast } from '../components/ui-shared';
 import { TODAY, addDays, fdate, fshort, fstamp, initials, weekKey, weekLabel, weekRange } from '../lib/format';
 
@@ -626,7 +626,7 @@ function PackPanel({ p }: { p: Product }) {
     <div className="card pad">
       <div className="row" style={{ alignItems: 'flex-start' }}>
         <div className="thumb" style={{ width: 140, height: 110, background: p.tint, fontSize: 70 }}>
-          {p.emoji}
+          <ProductPic product={p} />
         </div>
         <div className="col grow" style={{ alignItems: 'flex-end' }}>
           <BrandLogo brand={brandOf(state.brands, p.brandId)} size={14} />

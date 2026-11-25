@@ -15,6 +15,7 @@ import type {
   ISODate,
   CustomsStatus,
   Product,
+  ProductPhoto,
   Proforma,
   Forwarder,
   JournalEntry,
@@ -173,6 +174,7 @@ export type Action =
   | { type: 'planDelivery'; containerId: string; date: ISODate }
   | { type: 'advanceDev'; productId: string }
   | { type: 'toggleUrgent'; productId: string }
+  | { type: 'setProductPhoto'; productId: string; photo: ProductPhoto | null }
   | { type: 'markDeveloped'; productId: string }
   | { type: 'reassignPack'; productId: string; designer?: string; weekOf?: ISODate }
   | { type: 'startPack'; productId: string }
@@ -284,6 +286,13 @@ export function isAllowed(s: State, a: Action): boolean {
       if (!p) return false;
       if (isSupplier(u)) return p.supplierId === u.supplierId && p.pack.validations.fournisseur.state === 'pending' && p.pack.sentToSupplier;
       return can(u, 'pack.reject');
+    }
+    case 'setProductPhoto': {
+      // Équipe JONAS (hors finance) ; un fournisseur pour ses produits
+      const p = s.products.find((x) => x.id === a.productId);
+      if (!p || !u.active) return false;
+      if (isSupplier(u)) return p.supplierId === u.supplierId;
+      return !['transitaire', 'finance'].includes(u.role);
     }
     case 'addPackFiles':
     case 'removePackFile':
@@ -584,9 +593,14 @@ function materializeLines(s: State, supplierId: string, lines: ImportLine[], etd
     return [...count.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? fallback;
   };
   const created: Product[] = [];
+  // Produits existants sans photo : photo lue sur la proforma
+  const photos = new Map<string, ProductPhoto>();
   const codes = jonasCodesFor(s, supplierId, lines.filter((l) => !l.productId).map((l) => ({ ref: l.newProduct?.ref, ean: l.newProduct?.ean })));
   const out: ProformaLine[] = lines.map((l) => {
-    if (l.productId) return { productId: l.productId, qty: l.qty, price: l.price };
+    if (l.productId) {
+      if (l.photo) photos.set(l.productId, l.photo);
+      return { productId: l.productId, qty: l.qty, price: l.price };
+    }
     const n = l.newProduct!;
     const { ref, ean } = codes.shift()!;
     const deadline = addDays(etd, -35);
@@ -623,11 +637,18 @@ function materializeLines(s: State, supplierId: string, lines: ImportLine[], etd
         sentToSupplier: false,
       },
       stock: { Péronne: 0, Meaux: 0, Lillois: 0 },
+      photo: l.photo,
     };
     created.push(p);
     return { productId: p.id, qty: l.qty, price: l.price };
   });
-  return { lines: out, created };
+  return { lines: out, created, photos };
+}
+
+/** Catalogue après une proforma lue : nouveaux produits, et photos des produits existants qui n'en avaient pas */
+function withMaterialized(products: Product[], mat: { created: Product[]; photos: Map<string, ProductPhoto> }) {
+  const out = mat.photos.size ? products.map((p) => (!p.photo && mat.photos.has(p.id) ? { ...p, photo: mat.photos.get(p.id) } : p)) : products;
+  return [...out, ...mat.created];
 }
 
 /**
@@ -876,7 +897,7 @@ function applyAction(s: State, a: Action): State {
           ...(mat.created.length ? [{ date: TODAY, user: me, text: `${mat.created.length} produit(s) créé(s) depuis la proforma : ${mat.created.map((p) => p.ref).join(', ')}` }] : []),
         ],
       };
-      return { ...s, products: [...s.products, ...mat.created], proformas: [...s.proformas, pf] };
+      return { ...s, products: withMaterialized(s.products, mat), proformas: [...s.proformas, pf] };
     }
     case 'cancelOrder':
       return { ...s, proformas: s.proformas.filter((p) => p.id !== a.id) };
@@ -930,7 +951,7 @@ function applyAction(s: State, a: Action): State {
           lines: mat && !signed ? mat.lines : pf.lines,
         };
       });
-      return mat ? { ...next, products: [...next.products, ...mat.created] } : next;
+      return mat ? { ...next, products: withMaterialized(next.products, mat) } : next;
     }
     case 'signProforma': {
       const u = currentUser(s);
@@ -1383,6 +1404,8 @@ function applyAction(s: State, a: Action): State {
       return mapP(s, a.productId, (p) => (p.pack.startedAt ? p : { ...p, pack: { ...p.pack, startedAt: nowStamp() } }));
     case 'planPack':
       return mapP(s, a.productId, (p) => ({ ...p, pack: { ...p.pack, plannedStart: a.date ?? undefined } }));
+    case 'setProductPhoto':
+      return mapP(s, a.productId, (p) => ({ ...p, photo: a.photo ?? undefined }));
     case 'addPackFiles':
       return mapP(s, a.productId, (p) => {
         const files = p.pack.files ?? [];
@@ -1491,6 +1514,8 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
       return { target: a.id, text: `Nouvelle proforma ${a.id} : ${a.title}${a.file ? ' (déposée par le fournisseur)' : ''}` };
     case 'cancelOrder':
       return { target: a.id, text: 'Commande JONAS annulée avant proforma' };
+    case 'setProductPhoto':
+      return { target: a.productId, text: a.photo ? 'Photo du produit ajoutée' : 'Photo du produit retirée' };
     case 'setSupplierTerms':
       return { text: `${s.suppliers.find((x) => x.id === a.supplierId)?.shortName} : devise ${a.terms.currency}, acompte ${a.terms.depositPct} %, solde J+${a.terms.balanceDays}` };
     case 'requestSplit':

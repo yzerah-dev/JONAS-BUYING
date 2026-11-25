@@ -18,6 +18,10 @@ export interface ExtractedLine {
   price: number;
   pcb?: number;
   cbmCarton?: number;
+  /** Ligne du tableau dans la feuille Excel (0 = première) */
+  row?: number;
+  /** Photo incrustée sur la ligne (Excel) */
+  photo?: Blob;
 }
 
 export interface Extraction {

@@ -9,7 +9,7 @@ import { toast } from './ui-shared';
 import FileDrop from './FileDrop';
 import Combobox from './Combobox';
 import LinesEditor from './LinesEditor';
-import { emptyLine, fromExtraction, toImport, type EditLine } from '../lib/editLines';
+import { emptyLine, fromExtraction, toImport, withLinePhotos, type EditLine } from '../lib/editLines';
 import { extractProforma } from '../lib/proformaExtract';
 import { isSheet, readSheet, sheetMime, SHEET_ACCEPT } from '../lib/excelImport';
 import { Seg } from './ui';
@@ -84,8 +84,8 @@ function NewProformaDialog({ onClose, onCreated }: { onClose: () => void; onCrea
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return toast(t('np.needTitle'));
-    const ls = toImport(lines, state.products);
-    if (!ls) return toast(t('ex.invalid'));
+    const ls0 = toImport(lines, state.products);
+    if (!ls0) return toast(t('ex.invalid'));
     if (supplierSide && !file) return toast(t('np.needFile'));
     let f: { fileId: string; name: string; size: number; mime: string } | undefined;
     if (file) {
@@ -102,6 +102,7 @@ function NewProformaDialog({ onClose, onCreated }: { onClose: () => void; onCrea
         order.file = { fileId, name: orderFile.name, size: orderFile.size, mime: orderFile.type || 'application/octet-stream' };
       }
     }
+    const ls = await withLinePhotos(lines, ls0, supplierId, id);
     dispatch({ type: 'createProforma', id, supplierId, title, etd, eta, lines: ls, file: f, order });
     toast(supplierSide ? t('np.createdSup', { id }) : file ? t('np.createdJonas', { id }) : t('po.created', { id }));
     onClose();

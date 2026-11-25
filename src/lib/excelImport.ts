@@ -119,6 +119,7 @@ export function rowsToLines(rows: unknown[][]): ExtractedLine[] {
     if (!(pcb > 0) && ctn > 0 && Number.isInteger(qty / ctn)) pcb = qty / ctn;
     const cbm = toNumber(get('cbm'));
     out.push({
+      row: ROW.get(r),
       ref,
       jonasRef: jonasRef || undefined,
       name,
@@ -138,19 +139,36 @@ export async function sheetTables(file: Blob | Uint8Array, raw = false): Promise
   const XLSX = await import('xlsx');
   const data = file instanceof Uint8Array ? file : new Uint8Array(await file.arrayBuffer());
   const wb = XLSX.read(data, { type: 'array', cellDates: true });
-  return wb.SheetNames.map((name) => ({
-    name,
-    rows: XLSX.utils
-      .sheet_to_json<unknown[]>(wb.Sheets[name], { header: 1, raw, defval: '' })
-      .filter((r) => r.some((c) => String(c ?? '').trim() !== '')),
-  })).filter((s) => s.rows.length);
+  return wb.SheetNames.filter((name) => wb.Sheets[name]).map((name) => {
+    const ws = wb.Sheets[name];
+    const first = ws['!ref'] ? XLSX.utils.decode_range(ws['!ref']).s.r : 0;
+    const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, raw, defval: '', blankrows: true });
+    rows.forEach((r, i) => ROW.set(r, first + i));
+    return { name, rows: rows.filter((r) => r.some((c) => String(c ?? '').trim() !== '')) };
+  }).filter((s) => s.rows.length);
 }
+
+/** Numéro de ligne dans la feuille (0 = première), pour placer les photos incrustées */
+const ROW = new WeakMap<unknown[], number>();
 
 /** Lit les lignes d'un fichier Excel (.xlsx, .xls) ou CSV : première feuille où l'on trouve un tableau d'articles */
 export async function readSheet(file: Blob): Promise<ExtractedLine[]> {
-  for (const s of await sheetTables(file, true)) {
+  const data = new Uint8Array(await file.arrayBuffer());
+  const sheets = await sheetTables(data, true);
+  for (const [i, s] of sheets.entries()) {
     const lines = rowsToLines(s.rows);
-    if (lines.length) return lines;
+    if (!lines.length) continue;
+    // Photos incrustées (première feuille) : chacune va à la ligne sur laquelle elle est posée
+    if (i === 0) {
+      const { sheetImages } = await import('./sheetImages');
+      const images = await sheetImages(data).catch(() => []);
+      lines.forEach((l, k) => {
+        const next = lines[k + 1]?.row ?? Infinity;
+        const img = l.row !== undefined ? images.find((im) => im.row >= l.row! && im.row < next) : undefined;
+        l.photo = img?.blob ?? (images.length === lines.length && images.every((im) => im.row < 0) ? images[k].blob : undefined);
+      });
+    }
+    return lines;
   }
   return [];
 }

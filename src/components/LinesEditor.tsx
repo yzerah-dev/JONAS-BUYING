@@ -1,4 +1,5 @@
 import { Plus, Trash2 } from 'lucide-react';
+import { ProductPic } from './ui';
 import { jonasCodesFor, useStore } from '../data/store';
 import { emptyLine, jonasRefClash, toNum, type EditLine } from '../lib/editLines';
 import { useT } from '../i18n';
@@ -48,6 +49,11 @@ export default function LinesEditor({ supplierId, currency, lines, setLines }: {
                 onChange={(v) => set(i, { productId: v, by: v === 'new' ? 'new' : undefined })}
               />
               {badge(l)}
+              {l.photo && (
+                <span className="np-photo" title={t('ph.fromDoc')}>
+                  <ProductPic product={{ emoji: '', name: t('ph.fromDoc') }} src={l.photo} />
+                </span>
+              )}
             </div>
             <input aria-label={`${t('np.qty')} ${i + 1}`} className="input" inputMode="numeric" placeholder={t('np.qty')} value={l.qty} onChange={(e) => set(i, { qty: e.target.value })} />
             <input aria-label={`${t('np.price')} ${i + 1}`} className="input" inputMode="decimal" placeholder={`${t('np.price')} (${currency})`} value={l.price} onChange={(e) => set(i, { price: e.target.value })} />

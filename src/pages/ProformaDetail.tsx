@@ -43,7 +43,7 @@ import {
   brandOf,
 } from '../data/store';
 import type { Container, Proforma, ProformaStatus } from '../data/types';
-import { BrandLogo, ContainerStatusPill, PackPill, Pill, ProductThumb, ProformaStatusPill, Progress, Ring, Seg, SupplierLogo, Tabs } from '../components/ui';
+import { BrandLogo, ProductPic, ContainerStatusPill, PackPill, Pill, ProductThumb, ProformaStatusPill, Progress, Ring, Seg, SupplierLogo, Tabs } from '../components/ui';
 import { toast } from '../components/ui-shared';
 import { BookingRequestButton } from '../components/BookingDialog';
 import BookingReview, { LastRejection } from '../components/BookingReview';
@@ -280,7 +280,7 @@ function ProductsTab({ pf, state, mode }: { pf: Proforma; state: State; mode: 'g
         return (
           <div key={p.id} className="pcard" onClick={() => navigate(`/produits/${p.id}`)}>
             <div className="photo" style={{ background: p.tint }}>
-              {p.emoji}
+              <ProductPic product={p} />
             </div>
             <div className="row">
               <span className="ref-tag">{p.ref}</span>

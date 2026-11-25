@@ -1541,3 +1541,26 @@ button.fw-doc.missing:hover { background: var(--red); color: #fff; }
 .auth-card label { display: grid; gap: 4px; font-size: 13px; font-weight: 600; }
 .sync-error { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 200; padding: 8px 14px; border-radius: 10px; background: var(--red); color: #fff; font-weight: 700; }
 .sync-error button { background: none; border: 0; color: #fff; font-size: 16px; margin-left: 8px; cursor: pointer; }
+
+/* Photo produit : remplit le cadre de la vignette, sans déformation ni débordement */
+.thumb, .pcard .photo, .np-photo { position: relative; overflow: hidden; }
+.product-pic {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  background: #fff;
+  border-radius: inherit;
+}
+.np-photo {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  border-radius: 6px;
+  border: 1px solid var(--line, #e3e7e5);
+  overflow: hidden;
+  flex: none;
+  background: #fff;
+}

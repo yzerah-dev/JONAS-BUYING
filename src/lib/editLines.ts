@@ -1,5 +1,6 @@
 import type { ImportLine, Product } from '../data/types';
 import { matchProduct, type ExtractedLine } from './proformaExtract';
+import { newFileId, putBlob, supplierScope } from './files';
 
 /** Ligne en cours de saisie : produit existant, ou nouveau produit (lu sur la proforma ou saisi) */
 export interface EditLine {
@@ -14,6 +15,8 @@ export interface EditLine {
   pcb?: string;
   cbm?: string;
   by?: 'ref' | 'ean' | 'nom' | 'new';
+  /** Photo lue sur la proforma (pas encore enregistrée) */
+  photo?: Blob;
 }
 
 export const emptyLine = (): EditLine => ({ productId: '', qty: '', price: '' });
@@ -24,7 +27,7 @@ export function fromExtraction(lines: ExtractedLine[], products: Product[], cata
   return lines.map((l) => {
     const m = matchProduct(l, products, catalog);
     return m.product
-      ? { productId: m.product.id, qty: String(l.qty), price: String(l.price), by: m.by }
+      ? { productId: m.product.id, qty: String(l.qty), price: String(l.price), by: m.by, photo: m.product.photo ? undefined : l.photo }
       : {
           productId: 'new',
           qty: String(l.qty),
@@ -36,6 +39,7 @@ export function fromExtraction(lines: ExtractedLine[], products: Product[], cata
           pcb: l.pcb ? String(l.pcb) : '',
           cbm: l.cbmCarton ? String(l.cbmCarton) : '',
           by: 'new',
+          photo: l.photo,
         };
   });
 }
@@ -72,3 +76,20 @@ export function toImport(lines: EditLine[], catalog: Product[] = []): ImportLine
   return out;
 }
 
+
+/**
+ * Enregistre les photos lues sur la proforma (stockage des fichiers du fournisseur) et les joint aux lignes à enregistrer.
+ * `imported` : résultat de toImport(lines), dans le même ordre que les lignes renseignées.
+ */
+export async function withLinePhotos(lines: EditLine[], imported: ImportLine[], supplierId: string, tag: string): Promise<ImportLine[]> {
+  const used = lines.filter((l) => l.productId);
+  return Promise.all(
+    imported.map(async (l, i) => {
+      const photo = used[i]?.photo;
+      if (!photo) return l;
+      const fileId = newFileId(supplierScope(supplierId), `photo-${tag}`, i);
+      await putBlob(fileId, photo);
+      return { ...l, photo: { fileId, mime: photo.type || 'image/png' } };
+    }),
+  );
+}

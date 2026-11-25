@@ -34,7 +34,8 @@ import {
 import { DEV_STAGES, type Product } from '../data/types';
 import { SITES } from '../data/seed';
 import PackFiles from '../components/PackFiles';
-import { BrandLogo, ContainerStatusPill, PackPill, Pill, ProformaStatusPill, Progress, Tabs, ValidationCircuit } from '../components/ui';
+import ProductPhotoEdit from '../components/ProductPhotoEdit';
+import { BrandLogo, ProductPic, ContainerStatusPill, PackPill, Pill, ProformaStatusPill, Progress, Tabs, ValidationCircuit } from '../components/ui';
 import { toast } from '../components/ui-shared';
 import { dec, eur, eur2, fdate, fshort, num, weekLabel } from '../lib/format';
 
@@ -72,8 +73,11 @@ export default function ProductDetail() {
       </div>
 
       <div className="card pad row wrap gap-lg">
-        <div className="thumb" style={{ width: 220, height: 160, background: p.tint, fontSize: 110 }}>
-          {p.emoji}
+        <div className="col" style={{ gap: 6, alignItems: 'center' }}>
+          <div className="thumb" style={{ width: 220, height: 160, background: p.tint, fontSize: 110 }}>
+            <ProductPic product={p} />
+          </div>
+          <ProductPhotoEdit product={p} />
         </div>
         <BrandLogo brand={brand} size={20} />
         <div className="col" style={{ gap: 8 }}>
@@ -265,7 +269,7 @@ function DesignCard({ p, full }: { p: Product; full?: boolean }) {
           ✂️ Die cut {p.pack.dieCut === 'received' ? '(reçu)' : p.pack.dieCut === 'requested' ? '(demandé)' : '(—)'}
         </div>
         <div className="thumb" style={{ height: 90, background: p.tint, fontSize: 44 }}>
-          {p.emoji}
+          <ProductPic product={p} />
         </div>
       </div>
       <div className="row wrap mt">
