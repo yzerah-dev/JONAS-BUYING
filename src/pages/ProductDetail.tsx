@@ -34,7 +34,7 @@ import {
 } from '../data/store';
 import { DEV_STAGES, type Product } from '../data/types';
 import { SITES } from '../data/seed';
-import PackFiles from '../components/PackFiles';
+import PackFlow from '../components/PackFlow';
 import ProductGallery from '../components/ProductGallery';
 import ProductDescription from '../components/ProductDescription';
 import ProductEdit from '../components/ProductEdit';
@@ -273,7 +273,7 @@ function DesignCard({ p, full }: { p: Product; full?: boolean }) {
       </div>
       {full && (
         <div className="mt">
-          <PackFiles p={p} />
+          <PackFlow p={p} />
         </div>
       )}
       <div className="ps-validation">

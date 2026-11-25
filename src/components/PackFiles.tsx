@@ -10,7 +10,8 @@ const IMAGE = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg']);
 const isImage = (f: PackFile) => IMAGE.has(ext(f.name));
 const QUALITY_TYPES = ['MSDS (fiche de sécurité)', 'Fiche composition', 'Certificat de conformité', 'Rapport de test', 'Fiche technique', 'Autre'];
 
-type Round = 'diecut' | 'pack' | 'docs';
+export type PackRound = 'diecut' | 'pack' | 'docs';
+type Round = PackRound;
 /** Les trois ronds de l'espace pack */
 const ROUNDS: { id: Round; label: string; icon: typeof Scissors }[] = [
   { id: 'diecut', label: 'Die cut', icon: Scissors },
@@ -101,7 +102,7 @@ function Thumb({ f, onOpen, big }: { f: PackFile; onOpen: (url: string) => void;
  * Espace pack d'un produit, simple pour le designer : brief marketing, die cut, ancien pack,
  * pack (versions), dossier pack, fiches qualité. Chacun dépose ce qui le concerne ; tout le monde télécharge.
  */
-export default function PackFiles({ p }: { p: Product }) {
+export default function PackFiles({ p, round, onRound }: { p: Product; round?: PackRound; onRound?: (r: PackRound) => void }) {
   const { state, dispatch } = useStore();
   const auth = useAuth();
   const me = currentUser(state);
@@ -114,11 +115,19 @@ export default function PackFiles({ p }: { p: Product }) {
   const [preview, setPreview] = useState<string | null>(null);
   const [docType, setDocType] = useState(QUALITY_TYPES[0]);
   // Rond ouvert : le designer arrive sur le pack ; les autres sur le premier rond à faire
-  const [open, setOpen] = useState<Round>(() => {
+  const [own, setOwn] = useState<Round>(() => {
     if (me.role === 'designer') return 'pack';
+    // Pas encore de brief : l'acheteur commence par là (rond Pack)
+    if (!p.pack.brief && !files.some((f) => f.kind === 'brief') && canPackFiles(state, me, p.id, 'brief')) return 'pack';
     const has = (k: PackFileKind) => files.some((f) => f.kind === k);
     return !has('diecut') ? 'diecut' : !has('pack') ? 'pack' : 'docs';
   });
+  // Rond ouvert : piloté par la page (bouton « Prochaine action ») ou par un clic sur un rond
+  const open = round ?? own;
+  const setOpen = (r: Round) => {
+    setOwn(r);
+    onRound?.(r);
+  };
   const [brief, setBrief] = useState(p.pack.brief ?? '');
   const [briefSeen, setBriefSeen] = useState(p.pack.brief ?? '');
   if ((p.pack.brief ?? '') !== briefSeen) {
@@ -230,6 +239,9 @@ export default function PackFiles({ p }: { p: Product }) {
           {fsize(f.size)} · {fstamp(f.uploadedAt)} · {f.uploadedBy}
         </small>
       </span>
+      <span className="ps-ok" aria-hidden>
+        <Check size={13} strokeWidth={3} />
+      </span>
       <button className="icon-btn" title="Télécharger" onClick={() => download(f)}>
         <Download size={16} />
       </button>
@@ -327,6 +339,7 @@ export default function PackFiles({ p }: { p: Product }) {
               <textarea
                 className="input ps-brief"
                 rows={4}
+                id="ps-brief"
                 aria-label="Texte du brief marketing"
                 placeholder="Cible, positionnement, univers, couleurs, mentions obligatoires, prix de vente visé…"
                 value={brief}

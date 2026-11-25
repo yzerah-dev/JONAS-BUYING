@@ -54,8 +54,14 @@ test('Design & Pack : trois ronds (die cut, pack, documents) puis la validation'
   await expect(round('Pack')).toHaveAttribute('aria-selected', 'true');
   await expect(space).toContainText('Cible femme 25-40 ans');
   await expect(space.locator('.ps-inspi')).toHaveCount(2);
-  await space.getByLabel('Déposer : Pack', { exact: true }).setInputFiles(file('pack-v1.ai'));
+  // Prochaine action du designer : un gros bouton « Déposer et passer en validation »
+  const next = page.getByRole('region', { name: 'Prochaine action' });
+  await expect(next).toContainText('Déposer le pack');
+  const [chooser] = await Promise.all([page.waitForEvent('filechooser'), next.getByRole('button', { name: 'Déposer et passer en validation' }).click()]);
+  await chooser.setFiles(file('pack-v1.ai'));
   await expect(toast(page)).toContainText('Pack V1 envoyé en validation');
+  await expect(page.locator('.pk-steps li.done')).toHaveCount(2);
+  await expect(next).toContainText('Pack V1 en validation');
   await space.getByLabel('Déposer : Dossier pack').setInputFiles([file('rendu.png', 'image/png'), file('source.psd')]);
   await expect(round('Pack')).toHaveAccessibleName('Pack : uploadé');
   await expect(space.locator('.ps-round.ok')).toHaveCount(3);
@@ -66,6 +72,21 @@ test('Design & Pack : trois ronds (die cut, pack, documents) puis la validation'
   // Tout télécharger : rangé par rubrique
   const [zip] = await Promise.all([page.waitForEvent('download'), space.getByRole('button', { name: /Tout télécharger/ }).click()]);
   expect(zip.suggestedFilename()).toBe('CP-T001_dossier_pack.zip');
+
+  // Le valideur en cours voit « Valider le pack » en prochaine action
+  const step = await page.evaluate(() => {
+    const k = Object.keys(localStorage).find((x) => x.startsWith('jonas-buying-state'))!;
+    const v = JSON.parse(localStorage.getItem(k)!).products.find((p: { id: string }) => p.id === 'CP-T001').pack.validations;
+    return ['david', 'direction', 'moinard', 'fournisseur'].find((s) => v[s].state !== 'done');
+  });
+  if (step === 'david') {
+    await loginAs(page, 'David');
+    await go(page, 'produits/CP-T001');
+    await page.getByRole('button', { name: 'Design & Pack' }).click();
+    await expect(next).toContainText('Valider le pack V1');
+    await next.getByRole('button', { name: 'Valider le pack' }).click();
+    await expect(toast(page)).toContainText('Pack validé');
+  }
 });
 
 test('portail fournisseur : dépôt du die cut et des fiches qualité, téléchargement du pack (traduit)', async ({ page }) => {
