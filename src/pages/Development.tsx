@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Calendar, Check, ChevronDown, ChevronUp, Flame, Search, Users } from 'lucide-react';
-import { brandOf, byId, capacityOf, PACK_TRACK_LABELS, packTrack, useAuth, useStore, type PackTrack, type State } from '../data/store';
+import { brandOf, byId, capacityOf, packTrack, matchTrack, TRACK_CHIPS, TRACK_ORDER, useAuth, useStore, type TrackFilter, type State } from '../data/store';
+import PackTrackDots from '../components/PackTrack';
 import type { Product } from '../data/types';
 import { BrandLogo, Pill, ProductThumb, PA } from '../components/ui';
 import { designerColor, toast } from '../components/ui-shared';
@@ -9,32 +10,6 @@ import { pressable } from '../lib/a11y';
 import { TODAY, diffDays, fshort, fstamp, initials, num, weekKey, weekLabel, weekRange } from '../lib/format';
 
 type Tab = 'designer' | 'semaine' | 'urgent';
-/** Filtres du suivi pack */
-type TrackFilter = 'all' | 'diecut' | PackTrack;
-const TRACK_ORDER: Record<PackTrack, number> = { a_refaire: 0, attente: 1, a_faire: 2, valide: 3 };
-const matchTrack = (p: Product, f: TrackFilter) => f === 'all' || (f === 'diecut' ? packTrack(p).dieCutMissing : packTrack(p).status === f);
-
-/** Ronds de suivi du pack sur la ligne : die cut manquant, en attente de validation, à refaire, validé */
-function PackTrackDots({ p }: { p: Product }) {
-  const { dieCutMissing, status } = packTrack(p);
-  const dots: { key: string; on: boolean; cls: string; label: string }[] = [
-    { key: 'diecut', on: dieCutMissing, cls: 'red', label: 'Die cut manquant' },
-    { key: 'attente', on: status === 'attente', cls: 'orange', label: PACK_TRACK_LABELS.attente },
-    { key: 'a_refaire', on: status === 'a_refaire', cls: 'red', label: PACK_TRACK_LABELS.a_refaire },
-    { key: 'valide', on: status === 'valide', cls: 'green', label: PACK_TRACK_LABELS.valide },
-  ];
-  const on = dots.filter((d) => d.on).map((d) => d.label);
-  return (
-    <span className="dev-track" aria-label={`Suivi pack : ${on.length ? on.join(', ') : PACK_TRACK_LABELS.a_faire}`} title={on.length ? on.join(' · ') : PACK_TRACK_LABELS.a_faire}>
-      {dots.map((d) => (
-        <span key={d.key} className={`dev-dot ${d.on ? d.cls : ''}`} data-k={d.key} />
-      ))}
-      <small>{status === 'a_faire' ? (dieCutMissing ? 'Die cut manquant' : PACK_TRACK_LABELS.a_faire) : PACK_TRACK_LABELS[status].replace('Pack ', '')}</small>
-    </span>
-  );
-}
-
-
 const isLate = (p: Product) => p.devDeadline < TODAY;
 const isPushed = (p: Product) => !!p.urgent;
 
@@ -208,15 +183,7 @@ function DevelopmentPage() {
 
       {/* Suivi du pack : filtre par statut */}
       <div className="dev-trackbar" role="group" aria-label="Suivi pack">
-        {(
-          [
-            ['all', 'Tous', ''],
-            ['diecut', 'Die cut manquant', 'red'],
-            ['attente', 'Pack en attente de validation', 'orange'],
-            ['a_refaire', 'Pack à refaire', 'red'],
-            ['valide', 'Pack validé', 'green'],
-          ] as [TrackFilter, string, string][]
-        ).map(([k, label, cls]) => (
+        {TRACK_CHIPS.map(([k, label, cls]) => (
           <button key={k} type="button" className={`pf-chip ${track === k ? 'active' : ''}`} aria-pressed={track === k} onClick={() => setTrack(k)}>
             {cls && <span className={`dev-dot ${cls}`} />} {label} <b>{trackCount(k)}</b>
           </button>

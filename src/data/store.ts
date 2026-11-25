@@ -1942,6 +1942,20 @@ export function packTrack(p: Product): { dieCutMissing: boolean; status: PackTra
   return { dieCutMissing, status };
 }
 
+/** Filtre « Suivi pack » : tous, die cut manquant, ou un statut du pack */
+export type TrackFilter = 'all' | 'diecut' | PackTrack;
+export const TRACK_ORDER: Record<PackTrack, number> = { a_refaire: 0, attente: 1, a_faire: 2, valide: 3 };
+/** Filtres « Suivi pack » (avec compteurs) */
+export const TRACK_CHIPS: readonly (readonly [TrackFilter, string, string])[] = [
+  ['all', 'Tous', ''],
+  ['diecut', 'Die cut manquant', 'red'],
+  ['attente', 'Pack en attente de validation', 'orange'],
+  ['a_refaire', 'Pack à refaire', 'red'],
+  ['valide', 'Pack validé', 'green'],
+] as const;
+
+export const matchTrack = (p: Product, f: TrackFilter) => f === 'all' || (f === 'diecut' ? packTrack(p).dieCutMissing : packTrack(p).status === f);
+
 /** Fiches produit : Pilote, Direction et acheteurs */
 export const canEditProduct = (u: User) => u.active && ['pilote', 'direction', 'acheteur'].includes(u.role);
 

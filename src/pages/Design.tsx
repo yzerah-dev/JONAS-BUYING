@@ -3,10 +3,11 @@ import { Link } from 'react-router-dom';
 import { AlertTriangle, Box, Check, Download, FileText, Flame, History, Layers, Paperclip, Play, Scissors, Search, Send, X } from 'lucide-react';
 import PackFiles from '../components/PackFiles';
 import { pressable } from '../lib/a11y';
-import { brandOf, byId, capacityOf, packDone, packLate, useAuth, useStore, type State } from '../data/store';
+import { brandOf, byId, capacityOf, matchTrack, packDone, packLate, packTrack, TRACK_CHIPS, TRACK_ORDER, useAuth, useStore, type State, type TrackFilter } from '../data/store';
+import PackTrackDots from '../components/PackTrack';
 import type { Product } from '../data/types';
 import { VALIDATION_LABELS, VALIDATION_STEPS } from '../data/types';
-import { BrandLogo, ProductPic, Pill, ProductThumb, Tabs, ValidationCircuit, ValidationDot } from '../components/ui';
+import { BrandLogo, ProductPic, Pill, ProductThumb, Tabs, ValidationCircuit } from '../components/ui';
 import { designerColor, toast } from '../components/ui-shared';
 import { TODAY, addDays, fdate, fshort, fstamp, initials, weekKey, weekLabel, weekRange } from '../lib/format';
 
@@ -55,8 +56,8 @@ const sortPacks = (a: Product, b: Product) =>
   Number(packLate(b)) - Number(packLate(a)) || ORDER.indexOf(statusKey(a)) - ORDER.indexOf(statusKey(b)) || a.pack.artworkDeadline.localeCompare(b.pack.artworkDeadline);
 
 type GroupBy = 'none' | 'marque' | 'collection' | 'type' | 'fournisseur' | 'statut' | 'jour';
-type SortBy = 'priorite' | 'marque' | 'collection' | 'type' | 'echeance';
-const SORT_LABELS: Record<SortBy, string> = { priorite: 'Priorité', marque: 'Marque', collection: 'Collection', type: 'Type de pack', echeance: 'Échéance' };
+type SortBy = 'priorite' | 'pack' | 'marque' | 'collection' | 'type' | 'echeance';
+const SORT_LABELS: Record<SortBy, string> = { priorite: 'Priorité', pack: 'Statut du pack', marque: 'Marque', collection: 'Collection', type: 'Type de pack', echeance: 'Échéance' };
 const GROUP_LABELS: Record<GroupBy, string> = {
   none: 'Aucun',
   marque: 'Par marque',
@@ -91,6 +92,7 @@ function DesignPage() {
   const [designer, setDesigner] = useState(auth.user.designerName ?? 'all');
   const [week, setWeek] = useState(weekKey(TODAY));
   const [status, setStatus] = useState<StatusKey>('all');
+  const [track, setTrack] = useState<TrackFilter>('all');
   const [q, setQ] = useState('');
   const [groupBy, setGroupBy] = useState<GroupBy>('none');
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -104,6 +106,7 @@ function DesignPage() {
   const brandName = (p: Product) => brandOf(state.brands, p.brandId).name;
   const sorters: Record<SortBy, (a: Product, b: Product) => number> = {
     priorite: sortPacks,
+    pack: (a, b) => TRACK_ORDER[packTrack(a).status] - TRACK_ORDER[packTrack(b).status] || Number(packTrack(b).dieCutMissing) - Number(packTrack(a).dieCutMissing) || sortPacks(a, b),
     marque: (a, b) => brandName(a).localeCompare(brandName(b)) || sortPacks(a, b),
     collection: (a, b) => a.collection.localeCompare(b.collection) || sortPacks(a, b),
     type: (a, b) => a.pack.type.localeCompare(b.pack.type) || sortPacks(a, b),
@@ -117,6 +120,7 @@ function DesignPage() {
   const s = q.trim().toLowerCase();
   const list = scope
     .filter((p) => matches(p, status))
+    .filter((p) => matchTrack(p, track))
     .filter((p) => !s || `${p.ref} ${p.name} ${byId(state.suppliers, p.supplierId).name} ${brandOf(state.brands, p.brandId).name} ${p.collection} ${p.pack.type}`.toLowerCase().includes(s))
     .sort(sorters[sortBy]);
   const sel = list.find((p) => p.id === selId) ?? scope.find((p) => p.id === selId);
@@ -333,6 +337,16 @@ function DesignPage() {
             })}
           </div>
 
+          {/* Suivi pack : die cut manquant, en attente de validation, à refaire, validé */}
+          <div className="dev-trackbar pk-trackbar" role="group" aria-label="Suivi pack">
+            <span className="pk-trackbar-title">Suivi pack</span>
+            {TRACK_CHIPS.map(([k, label, cls]) => (
+              <button key={k} type="button" className={`pf-chip ${track === k ? 'active' : ''}`} aria-pressed={track === k} onClick={() => setTrack(k)}>
+                {cls && <span className={`dev-dot ${cls}`} />} {label} <b>{scope.filter((p) => matchTrack(p, k)).length}</b>
+              </button>
+            ))}
+          </div>
+
           <div className="pk-toolbar">
             <label className="pf-search pk-search">
               <Search size={18} />
@@ -444,7 +458,7 @@ function DesignPage() {
               <span className="pk-c-brand">Marque</span>
               <span className="pk-c-sup">Fournisseur</span>
               <span className="pk-c-type">Type de pack</span>
-              <span className="pk-c-val">D · Dir · M · F</span>
+              <span className="pk-c-val">Suivi pack</span>
               <span className="pk-c-due">Échéance</span>
               <span className="pk-c-st">Statut</span>
             </div>
@@ -586,9 +600,7 @@ function PackRow({
       <span className="pk-c-sup">{byId(state.suppliers, p.supplierId).shortName}</span>
       <span className="pk-c-type">{p.pack.type}</span>
       <span className="pk-c-val">
-        {VALIDATION_STEPS.map((st) => (
-          <ValidationDot key={st} state={p.pack.validations[st].state} />
-        ))}
+        <PackTrackDots p={p} />
       </span>
       <span className={`pk-c-due ${late ? 'red' : ''}`}>{fshort(p.pack.artworkDeadline)}</span>
       <span className="pk-c-st">

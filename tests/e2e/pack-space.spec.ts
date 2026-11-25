@@ -273,3 +273,22 @@ test('Développement : ronds de suivi du pack sur chaque ligne, filtre et tri pa
   await page.locator('#dev-sort').selectOption('pack');
   await expect(page.locator('#dev-sort')).toHaveValue('pack');
 });
+
+test('Espace Designer (ABIR) : suivi pack visible sur chaque ligne, filtre et tri', async ({ page }) => {
+  await resetApp(page);
+  await loginAs(page, 'ABIR');
+  await go(page, 'design');
+  const bar = page.getByRole('group', { name: 'Suivi pack' });
+  await expect(bar).toBeVisible();
+  for (const l of ['Die cut manquant', 'Pack en attente de validation', 'Pack à refaire', 'Pack validé']) await expect(bar).toContainText(l);
+  await expect(page.locator('.pk-row').first().locator('.dev-dot')).toHaveCount(4);
+  // Filtre « Pack validé » : chaque ligne a le rond vert
+  await bar.getByRole('button', { name: /Pack validé/ }).click();
+  const n = await page.locator('.pk-row').count();
+  expect(n).toBeGreaterThan(0);
+  await expect(page.locator('.pk-row .dev-dot[data-k="valide"].green')).toHaveCount(n);
+  // Tri par statut du pack
+  await bar.getByRole('button', { name: /^Tous/ }).click();
+  await page.locator('#pk-sort').selectOption('pack');
+  await expect(page.locator('#pk-sort')).toHaveValue('pack');
+});
