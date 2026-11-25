@@ -164,3 +164,23 @@ test.describe('Espace Designer – démarrage des packs', () => {
     await expect(page.locator('.pk-row', { hasText: ref }).locator('.pk-c-st')).toContainText('prévu 17 nov.');
   });
 });
+
+test('Développement = une seule page : ancienne adresse redirigée, PUSH URGENT, marquer développé', async ({ page }) => {
+  await resetApp(page);
+  await loginAs(page, 'David');
+  await go(page, 'developpement');
+  await expect(page).toHaveURL(/#\/design$/);
+  await expect(page.locator('h1').first()).toHaveText('Développement');
+  // Filtre PUSH URGENT
+  await page.locator('.pk-row').first().click();
+  const ref = (await page.locator('.pk-row.active b').first().innerText()).trim();
+  await page.getByRole('button', { name: 'Push urgent', exact: true }).last().click();
+  await expect(toast(page)).toContainText(`${ref} poussé en urgent`);
+  await page.locator('.pk-chip', { hasText: 'PUSH URGENT' }).click();
+  await expect(page.locator('.pk-row', { hasText: ref })).toHaveCount(1);
+  // Marquer développé depuis le panneau
+  await page.locator('.pk-row', { hasText: ref }).click();
+  await page.getByRole('button', { name: 'Marquer développé' }).click();
+  await expect(toast(page)).toContainText(`${ref} marqué comme développé`);
+});
+

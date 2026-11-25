@@ -15,7 +15,6 @@ const ProformaDetail = lazy(() => import('./pages/ProformaDetail'));
 const Products = lazy(() => import('./pages/Products'));
 const ProductDetail = lazy(() => import('./pages/ProductDetail'));
 const ProductListsPage = lazy(() => import('./pages/ProductListsPage'));
-const Development = lazy(() => import('./pages/Development'));
 const Design = lazy(() => import('./pages/Design'));
 const Containers = lazy(() => import('./pages/Containers'));
 const Suppliers = lazy(() => import('./pages/Suppliers'));
@@ -52,7 +51,8 @@ export default function App() {
             <Route path="produits" element={page(<Products />)} />
             <Route path="listes" element={page(<ProductListsPage />)} />
             <Route path="produits/:id" element={page(<ProductDetail />)} />
-            <Route path="developpement" element={page(<Development />)} />
+            {/* Une seule page Développement (ex-Espace Designer) */}
+            <Route path="developpement" element={<Navigate to="/design" replace />} />
             <Route path="design" element={page(<Design />)} />
             <Route path="conteneurs" element={page(<Containers />)} />
             <Route path="fournisseurs" element={page(<Suppliers />)} />

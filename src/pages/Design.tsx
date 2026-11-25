@@ -26,9 +26,10 @@ function proformaOf(s: State, p: Product) {
 }
 
 
-type StatusKey = 'all' | 'retard' | 'a_traiter' | 'en_creation' | 'a_valider' | 'en_validation' | 'a_envoyer' | 'fournisseur' | 'valide';
+type StatusKey = 'all' | 'urgent' | 'retard' | 'a_traiter' | 'en_creation' | 'a_valider' | 'en_validation' | 'a_envoyer' | 'fournisseur' | 'valide';
 const STATUS_CHIPS: { id: StatusKey; label: string }[] = [
   { id: 'all', label: 'Tous' },
+  { id: 'urgent', label: 'PUSH URGENT' },
   { id: 'retard', label: 'En retard' },
   { id: 'a_traiter', label: 'Pas commencés' },
   { id: 'en_creation', label: 'En création' },
@@ -49,7 +50,7 @@ const LABEL_TO_KEY: Record<string, StatusKey> = {
   'Chez fournisseur': 'fournisseur',
 };
 const statusKey = (p: Product) => LABEL_TO_KEY[packStatus(p)[0]];
-const matches = (p: Product, k: StatusKey) => k === 'all' || (k === 'retard' ? packLate(p) : statusKey(p) === k);
+const matches = (p: Product, k: StatusKey) => k === 'all' || (k === 'urgent' ? !!p.urgent : k === 'retard' ? packLate(p) : statusKey(p) === k);
 // Ordre de traitement : retards d'abord, puis par avancement, puis par date
 const ORDER: StatusKey[] = ['a_traiter', 'en_creation', 'a_valider', 'en_validation', 'a_envoyer', 'fournisseur', 'valide'];
 const sortPacks = (a: Product, b: Product) =>
@@ -216,7 +217,7 @@ function DesignPage() {
   return (
     <div className="pf-page">
       <div className="row wrap" style={{ gap: 16 }}>
-        <h1 className="pf-title">Espace Designer</h1>
+        <h1 className="pf-title">Développement</h1>
         <span className="muted">
           Capacité par défaut : {state.settings.defaultCapacity} packs / designer / semaine{auth.can('users.manage') ? ' (réglable dans Paramètres)' : ''}
         </span>
@@ -846,6 +847,18 @@ function PackPanel({ p }: { p: Product }) {
             <Flame size={15} /> {p.urgent ? 'Retirer de l’urgent' : 'Push urgent'}
           </button>
         )}
+        {auth.allowed({ type: 'markDeveloped', productId: p.id }) && !p.developed && (
+          <button
+            className="btn"
+            onClick={() => {
+              dispatch({ type: 'markDeveloped', productId: p.id });
+              toast(`${p.ref} marqué comme développé`);
+            }}
+          >
+            <Check size={15} /> Marquer développé
+          </button>
+        )}
+        {p.developed && <span className="pill green">Produit développé</span>}
       </div>
       {!done && pendingStep && !auth.allowed({ type: 'validatePack', productId: p.id }) && (
         <div className="small muted mt">

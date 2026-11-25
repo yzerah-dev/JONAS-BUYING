@@ -8,7 +8,9 @@ test.describe('Rôles et visibilité des modules', () => {
   test('le designer ne voit que ses modules et est bloqué hors périmètre', async ({ page }) => {
     await loginAs(page, 'ABIR');
     const nav = await sidebarItems(page);
-    expect(nav).toEqual(expect.arrayContaining(['Développement', 'Design', 'Performance', 'Paramètres']));
+    expect(nav).toEqual(expect.arrayContaining(['Développement', 'Performance', 'Paramètres']));
+    // Une seule page : plus d'entrée « Design » séparée
+    expect(nav).not.toContain('Design');
     expect(nav).not.toContain('Proformas');
     expect(nav).not.toContain('Factures & Finance');
 
@@ -21,7 +23,7 @@ test.describe('Rôles et visibilité des modules', () => {
     const nav = await sidebarItems(page);
     expect(nav).toEqual(expect.arrayContaining(['Proformas', 'Conteneurs', 'Fournisseurs']));
     expect(nav).not.toContain('Factures & Finance');
-    expect(nav).not.toContain('Design');
+    expect(nav).not.toContain('Développement');
 
     await go(page, 'proformas/PF-2026-0143');
     await expect(page.getByRole('button', { name: 'Suivi & Logistique' })).toBeVisible();
@@ -36,7 +38,7 @@ test.describe('Rôles et visibilité des modules', () => {
     const nav = await sidebarItems(page);
     expect(nav).toEqual(expect.arrayContaining(['Proformas', 'Factures & Finance']));
     expect(nav).not.toContain('Conteneurs');
-    expect(nav).not.toContain('Design');
+    expect(nav).not.toContain('Développement');
 
     await go(page, 'finance');
     await expect(page.getByRole('button', { name: /Marquer payé/ }).first()).toBeVisible();
