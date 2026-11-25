@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Calendar, Check, ChevronDown, ChevronUp, Flame, Search, Users } from 'lucide-react';
 import { brandOf, byId, capacityOf, packTrack, matchTrack, TRACK_CHIPS, TRACK_ORDER, useAuth, useStore, type TrackFilter, type State } from '../data/store';
-import PackTrackDots from '../components/PackTrack';
+import PackTrackDots, { TrackRound } from '../components/PackTrack';
 import type { Product } from '../data/types';
 import { BrandLogo, Pill, ProductThumb, PA } from '../components/ui';
 import { designerColor, toast } from '../components/ui-shared';
@@ -183,9 +183,9 @@ function DevelopmentPage() {
 
       {/* Suivi du pack : filtre par statut */}
       <div className="dev-trackbar" role="group" aria-label="Suivi pack">
-        {TRACK_CHIPS.map(([k, label, cls]) => (
+        {TRACK_CHIPS.map(([k, label]) => (
           <button key={k} type="button" className={`pf-chip ${track === k ? 'active' : ''}`} aria-pressed={track === k} onClick={() => setTrack(k)}>
-            {cls && <span className={`dev-dot ${cls}`} />} {label} <b>{trackCount(k)}</b>
+            {k !== 'all' && <TrackRound k={k} />} {label} <b>{trackCount(k)}</b>
           </button>
         ))}
       </div>

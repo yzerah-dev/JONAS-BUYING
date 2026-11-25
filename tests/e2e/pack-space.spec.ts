@@ -257,17 +257,18 @@ test('Développement : ronds de suivi du pack sur chaque ligne, filtre et tri pa
   const bar = page.getByRole('group', { name: 'Suivi pack' });
   for (const l of ['Die cut manquant', 'Pack en attente de validation', 'Pack à refaire', 'Pack validé']) await expect(bar).toContainText(l);
   const line = page.locator('.dev-line').first();
-  await expect(line.locator('.dev-track .dev-dot')).toHaveCount(4);
+  await expect(line.locator('.trk-list .trk-label').first()).toBeVisible();
   // Filtre : die cut manquant → chaque ligne a le rond rouge du die cut
   const n = Number(await bar.getByRole('button', { name: /Die cut manquant/ }).locator('b').innerText());
   await bar.getByRole('button', { name: /Die cut manquant/ }).click();
   expect(n).toBeGreaterThan(0);
   await expect(page.locator('.dev-line:not(.done)').first()).toBeVisible();
-  await expect(page.locator('.dev-line:not(.done) .dev-dot[data-k="diecut"]:not(.red)')).toHaveCount(0);
+  const shown = await page.locator('.dev-line:not(.done)').count();
+  await expect(page.locator('.dev-line:not(.done) .trk[data-k="diecut"]')).toHaveCount(shown);
   // Filtre : pack en attente de validation
   await bar.getByRole('button', { name: /Pack en attente de validation/ }).click();
   const m = await page.locator('.dev-line:not(.done)').count();
-  if (m) await expect(page.locator('.dev-line:not(.done) .dev-dot[data-k="attente"].orange')).toHaveCount(m);
+  if (m) await expect(page.locator('.dev-line:not(.done) .trk[data-k="attente"]')).toHaveCount(m);
   // Tri par statut du pack
   await bar.getByRole('button', { name: /^Tous/ }).click();
   await page.locator('#dev-sort').selectOption('pack');
@@ -281,12 +282,13 @@ test('Espace Designer (ABIR) : suivi pack visible sur chaque ligne, filtre et tr
   const bar = page.getByRole('group', { name: 'Suivi pack' });
   await expect(bar).toBeVisible();
   for (const l of ['Die cut manquant', 'Pack en attente de validation', 'Pack à refaire', 'Pack validé']) await expect(bar).toContainText(l);
-  await expect(page.locator('.pk-row').first().locator('.dev-dot')).toHaveCount(4);
+  await expect(page.locator('.pk-row').first().locator('.trk-list .trk-label').first()).toBeVisible();
   // Filtre « Pack validé » : chaque ligne a le rond vert
   await bar.getByRole('button', { name: /Pack validé/ }).click();
   const n = await page.locator('.pk-row').count();
   expect(n).toBeGreaterThan(0);
-  await expect(page.locator('.pk-row .dev-dot[data-k="valide"].green')).toHaveCount(n);
+  await expect(page.locator('.pk-row .trk[data-k="valide"]')).toHaveCount(n);
+  await expect(page.locator('.pk-row').first()).toContainText('Pack validé');
   // Tri par statut du pack
   await bar.getByRole('button', { name: /^Tous/ }).click();
   await page.locator('#pk-sort').selectOption('pack');

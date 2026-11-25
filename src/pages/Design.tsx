@@ -4,7 +4,7 @@ import { AlertTriangle, Box, Check, Download, FileText, Flame, History, Layers, 
 import PackFiles from '../components/PackFiles';
 import { pressable } from '../lib/a11y';
 import { brandOf, byId, capacityOf, matchTrack, packDone, packLate, packTrack, TRACK_CHIPS, TRACK_ORDER, useAuth, useStore, type State, type TrackFilter } from '../data/store';
-import PackTrackDots from '../components/PackTrack';
+import PackTrackDots, { TrackRound } from '../components/PackTrack';
 import type { Product } from '../data/types';
 import { VALIDATION_LABELS, VALIDATION_STEPS } from '../data/types';
 import { BrandLogo, ProductPic, Pill, ProductThumb, Tabs, ValidationCircuit } from '../components/ui';
@@ -340,9 +340,9 @@ function DesignPage() {
           {/* Suivi pack : die cut manquant, en attente de validation, à refaire, validé */}
           <div className="dev-trackbar pk-trackbar" role="group" aria-label="Suivi pack">
             <span className="pk-trackbar-title">Suivi pack</span>
-            {TRACK_CHIPS.map(([k, label, cls]) => (
+            {TRACK_CHIPS.map(([k, label]) => (
               <button key={k} type="button" className={`pf-chip ${track === k ? 'active' : ''}`} aria-pressed={track === k} onClick={() => setTrack(k)}>
-                {cls && <span className={`dev-dot ${cls}`} />} {label} <b>{scope.filter((p) => matchTrack(p, k)).length}</b>
+                {k !== 'all' && <TrackRound k={k} />} {label} <b>{scope.filter((p) => matchTrack(p, k)).length}</b>
               </button>
             ))}
           </div>

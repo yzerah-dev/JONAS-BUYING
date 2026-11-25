@@ -1764,3 +1764,22 @@ select.pi-input { cursor: pointer; }
 .pk-c-val .dev-track small { font-size: 11px; }
 .pk-c-val { overflow: hidden; min-width: 0; }
 .pk-c-val .dev-track small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+
+/* Suivi pack : gros ronds avec le statut écrit */
+.trk-list { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.trk { display: inline-flex; align-items: center; gap: 7px; min-width: 0; font-size: 12.5px; font-weight: 700; line-height: 1.15; }
+.trk-round { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; color: #fff; }
+.trk-label { min-width: 0; }
+.trk.green .trk-round { background: var(--green); }
+.trk.green { color: var(--green-dark); }
+.trk.orange .trk-round { background: #f59e0b; }
+.trk.orange { color: #b45309; }
+.trk.red .trk-round { background: #dc2626; }
+.trk.red { color: #b91c1c; }
+.trk.grey .trk-round { background: #cfd6d3; color: #4b5563; }
+.trk.grey { color: var(--muted); }
+.pf-chip .trk-round { width: 22px; height: 22px; }
+.pf-chip.active .trk-round { box-shadow: 0 0 0 2px #fff; }
+.pk-c-val .trk-list { padding: 4px 0; }
+.dev-line .trk-list { width: 190px; flex: none; }
+@media (max-width: 760px) { .trk-label { display: none; } .dev-line .trk-list { width: auto; flex-direction: row; } }
