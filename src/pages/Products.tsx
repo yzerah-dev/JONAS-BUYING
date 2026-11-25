@@ -5,6 +5,7 @@ import { brandOf, byId, packState, productQuantities, useStore } from '../data/s
 import { BrandLogo, ProductPic, PackPill, Pill, ProductThumb, Seg } from '../components/ui';
 import { eur2, num, weekLabel } from '../lib/format';
 import Combobox from '../components/Combobox';
+import PhotoImport from '../components/PhotoImport';
 
 export default function Products() {
   const { state } = useStore();
@@ -40,6 +41,7 @@ export default function Products() {
         <h1>Total – Tous les produits</h1>
         <span className="pill green">{state.products.length} références</span>
         <div className="grow" />
+        <PhotoImport products={state.products} />
         <Seg
           value={mode}
           onChange={setMode}

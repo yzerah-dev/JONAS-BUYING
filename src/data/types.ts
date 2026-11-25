@@ -121,8 +121,10 @@ export interface Product {
   material: string;
   sizes?: string;
   emoji: string;
-  /** Photo du produit (stockage des fichiers) ; à défaut, le pictogramme */
+  /** Photo principale du produit (stockage des fichiers) ; à défaut, le pictogramme */
   photo?: ProductPhoto;
+  /** Autres photos (galerie : dos, détail, packaging…) */
+  photos?: ProductPhoto[];
   tint: string;
   pa: number; // prix d'achat unitaire €
   pcb: number; // pièces par carton

@@ -1564,3 +1564,18 @@ button.fw-doc.missing:hover { background: var(--red); color: #fff; }
   flex: none;
   background: #fff;
 }
+
+/* Galerie photo de la fiche produit */
+.gallery-box { display: grid; gap: 8px; justify-items: center; width: 240px; }
+.gal-main { width: 240px; height: 180px; font-size: 110px; outline: 2px dashed transparent; outline-offset: 3px; transition: outline-color 0.15s; }
+.gal-main.over { outline-color: var(--green); }
+.gal-over { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(18, 137, 108, 0.82); color: #fff; font-size: 15px; font-weight: 800; }
+.gal-badge { position: absolute; left: 6px; top: 6px; background: var(--green); color: #fff; font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 999px; }
+.gal-strip { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.gal-thumb { width: 44px; height: 44px; border-radius: 8px; border: 2px solid var(--line, #e3e7e5); background: #fff; padding: 0; overflow: hidden; cursor: pointer; display: grid; place-items: center; color: var(--green-dark); }
+.gal-thumb img { width: 100%; height: 100%; object-fit: contain; }
+.gal-thumb.active { border-color: var(--green); }
+.gal-add { border-style: dashed; }
+.pi-table { max-height: 300px; overflow: auto; border: 1px solid var(--line, #e3e7e5); border-radius: 8px; }
+.pi-table .pi-ko td { background: #fff5f5; }
+@media (max-width: 640px) { .gallery-box, .gal-main { width: 100%; } }

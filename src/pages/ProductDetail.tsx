@@ -34,7 +34,7 @@ import {
 import { DEV_STAGES, type Product } from '../data/types';
 import { SITES } from '../data/seed';
 import PackFiles from '../components/PackFiles';
-import ProductPhotoEdit from '../components/ProductPhotoEdit';
+import ProductGallery from '../components/ProductGallery';
 import { BrandLogo, ProductPic, ContainerStatusPill, PackPill, Pill, ProformaStatusPill, Progress, Tabs, ValidationCircuit } from '../components/ui';
 import { toast } from '../components/ui-shared';
 import { dec, eur, eur2, fdate, fshort, num, weekLabel } from '../lib/format';
@@ -73,12 +73,7 @@ export default function ProductDetail() {
       </div>
 
       <div className="card pad row wrap gap-lg">
-        <div className="col" style={{ gap: 6, alignItems: 'center' }}>
-          <div className="thumb" style={{ width: 220, height: 160, background: p.tint, fontSize: 110 }}>
-            <ProductPic product={p} />
-          </div>
-          <ProductPhotoEdit product={p} />
-        </div>
+        <ProductGallery product={p} />
         <BrandLogo brand={brand} size={20} />
         <div className="col" style={{ gap: 8 }}>
           <h2 style={{ fontSize: 26, color: 'var(--green-dark)' }}>{p.name}</h2>

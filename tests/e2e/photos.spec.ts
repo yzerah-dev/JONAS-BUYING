@@ -185,29 +185,122 @@ for (const kind of ['xls', 'xlsx'] as const) {
   });
 }
 
-test('photo ajoutée à la main : fiche produit (JONAS) et portail (fournisseur), retirée ensuite', async ({ page }) => {
+test('noms de fichiers → produits : réf. JONAS, suffixes, EAN, réf. fournisseur, inconnus et formats refusés', async () => {
+  const { matchPhotoFiles } = await import('../../src/lib/productPhotos');
+  const P = (ref: string, ean: string, supplierRef?: string) => ({ id: ref, ref, ean, supplierRef }) as never;
+  const products = [P('LTM007', '3701571431633', '71726'), P('CP-T001', '3700000000017', 'T-88')];
+  const f = (name: string, type = 'image/jpeg') => new File([new Uint8Array(10)], name, { type });
+  const m = matchPhotoFiles(
+    [f('LTM007-2.jpg'), f('LTM007.jpg'), f('ltm007_dos.png'), f('CP-T001 (3).webp'), f('3700000000017.jpg'), f('71726.jpg'), f('inconnu.jpg'), f('CP-T001.pdf', 'application/pdf')],
+    products,
+  );
+  const got = m.map((x) => [x.file.name, (x.product as { ref?: string } | undefined)?.ref ?? null, x.by ?? null, x.problem ?? null]);
+  // Photo sans suffixe d'abord : elle devient la principale
+  const names = got.map((g) => g[0]);
+  expect(names.indexOf('LTM007.jpg')).toBeLessThan(names.indexOf('LTM007-2.jpg'));
+  expect([...got].sort((a, b) => String(a[0]).localeCompare(String(b[0])))).toEqual([
+    ['3700000000017.jpg', 'CP-T001', 'ean', null],
+    ['71726.jpg', 'LTM007', 'refFournisseur', null],
+    ['CP-T001 (3).webp', 'CP-T001', 'ref', null],
+    ['CP-T001.pdf', 'CP-T001', 'ref', 'type'],
+    ['inconnu.jpg', null, null, null],
+    ['LTM007.jpg', 'LTM007', 'ref', null],
+    ['LTM007-2.jpg', 'LTM007', 'ref', null],
+    ['ltm007_dos.png', 'LTM007', 'ref', null],
+  ].sort((a, b) => String(a[0]).localeCompare(String(b[0]))));
+});
+
+const photoCount = (page: import('@playwright/test').Page, ref: string) =>
+  page.evaluate((ref) => {
+    const k = Object.keys(localStorage).find((x) => x.startsWith('jonas-buying-state'))!;
+    const p = (JSON.parse(localStorage.getItem(k)!).products as { ref: string; photo?: { fileId: string }; photos?: unknown[] }[]).find((x) => x.ref === ref)!;
+    return { total: (p.photo ? 1 : 0) + (p.photos?.length ?? 0), main: p.photo?.fileId ?? '' };
+  }, ref);
+
+test('galerie de la fiche produit : plusieurs photos, glisser-déposer, photo principale, suppression', async ({ page }) => {
   await resetApp(page);
   await loginAs(page, 'David');
   await go(page, 'produits/CP-T001');
-  await expect(page.locator('main .thumb img.product-pic')).toHaveCount(0);
-  await page.getByLabel('Ajouter une photo CP-T001').setInputFiles({ name: 'tong.png', mimeType: 'image/png', buffer: PINK });
-  await expect(toast(page)).toContainText('Photo enregistrée pour CP-T001');
-  await expect(page.locator('main .thumb img.product-pic').first()).toBeVisible();
-  // Liste des produits : la photo aussi
-  await go(page, 'produits');
-  await expect(page.locator('main img.product-pic').first()).toBeVisible();
-  // Mauvais format refusé
-  await go(page, 'produits/CP-T001');
-  await page.getByLabel('Changer la photo CP-T001').setInputFiles({ name: 'tong.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF') });
+  await expect(page.locator('main .gal-main img')).toHaveCount(0);
+  // Plusieurs photos d'un coup (bouton +)
+  await page.getByLabel('Ajouter des photos CP-T001').setInputFiles([
+    { name: 'face.png', mimeType: 'image/png', buffer: PINK },
+    { name: 'dos.png', mimeType: 'image/png', buffer: GREY },
+  ]);
+  await expect(toast(page)).toContainText('2 photo(s) ajoutée(s) pour CP-T001');
+  await expect(page.locator('main .gal-thumb img')).toHaveCount(2);
+  await expect(page.locator('main .gal-main img.product-pic')).toBeVisible();
+  const first = await photoCount(page, 'CP-T001');
+  expect(first.total).toBe(2);
+
+  // Glisser-déposer une photo sur le grand cadre
+  const dt = await page.evaluateHandle((b64) => {
+    const d = new DataTransfer();
+    d.items.add(new File([Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))], 'detail.png', { type: 'image/png' }));
+    return d;
+  }, PINK.toString('base64'));
+  await page.locator('main .gal-main').dispatchEvent('dragover', { dataTransfer: dt });
+  await expect(page.locator('main .gal-over')).toBeVisible();
+  await page.locator('main .gal-main').dispatchEvent('drop', { dataTransfer: dt });
+  await expect(toast(page)).toContainText('1 photo(s) ajoutée(s) pour CP-T001');
+  await expect(page.locator('main .gal-thumb img')).toHaveCount(3);
+
+  // La 2e photo devient la principale
+  await page.getByRole('button', { name: 'Photo 2' }).click();
+  await page.getByRole('button', { name: 'Photo principale' }).click();
+  await expect(toast(page)).toContainText('Photo principale changée pour CP-T001');
+  const after = await photoCount(page, 'CP-T001');
+  expect(after.main).not.toBe(first.main);
+  expect(after.total).toBe(3);
+  // Format refusé
+  await page.getByLabel('Ajouter des photos CP-T001').setInputFiles({ name: 'fiche.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF') });
   await expect(toast(page)).toContainText('Photo : JPG, PNG, WEBP ou GIF');
+  // Suppression de la photo affichée
   await page.getByLabel('Retirer la photo CP-T001').click();
   await expect(toast(page)).toContainText('Photo retirée pour CP-T001');
-  await expect(page.locator('main .thumb img.product-pic')).toHaveCount(0);
+  expect((await photoCount(page, 'CP-T001')).total).toBe(2);
 
-  // Le fournisseur ajoute la photo de son produit depuis son portail
+  // Liste des produits : la photo principale
+  await go(page, 'produits');
+  await expect(page.locator('main img.product-pic').first()).toBeVisible();
+});
+
+test('import de photos en lot : JONAS (tout le catalogue) et fournisseur (ses produits seulement)', async ({ page }) => {
+  await resetApp(page);
+  const ean = await page.evaluate(() => {
+    const k = Object.keys(localStorage).find((x) => x.startsWith('jonas-buying-state'))!;
+    return (JSON.parse(localStorage.getItem(k)!).products as { ref: string; ean: string }[]).find((x) => x.ref === 'AB-M026')!.ean;
+  });
+  await loginAs(page, 'David');
+  await go(page, 'produits');
+  await page.getByRole('button', { name: 'Importer des photos' }).click();
+  const dlg = page.getByRole('dialog', { name: 'Importer des photos en lot' });
+  await dlg.getByLabel('Importer des photos en lot').setInputFiles([
+    { name: 'CP-T001.png', mimeType: 'image/png', buffer: PINK },
+    { name: 'CP-T001-2.png', mimeType: 'image/png', buffer: GREY },
+    { name: `${ean}.png`, mimeType: 'image/png', buffer: PINK },
+    { name: 'photo-vacances.jpg', mimeType: 'image/jpeg', buffer: GREY },
+  ]);
+  await expect(dlg).toContainText('3 photo(s) reconnue(s) pour 2 produit(s) · 1 non reconnue(s)');
+  await expect(dlg.locator('tr', { hasText: `${ean}.png` })).toContainText('AB-M026');
+  await expect(dlg.locator('tr', { hasText: 'photo-vacances.jpg' })).toContainText('Non reconnu');
+  await dlg.getByRole('button', { name: 'Importer 3 photo(s)' }).click();
+  await expect(toast(page)).toContainText('3 photo(s) importée(s) pour 2 produit(s)');
+  expect((await photoCount(page, 'CP-T001')).total).toBe(2);
+  expect((await photoCount(page, 'AB-M026')).total).toBe(1);
+
+  // Fournisseur Tide : un produit d'un autre fournisseur n'est pas reconnu
   await loginAs(page, 'Tide');
   await go(page, 'portail/produits');
-  await page.getByLabel('Ajouter une photo CP-T001').setInputFiles({ name: 'tong.png', mimeType: 'image/png', buffer: GREY });
-  await expect(toast(page)).toContainText('Photo enregistrée pour CP-T001');
-  await expect(page.locator('main tr', { hasText: 'CP-T001' }).locator('img.product-pic')).toBeVisible();
+  await page.getByRole('button', { name: 'Importer des photos' }).click();
+  const d2 = page.getByRole('dialog', { name: 'Importer des photos en lot' });
+  await d2.getByLabel('Importer des photos en lot').setInputFiles([
+    { name: 'CP-C042.png', mimeType: 'image/png', buffer: PINK },
+    { name: 'AB-M026.png', mimeType: 'image/png', buffer: GREY },
+  ]);
+  await expect(d2).toContainText('1 photo(s) reconnue(s) pour 1 produit(s) · 1 non reconnue(s)');
+  await d2.getByRole('button', { name: 'Importer 1 photo(s)' }).click();
+  await expect(toast(page)).toContainText('1 photo(s) importée(s) pour 1 produit(s)');
+  await expect(page.locator('main tr', { hasText: 'CP-C042' }).locator('img.product-pic')).toBeVisible();
+  expect((await photoCount(page, 'AB-M026')).total).toBe(1);
 });

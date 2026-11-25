@@ -22,6 +22,7 @@ import {
   brandOf,
 } from '../data/store';
 import ProductPhotoEdit from '../components/ProductPhotoEdit';
+import PhotoImport from '../components/PhotoImport';
 import { BrandLogo, ContainerStatusPill, Kpi, PackPill, Pill, ProductThumb, ProformaStatusPill, Ring, Seg, ValidationCircuit } from '../components/ui';
 import { toast } from '../components/ui-shared';
 import type { Proforma } from '../data/types';
@@ -131,6 +132,8 @@ export function PortalProducts() {
     <>
       <div className="page-head">
         <h1>{t('products.title', { n: products.length })}</h1>
+        <div className="grow" />
+        <PhotoImport products={products} />
       </div>
       <div className="grid2 mb">
         <div className="card pad row gap-lg">
@@ -180,7 +183,7 @@ export function PortalProducts() {
                 <td>
                   <div className="row" style={{ gap: 6 }}>
                     <ProductThumb product={p} size={40} />
-                    <ProductPhotoEdit product={p} compact />
+                    <ProductPhotoEdit product={p} />
                   </div>
                 </td>
                 <td>{p.name}</td>

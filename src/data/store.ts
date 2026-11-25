@@ -175,6 +175,10 @@ export type Action =
   | { type: 'advanceDev'; productId: string }
   | { type: 'toggleUrgent'; productId: string }
   | { type: 'setProductPhoto'; productId: string; photo: ProductPhoto | null }
+  /** Galerie complète d'un produit : la première photo est la principale */
+  | { type: 'setProductPhotos'; productId: string; photos: ProductPhoto[] }
+  /** Import de photos en lot : ajoutées à la galerie de chaque produit (principale si le produit n'en a pas) */
+  | { type: 'addProductPhotos'; items: { productId: string; photos: ProductPhoto[] }[] }
   | { type: 'markDeveloped'; productId: string }
   | { type: 'reassignPack'; productId: string; designer?: string; weekOf?: ISODate }
   | { type: 'startPack'; productId: string }
@@ -287,13 +291,11 @@ export function isAllowed(s: State, a: Action): boolean {
       if (isSupplier(u)) return p.supplierId === u.supplierId && p.pack.validations.fournisseur.state === 'pending' && p.pack.sentToSupplier;
       return can(u, 'pack.reject');
     }
-    case 'setProductPhoto': {
-      // Équipe JONAS (hors finance) ; un fournisseur pour ses produits
-      const p = s.products.find((x) => x.id === a.productId);
-      if (!p || !u.active) return false;
-      if (isSupplier(u)) return p.supplierId === u.supplierId;
-      return !['transitaire', 'finance'].includes(u.role);
-    }
+    case 'setProductPhoto':
+    case 'setProductPhotos':
+      return canEditPhotos(s, u, a.productId);
+    case 'addProductPhotos':
+      return a.items.length > 0 && a.items.every((i) => canEditPhotos(s, u, i.productId));
     case 'addPackFiles':
     case 'removePackFile':
     case 'startPack':
@@ -1405,7 +1407,13 @@ function applyAction(s: State, a: Action): State {
     case 'planPack':
       return mapP(s, a.productId, (p) => ({ ...p, pack: { ...p.pack, plannedStart: a.date ?? undefined } }));
     case 'setProductPhoto':
-      return mapP(s, a.productId, (p) => ({ ...p, photo: a.photo ?? undefined }));
+      return mapP(s, a.productId, (p) => withPhotos(p, a.photo ? [a.photo, ...allPhotos(p).slice(1)] : allPhotos(p).slice(1)));
+    case 'setProductPhotos':
+      return mapP(s, a.productId, (p) => withPhotos(p, a.photos));
+    case 'addProductPhotos': {
+      const add = new Map(a.items.map((i) => [i.productId, i.photos]));
+      return { ...s, products: s.products.map((p) => (add.has(p.id) ? withPhotos(p, [...allPhotos(p), ...add.get(p.id)!]) : p)) };
+    }
     case 'addPackFiles':
       return mapP(s, a.productId, (p) => {
         const files = p.pack.files ?? [];
@@ -1516,6 +1524,12 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
       return { target: a.id, text: 'Commande JONAS annulée avant proforma' };
     case 'setProductPhoto':
       return { target: a.productId, text: a.photo ? 'Photo du produit ajoutée' : 'Photo du produit retirée' };
+    case 'setProductPhotos':
+      return { target: a.productId, text: `Photos du produit : ${a.photos.length}` };
+    case 'addProductPhotos': {
+      const n = a.items.reduce((t, i) => t + i.photos.length, 0);
+      return { target: a.items.length === 1 ? a.items[0].productId : undefined, text: `${n} photo(s) importée(s) pour ${a.items.length} produit(s)` };
+    }
     case 'setSupplierTerms':
       return { text: `${s.suppliers.find((x) => x.id === a.supplierId)?.shortName} : devise ${a.terms.currency}, acompte ${a.terms.depositPct} %, solde J+${a.terms.balanceDays}` };
     case 'requestSplit':
@@ -1687,6 +1701,22 @@ export const CONTAINER_STATUS_LABEL: Record<ContainerStatus, string> = {
 
 // ---------------------------------------------------------------------------
 // Sélecteurs / règles de calcul
+
+/** Photos d'un produit, la principale en premier */
+export const allPhotos = (p: Pick<Product, 'photo' | 'photos'>): ProductPhoto[] => [...(p.photo ? [p.photo] : []), ...(p.photos ?? [])];
+/** Produit avec cette galerie (doublons retirés ; la première devient la principale) */
+function withPhotos(p: Product, list: ProductPhoto[]): Product {
+  const seen = new Set<string>();
+  const uniq = list.filter((x) => !seen.has(x.fileId) && seen.add(x.fileId));
+  return { ...p, photo: uniq[0], photos: uniq.length > 1 ? uniq.slice(1) : undefined };
+}
+/** Photos d'un produit : équipe JONAS (hors finance et transitaires) ; un fournisseur pour ses produits */
+function canEditPhotos(s: State, u: User, productId: string) {
+  const p = s.products.find((x) => x.id === productId);
+  if (!p || !u.active) return false;
+  if (isSupplier(u)) return p.supplierId === u.supplierId;
+  return !['transitaire', 'finance'].includes(u.role);
+}
 
 export const byId = <T extends { id: string }>(list: T[], id: string) => list.find((x) => x.id === id)!;
 /** Marque d'un produit ; une marque absente de la liste (base vierge) s'affiche sans bloquer l'écran */
