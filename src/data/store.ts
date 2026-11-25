@@ -50,7 +50,7 @@ export const DEFAULT_SETTINGS: Settings = {
   defaultCapacity: 40,
   capacity: {},
   fx: { EUR: 1, USD: 0.93, CNY: 0.128 },
-  company: { name: 'JONAS INTERNATIONAL', address: '189 rue d\'Aubervilliers', city: '75018 Paris', vat: '', gs1Prefix: DEFAULT_GS1 },
+  company: { name: 'JONAS INTERNATIONAL', address: '189 rue d\'Aubervilliers', city: '75018 Paris', vat: 'FR50842235913', gs1Prefix: DEFAULT_GS1 },
 };
 
 /** Version de l'adresse société par défaut : une hausse réapplique l'adresse par défaut aux navigateurs existants */
