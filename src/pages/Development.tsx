@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Calendar, Check, ChevronDown, ChevronUp, Flame, Search, Users } from 'lucide-react';
-import { brandOf, byId, capacityOf, useAuth, useStore, type State } from '../data/store';
+import { brandOf, byId, capacityOf, PACK_TRACK_LABELS, packTrack, useAuth, useStore, type PackTrack, type State } from '../data/store';
 import type { Product } from '../data/types';
 import { BrandLogo, Pill, ProductThumb, PA } from '../components/ui';
 import { designerColor, toast } from '../components/ui-shared';
@@ -9,6 +9,30 @@ import { pressable } from '../lib/a11y';
 import { TODAY, diffDays, fshort, fstamp, initials, num, weekKey, weekLabel, weekRange } from '../lib/format';
 
 type Tab = 'designer' | 'semaine' | 'urgent';
+/** Filtres du suivi pack */
+type TrackFilter = 'all' | 'diecut' | PackTrack;
+const TRACK_ORDER: Record<PackTrack, number> = { a_refaire: 0, attente: 1, a_faire: 2, valide: 3 };
+const matchTrack = (p: Product, f: TrackFilter) => f === 'all' || (f === 'diecut' ? packTrack(p).dieCutMissing : packTrack(p).status === f);
+
+/** Ronds de suivi du pack sur la ligne : die cut manquant, en attente de validation, à refaire, validé */
+function PackTrackDots({ p }: { p: Product }) {
+  const { dieCutMissing, status } = packTrack(p);
+  const dots: { key: string; on: boolean; cls: string; label: string }[] = [
+    { key: 'diecut', on: dieCutMissing, cls: 'red', label: 'Die cut manquant' },
+    { key: 'attente', on: status === 'attente', cls: 'orange', label: PACK_TRACK_LABELS.attente },
+    { key: 'a_refaire', on: status === 'a_refaire', cls: 'red', label: PACK_TRACK_LABELS.a_refaire },
+    { key: 'valide', on: status === 'valide', cls: 'green', label: PACK_TRACK_LABELS.valide },
+  ];
+  const on = dots.filter((d) => d.on).map((d) => d.label);
+  return (
+    <span className="dev-track" aria-label={`Suivi pack : ${on.length ? on.join(', ') : PACK_TRACK_LABELS.a_faire}`} title={on.length ? on.join(' · ') : PACK_TRACK_LABELS.a_faire}>
+      {dots.map((d) => (
+        <span key={d.key} className={`dev-dot ${d.on ? d.cls : ''}`} data-k={d.key} />
+      ))}
+      <small>{status === 'a_faire' ? (dieCutMissing ? 'Die cut manquant' : PACK_TRACK_LABELS.a_faire) : PACK_TRACK_LABELS[status].replace('Pack ', '')}</small>
+    </span>
+  );
+}
 
 
 const isLate = (p: Product) => p.devDeadline < TODAY;
@@ -26,7 +50,8 @@ function DevelopmentPage() {
   const navigate = useNavigate();
   const canAct = auth.can('dev.advance');
   const canAssign = auth.can('pack.assign');
-  const [sortBy, setSortBy] = useState<'echeance' | 'marque' | 'collection' | 'type'>('echeance');
+  const [sortBy, setSortBy] = useState<'echeance' | 'marque' | 'collection' | 'type' | 'pack'>('echeance');
+  const [track, setTrack] = useState<TrackFilter>('all');
   const [dropKey, setDropKey] = useState<string | null>(null);
   const brandName = (p: Product) => brandOf(state.brands, p.brandId).name;
   const sortFn = (a: Product, b: Product) =>
@@ -36,7 +61,9 @@ function DevelopmentPage() {
         ? a.collection.localeCompare(b.collection)
         : sortBy === 'type'
           ? a.pack.type.localeCompare(b.pack.type)
-          : 0) || a.devDeadline.localeCompare(b.devDeadline);
+          : sortBy === 'pack'
+            ? TRACK_ORDER[packTrack(a).status] - TRACK_ORDER[packTrack(b).status] || Number(packTrack(b).dieCutMissing) - Number(packTrack(a).dieCutMissing)
+            : 0) || a.devDeadline.localeCompare(b.devDeadline);
   /** Zone de dépôt (administrateur) : change designer et/ou semaine */
   const dropZone = (key: string, toDesigner?: string, toWeekOf?: string) =>
     canAssign
@@ -78,7 +105,11 @@ function DevelopmentPage() {
     .filter((p) => !p.developed)
     .filter((p) => designer === 'all' || p.pack.designer === designer)
     .filter((p) => !qs || `${p.ref} ${p.name} ${byId(state.suppliers, p.supplierId).name}`.toLowerCase().includes(qs))
+    .filter((p) => matchTrack(p, track))
     .sort(sortFn);
+  // Compteurs du suivi pack (avant le filtre de suivi)
+  const base = state.products.filter((p) => !p.developed && (designer === 'all' || p.pack.designer === designer));
+  const trackCount = (f: TrackFilter) => base.filter((p) => matchTrack(p, f)).length;
   const done = state.products.filter((p) => p.developed && (designer === 'all' || p.pack.designer === designer));
   const pushed = todo.filter(isPushed).sort((a, b) => Number(isLate(b)) - Number(isLate(a)) || a.devDeadline.localeCompare(b.devDeadline));
   const late = todo.filter(isLate);
@@ -169,9 +200,27 @@ function DevelopmentPage() {
             <option value="marque">Marque</option>
             <option value="collection">Collection</option>
             <option value="type">Type de pack</option>
+            <option value="pack">Statut du pack</option>
           </select>
         </label>
         {canAssign && <span className="pk-hint">Administrateur : glissez un produit sur un designer ou une semaine pour le réaffecter.</span>}
+      </div>
+
+      {/* Suivi du pack : filtre par statut */}
+      <div className="dev-trackbar" role="group" aria-label="Suivi pack">
+        {(
+          [
+            ['all', 'Tous', ''],
+            ['diecut', 'Die cut manquant', 'red'],
+            ['attente', 'Pack en attente de validation', 'orange'],
+            ['a_refaire', 'Pack à refaire', 'red'],
+            ['valide', 'Pack validé', 'green'],
+          ] as [TrackFilter, string, string][]
+        ).map(([k, label, cls]) => (
+          <button key={k} type="button" className={`pf-chip ${track === k ? 'active' : ''}`} aria-pressed={track === k} onClick={() => setTrack(k)}>
+            {cls && <span className={`dev-dot ${cls}`} />} {label} <b>{trackCount(k)}</b>
+          </button>
+        ))}
       </div>
 
       {todo.length === 0 && <div className="card empty">Aucun produit à développer{designer !== 'all' ? ` pour ${designer}` : ''}.</div>}
@@ -387,6 +436,7 @@ function Line({ p, state, showDesigner, canAct, colorOf, onOpen, onUrgent, onDon
           {p.pack.designer}
         </span>
       )}
+      <PackTrackDots p={p} />
       <span className={`dev-due ${late ? 'late' : days <= 7 ? 'soon' : ''}`}>
         <b>{weekLabel(p.devDeadline)}</b>
         <small>{late ? `retard ${-days} j` : fshort(p.devDeadline)}</small>

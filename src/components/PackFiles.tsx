@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Archive, Check, Download, Package, Scissors, File as FileIcon, FileImage, FileText, Folder, FolderUp, Loader2, Trash2, Upload, X } from 'lucide-react';
-import { canPackFiles, currentUser, useAuth, useStore } from '../data/store';
+import { Archive, Check, Download, Lock, Package, Scissors, File as FileIcon, FileImage, FileText, Folder, FolderUp, Loader2, Trash2, Upload, X } from 'lucide-react';
+import { canPackFiles, currentUser, packFileLocked, useAuth, useStore } from '../data/store';
 import type { PackFile, PackFileKind, Product } from '../data/types';
 import { deleteBlob, newFileId, supplierScope, ext, fromDrop, fromInput, fsize, getBlob, putBlob, saveBlob, zipBlobs, type PickedFile } from '../lib/files';
 import { fstamp } from '../lib/format';
@@ -245,7 +245,12 @@ export default function PackFiles({ p, round, onRound }: { p: Product; round?: P
       <button className="icon-btn" title="Télécharger" onClick={() => download(f)}>
         <Download size={16} />
       </button>
-      {can(f.kind) && (
+      {packFileLocked(p, f.kind) && (
+        <span className="ps-lock" title="Pack validé par tout le monde : fichier verrouillé" aria-label="Verrouillé">
+          <Lock size={14} />
+        </span>
+      )}
+      {can(f.kind) && !packFileLocked(p, f.kind) && (
         <button className="icon-btn danger-ico" title="Supprimer" onClick={() => remove(f)}>
           <Trash2 size={16} />
         </button>

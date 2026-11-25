@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { Download, FolderOpen, Trash2, Upload, X } from 'lucide-react';
-import { canPackFiles, currentUser, useStore } from '../data/store';
+import { canPackFiles, currentUser, packFileLocked, useStore } from '../data/store';
 import type { PackFile, PackFileKind, Product } from '../data/types';
 import { deleteBlob, fromInput, fsize, getBlob, newFileId, putBlob, saveBlob, supplierScope } from '../lib/files';
 import { toast } from '../components/ui-shared';
@@ -66,7 +66,7 @@ export default function SupplierPackFiles({ product: p, label }: { product: Prod
       <button className="icon-btn" title={t('pd.button')} aria-label={`${f.name}`} onClick={() => download(f)}>
         <Download size={16} />
       </button>
-      {canPackFiles(state, me, p.id, f.kind) && (
+      {canPackFiles(state, me, p.id, f.kind) && !packFileLocked(p, f.kind) && (
         <button
           className="icon-btn danger-ico"
           aria-label={`× ${f.name}`}

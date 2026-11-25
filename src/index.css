@@ -1739,3 +1739,19 @@ select.pi-input { cursor: pointer; }
 .pk-rejection { display: grid; gap: 2px; margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: #fdecec; border: 1px solid #f3b4b4; color: #9b1c1c; }
 .pk-rejection span { color: #3b1111; }
 .pk-rejection small { color: #9b1c1c; opacity: 0.8; }
+.ps-lock { color: var(--muted); display: inline-flex; padding: 0 6px; }
+.pk-newreq { display: grid; gap: 2px; margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: #eef4ff; border: 1px solid #bcd0f5; color: #1d3f8f; }
+.pk-newreq span { color: #13244d; }
+.pk-newreq small { opacity: 0.8; }
+
+/* Développement : suivi du pack */
+.dev-trackbar { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 12px; }
+.dev-trackbar .pf-chip { height: 40px; font-size: 14px; }
+.dev-track { display: inline-flex; align-items: center; gap: 4px; flex: none; min-width: 150px; }
+.dev-track small { font-size: 12px; color: var(--muted); margin-left: 4px; white-space: nowrap; }
+.dev-dot { display: inline-block; width: 14px; height: 14px; border-radius: 50%; background: #e7ebe9; border: 1px solid #d6ddd9; flex: none; }
+.dev-dot.red { background: #dc2626; border-color: #dc2626; }
+.dev-dot.orange { background: #f59e0b; border-color: #f59e0b; }
+.dev-dot.green { background: var(--green); border-color: var(--green); }
+.pf-chip.active .dev-dot { border-color: #fff; }
+@media (max-width: 760px) { .dev-track small { display: none; } .dev-track { min-width: 0; } }

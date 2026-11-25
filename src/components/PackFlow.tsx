@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Check, CheckCircle2, Clock, History, PenLine, ThumbsDown, Upload } from 'lucide-react';
-import { canPackFiles, currentUser, currentValidatorLabel, packDone, useAuth, useStore } from '../data/store';
+import { Check, CheckCircle2, Clock, History, PenLine, RefreshCw, ThumbsDown, Upload } from 'lucide-react';
+import { canPackFiles, canRequestNewPack, currentUser, currentValidatorLabel, packDone, useAuth, useStore } from '../data/store';
 import { VALIDATION_LABELS, VALIDATION_STEPS, type PackFileKind, type Product } from '../data/types';
 import { fdate, fstamp } from '../lib/format';
 import { fromInput, newFileId, putBlob, supplierScope } from '../lib/files';
@@ -11,7 +11,7 @@ import { toast } from './ui-shared';
 function Stepper({ p }: { p: Product }) {
   const files = p.pack.files ?? [];
   // Pack créé : fichier déposé (ou version déjà déclarée) ; un pack créé vaut brief passé
-  const pack = files.some((f) => f.kind === 'pack') || p.pack.artworkVersions > 0;
+  const pack = files.some((f) => f.kind === 'pack') || (!p.pack.newRequest && p.pack.artworkVersions > 0);
   const brief = pack || !!p.pack.brief || files.some((f) => f.kind === 'brief');
   const done = packDone(p);
   const nDone = VALIDATION_STEPS.filter((s) => p.pack.validations[s].state === 'done').length;
@@ -43,7 +43,7 @@ function Validations({ p }: { p: Product }) {
   const lastPack = Math.max(p.pack.artworkVersions, ...(p.pack.files ?? []).filter((f) => f.kind === 'pack').map((f) => f.version ?? 0));
   const waiting = !!p.pack.rejection && p.pack.rejection.version >= lastPack && !packDone(p);
   const history = state.journal
-    .filter((j) => j.target === p.ref && (j.type === 'validatePack' || j.type === 'rejectPack' || (j.type === 'addPackFiles' && j.text.startsWith('Pack uploadé'))))
+    .filter((j) => j.target === p.ref && (j.type === 'validatePack' || j.type === 'rejectPack' || (j.type === 'addPackFiles' && j.text.startsWith('Pack uploadé')) || j.type === 'requestNewPack'))
     .slice(0, 6);
   return (
     <section className="card pad pk-valid" aria-label="Validation du pack">
@@ -57,6 +57,13 @@ function Validations({ p }: { p: Product }) {
         </span>
       </div>
       {!started && <p className="muted small">Le circuit démarre quand le designer dépose le pack.</p>}
+      {p.pack.newRequest && (
+        <div className="pk-newreq" role="note">
+          <b>Nouveau pack demandé par {p.pack.newRequest.by}</b>
+          <span>« {p.pack.newRequest.reason} »</span>
+          <small>{fstamp(p.pack.newRequest.at)}</small>
+        </div>
+      )}
       {p.pack.rejection && !packDone(p) && (
         <div className="pk-rejection" role="note">
           <b>
@@ -104,6 +111,8 @@ export default function PackFlow({ p }: { p: Product }) {
   const me = currentUser(state);
   const [round, setRound] = useState<PackRound | undefined>();
   const [refusing, setRefusing] = useState(false);
+  const [asking, setAsking] = useState(false);
+  const [askReason, setAskReason] = useState('');
   const [reason, setReason] = useState('');
   const [kind, setKind] = useState<PackFileKind>('pack');
   const files = p.pack.files ?? [];
@@ -153,8 +162,12 @@ export default function PackFlow({ p }: { p: Product }) {
     };
   else if (can('pack') && !has('pack'))
     action = {
-      title: 'Déposer le pack',
-      text: has('brief') || p.pack.brief ? 'Le brief est prêt (rond Pack).' : 'Pas encore de brief : demandez-le à l’acheteur.',
+      title: p.pack.newRequest ? 'Nouveau pack demandé' : 'Déposer le pack',
+      text: p.pack.newRequest
+        ? `${p.pack.newRequest.by} : « ${p.pack.newRequest.reason} ». L’ancien pack est dans le rond Pack.`
+        : has('brief') || p.pack.brief
+          ? 'Le brief est prêt (rond Pack).'
+          : 'Pas encore de brief : demandez-le à l’acheteur.',
       button: { label: 'Déposer et passer en validation', icon: Upload, run: () => pick('pack', 'pack') },
     };
   else if (can('brief') && !p.pack.brief && !has('brief'))
@@ -237,6 +250,37 @@ export default function PackFlow({ p }: { p: Product }) {
               <div className="pk-wait">
                 <Clock size={16} /> {step ? `Circuit : ${step}` : ''}
               </div>
+            )}
+            {canRequestNewPack(me) && (has('pack') || p.pack.artworkVersions > 0) && !p.pack.newRequest && !asking && !refusing && (
+              <button className="btn ghost pk-next-second" onClick={() => setAsking(true)}>
+                <RefreshCw size={15} /> Demander un nouveau pack
+              </button>
+            )}
+            {asking && (
+              <form
+                className="pk-refuse"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!askReason.trim()) return;
+                  dispatch({ type: 'requestNewPack', productId: p.id, reason: askReason });
+                  toast('Nouveau pack demandé au designer');
+                  setAsking(false);
+                  setAskReason('');
+                }}
+              >
+                <label htmlFor="pk-newpack" className="pk-next-label">
+                  Demande de nouveau pack
+                </label>
+                <textarea id="pk-newpack" className="input" rows={3} autoFocus placeholder="Pourquoi un nouveau pack : nouvelle charte, nouveau marché, retour client…" value={askReason} onChange={(e) => setAskReason(e.target.value)} />
+                <div className="row" style={{ gap: 8 }}>
+                  <button type="button" className="btn" onClick={() => setAsking(false)}>
+                    Annuler
+                  </button>
+                  <button type="submit" className="btn primary grow" disabled={!askReason.trim()}>
+                    <RefreshCw size={15} /> Envoyer la demande au designer
+                  </button>
+                </div>
+              </form>
             )}
           </section>
           <Validations p={p} />

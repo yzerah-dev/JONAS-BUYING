@@ -172,3 +172,104 @@ test('refuser le pack avec une demande de modification écrite : le designer la 
   await page.getByRole('button', { name: 'Design & Pack' }).click();
   await expect(next.getByRole('button', { name: 'Valider le pack' })).toBeVisible();
 });
+
+/** Modifie l'état enregistré puis recharge (raccourci pour préparer un cas) */
+async function patchProduct(page: import('@playwright/test').Page, id: string, fn: string) {
+  await page.evaluate(
+    ([id, fn]) => {
+      const k = Object.keys(localStorage).find((x) => x.startsWith('jonas-buying-state'))!;
+      const s = JSON.parse(localStorage.getItem(k)!);
+      const p = s.products.find((x: { id: string }) => x.id === id);
+      new Function('p', fn)(p);
+      localStorage.setItem(k, JSON.stringify(s));
+    },
+    [id, fn],
+  );
+  await page.reload();
+}
+
+test('pack validé par tout le monde : pack, die cut et documents ne se suppriment plus', async ({ page }) => {
+  await resetApp(page);
+  await loginAs(page, 'David');
+  await go(page, 'produits/CP-T001');
+  await page.getByRole('button', { name: 'Design & Pack' }).click();
+  const space = page.locator('.pack-space');
+  await space.getByRole('tab', { name: /^Die cut :/ }).click();
+  await space.getByLabel('Déposer : Die cut').setInputFiles(file('diecut.pdf', 'application/pdf'));
+  await space.getByRole('tab', { name: /^Documents :/ }).click();
+  await space.getByLabel('Déposer : Fiches qualité').setInputFiles(file('msds.pdf', 'application/pdf'));
+  // Avant validation complète : suppression possible
+  await expect(space.getByRole('region', { name: 'Fiches qualité' }).getByTitle('Supprimer')).toHaveCount(1);
+  // Toutes les validations faites
+  await patchProduct(page, 'CP-T001', "for (const k of ['direction','moinard','fournisseur']) p.pack.validations[k] = { state: 'done', date: '2026-11-20' };");
+  await page.getByRole('button', { name: 'Design & Pack' }).click();
+  await space.getByRole('tab', { name: /^Documents :/ }).click();
+  await expect(space.getByRole('region', { name: 'Fiches qualité' }).getByTitle('Supprimer')).toHaveCount(0);
+  await expect(space.getByRole('region', { name: 'Fiches qualité' }).getByLabel('Verrouillé')).toHaveCount(1);
+  await space.getByRole('tab', { name: /^Die cut :/ }).click();
+  await expect(space.getByRole('region', { name: 'Die cut' }).getByTitle('Supprimer')).toHaveCount(0);
+});
+
+test('demander un nouveau pack (Direction, acheteur) : l’ancien pack est gardé, le designer refait', async ({ page }) => {
+  await resetApp(page);
+  // Pack V1 déposé et validé
+  const designer = await page.evaluate(() => {
+    const k = Object.keys(localStorage).find((x) => x.startsWith('jonas-buying-state'))!;
+    return JSON.parse(localStorage.getItem(k)!).products.find((p: { id: string }) => p.id === 'CP-T001').pack.designer as string;
+  });
+  await loginAs(page, designer);
+  await go(page, 'produits/CP-T001');
+  await page.getByRole('button', { name: 'Design & Pack' }).click();
+  await page.locator('.pack-space').getByLabel('Déposer : Pack', { exact: true }).setInputFiles(file('pack-ete.ai'));
+  const next = page.getByRole('region', { name: 'Prochaine action' });
+  // Designer et Moinard : pas de demande de nouveau pack
+  await expect(next.getByRole('button', { name: 'Demander un nouveau pack' })).toHaveCount(0);
+  await loginAs(page, 'Moinard');
+  await go(page, 'produits/CP-T001');
+  await page.getByRole('button', { name: 'Design & Pack' }).click();
+  await expect(next.getByRole('button', { name: 'Demander un nouveau pack' })).toHaveCount(0);
+  // Direction : demande avec le motif
+  await loginAs(page, 'Rudy Zerah');
+  await go(page, 'produits/CP-T001');
+  await page.getByRole('button', { name: 'Design & Pack' }).click();
+  await next.getByRole('button', { name: 'Demander un nouveau pack' }).click();
+  await next.getByLabel('Demande de nouveau pack').fill('Nouvelle charte Camille Paris 2027.');
+  await next.getByRole('button', { name: 'Envoyer la demande au designer' }).click();
+  await expect(toast(page)).toContainText('Nouveau pack demandé au designer');
+  await expect(page.getByRole('region', { name: 'Validation du pack' }).locator('.pk-newreq')).toContainText('Nouvelle charte Camille Paris 2027.');
+  // Le designer : « Nouveau pack demandé », l'ancien pack est rangé dans « Ancien pack »
+  await loginAs(page, designer);
+  await go(page, 'produits/CP-T001');
+  await page.getByRole('button', { name: 'Design & Pack' }).click();
+  await expect(next).toContainText('Nouveau pack demandé');
+  await expect(next).toContainText('Nouvelle charte Camille Paris 2027.');
+  await expect(page.getByRole('region', { name: 'Ancien pack' })).toContainText('pack-ete.ai');
+  await expect(page.getByRole('tab', { name: 'Pack : à uploader' })).toBeVisible();
+  const [chooser] = await Promise.all([page.waitForEvent('filechooser'), next.getByRole('button', { name: 'Déposer et passer en validation' }).click()]);
+  await chooser.setFiles(file('pack-2027.ai'));
+  await expect(page.getByRole('region', { name: 'Validation du pack' }).locator('.pk-newreq')).toHaveCount(0);
+});
+
+test('Développement : ronds de suivi du pack sur chaque ligne, filtre et tri par statut', async ({ page }) => {
+  await resetApp(page);
+  await loginAs(page, 'ABIR');
+  await go(page, 'developpement');
+  const bar = page.getByRole('group', { name: 'Suivi pack' });
+  for (const l of ['Die cut manquant', 'Pack en attente de validation', 'Pack à refaire', 'Pack validé']) await expect(bar).toContainText(l);
+  const line = page.locator('.dev-line').first();
+  await expect(line.locator('.dev-track .dev-dot')).toHaveCount(4);
+  // Filtre : die cut manquant → chaque ligne a le rond rouge du die cut
+  const n = Number(await bar.getByRole('button', { name: /Die cut manquant/ }).locator('b').innerText());
+  await bar.getByRole('button', { name: /Die cut manquant/ }).click();
+  expect(n).toBeGreaterThan(0);
+  await expect(page.locator('.dev-line:not(.done)').first()).toBeVisible();
+  await expect(page.locator('.dev-line:not(.done) .dev-dot[data-k="diecut"]:not(.red)')).toHaveCount(0);
+  // Filtre : pack en attente de validation
+  await bar.getByRole('button', { name: /Pack en attente de validation/ }).click();
+  const m = await page.locator('.dev-line:not(.done)').count();
+  if (m) await expect(page.locator('.dev-line:not(.done) .dev-dot[data-k="attente"].orange')).toHaveCount(m);
+  // Tri par statut du pack
+  await bar.getByRole('button', { name: /^Tous/ }).click();
+  await page.locator('#dev-sort').selectOption('pack');
+  await expect(page.locator('#dev-sort')).toHaveValue('pack');
+});

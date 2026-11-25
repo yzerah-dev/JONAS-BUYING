@@ -195,6 +195,7 @@ export type Action =
   | { type: 'startPack'; productId: string }
   | { type: 'planPack'; productId: string; date: ISODate | null }
   | { type: 'setPackBrief'; productId: string; brief: string }
+  | { type: 'requestNewPack'; productId: string; reason: string }
   | { type: 'addPackFiles'; productId: string; kind: PackFileKind; files: Omit<PackFile, 'kind' | 'version' | 'uploadedAt' | 'uploadedBy'>[] }
   | { type: 'removePackFile'; productId: string; fileId: string }
   | { type: 'setCapacity'; designer: string; capacity: number | null }
@@ -322,9 +323,13 @@ export function isAllowed(s: State, a: Action): boolean {
     case 'addPackFiles':
       return canPackFiles(s, u, a.productId, a.kind);
     case 'removePackFile': {
-      const f = s.products.find((x) => x.id === a.productId)?.pack.files?.find((x) => x.id === a.fileId);
-      return !!f && canPackFiles(s, u, a.productId, f.kind);
+      const p = s.products.find((x) => x.id === a.productId);
+      const f = p?.pack.files?.find((x) => x.id === a.fileId);
+      // Pack validé par tout le monde : pack, die cut et documents ne se suppriment plus
+      return !!p && !!f && canPackFiles(s, u, a.productId, f.kind) && !packFileLocked(p, f.kind);
     }
+    case 'requestNewPack':
+      return !!a.reason.trim() && canRequestNewPack(u) && s.products.some((x) => x.id === a.productId);
     case 'setPackBrief':
       return canEditProduct(u) && s.products.some((x) => x.id === a.productId);
     case 'startPack':
@@ -1567,10 +1572,23 @@ function applyAction(s: State, a: Action): State {
           // Nouvelle version du pack = soumise au circuit (Direction)
           // Pack uploadé = envoyé en validation : le circuit (re)part de la Direction, la nouvelle version repasse chez chacun
           const v = { direction: { state: 'pending' as const }, moinard: { state: 'todo' as const }, fournisseur: { state: 'todo' as const } };
-          return { ...p, pack: { ...pack, validations: v, sentToSupplier: false, artworkVersions: Math.max(p.pack.artworkVersions, version) } };
+          return { ...p, pack: { ...pack, validations: v, sentToSupplier: false, newRequest: undefined, artworkVersions: Math.max(p.pack.artworkVersions, version) } };
         }
         return { ...p, pack };
       });
+    case 'requestNewPack':
+      return mapP(s, a.productId, (p) => ({
+        ...p,
+        pack: {
+          ...p.pack,
+          // Le pack actuel devient la référence « ancien pack » du designer
+          files: (p.pack.files ?? []).map((f) => (f.kind === 'pack' ? { ...f, kind: 'oldpack' as const, name: `V${f.version ?? ''} - ${f.name}` } : f)),
+          validations: { direction: { state: 'todo' }, moinard: { state: 'todo' }, fournisseur: { state: 'todo' } },
+          sentToSupplier: false,
+          rejection: undefined,
+          newRequest: { at: nowStamp(), by: me, reason: a.reason.trim() },
+        },
+      }));
     case 'setPackBrief':
       return mapP(s, a.productId, (p) => ({ ...p, pack: { ...p.pack, brief: a.brief.trim() || undefined } }));
     case 'removePackFile':
@@ -1798,6 +1816,8 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
     }
     case 'setPackBrief':
       return { target: ref(a.productId), text: 'Brief marketing mis à jour' };
+    case 'requestNewPack':
+      return { target: ref(a.productId), text: `Nouveau pack demandé : ${a.reason.trim()}` };
     case 'removePackFile':
       return { target: ref(a.productId), text: 'Fichier supprimé' };
     case 'setUserRole':
@@ -1900,6 +1920,26 @@ export function canPackFiles(s: State, u: User, productId: string, kind: PackFil
   if (kind === 'pack' || kind === 'crea') return u.role === 'pilote' || (u.role === 'designer' && u.designerName === p.pack.designer);
   if (kind === 'brief') return canEditProduct(u);
   return canEditProduct(u) || (isSupplier(u) && u.supplierId === p.supplierId);
+}
+
+/** Pack validé par tout le circuit : pack, die cut et documents verrouillés (plus de suppression) */
+export const packFileLocked = (p: Product, kind: PackFileKind) => packDone(p) && (kind === 'pack' || kind === 'diecut' || kind === 'quality');
+/** Demande de nouveau pack : Direction et acheteurs (et le Pilote) */
+export const canRequestNewPack = (u: User) => u.active && ['direction', 'acheteur', 'pilote'].includes(u.role);
+
+/** Suivi du pack (page Développement) : die cut manquant, et où en est le pack */
+export type PackTrack = 'a_faire' | 'attente' | 'a_refaire' | 'valide';
+export const PACK_TRACK_LABELS: Record<PackTrack, string> = { a_faire: 'Pack à faire', attente: 'Pack en attente de validation', a_refaire: 'Pack à refaire', valide: 'Pack validé' };
+export function packTrack(p: Product): { dieCutMissing: boolean; status: PackTrack } {
+  const files = p.pack.files ?? [];
+  const dieCutMissing = !files.some((f) => f.kind === 'diecut') && p.pack.dieCut !== 'received';
+  const lastPack = Math.max(p.pack.artworkVersions, ...files.filter((f) => f.kind === 'pack').map((f) => f.version ?? 0));
+  const hasPack = files.some((f) => f.kind === 'pack') || (!p.pack.newRequest && p.pack.artworkVersions > 0);
+  let status: PackTrack = 'a_faire';
+  if (packDone(p)) status = 'valide';
+  else if (p.pack.rejection && p.pack.rejection.version >= lastPack) status = 'a_refaire';
+  else if (hasPack && VALIDATION_STEPS.some((st) => p.pack.validations[st].state !== 'todo')) status = 'attente';
+  return { dieCutMissing, status };
 }
 
 /** Fiches produit : Pilote, Direction et acheteurs */

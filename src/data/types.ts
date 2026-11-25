@@ -80,6 +80,8 @@ export interface Pack {
   files?: PackFile[];
   /** Brief marketing pour le designer */
   brief?: string;
+  /** Demande de nouveau pack (Direction, acheteur) : l'ancien pack passe en « ancien pack », le circuit repart à zéro */
+  newRequest?: { at: string; by: string; reason: string };
   /** Dernier refus : demande de modification écrite par le valideur (pour la version `version` du pack) */
   rejection?: { at: string; by: string; step: string; reason: string; version: number };
 }
