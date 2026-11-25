@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { AlertTriangle, Box, Check, Download, FileText, Flame, History, Layers, Paperclip, Play, Scissors, Search, Send, X } from 'lucide-react';
 import PackFiles from '../components/PackFiles';
 import { pressable } from '../lib/a11y';
-import { byId, capacityOf, packDone, packLate, useAuth, useStore, type State } from '../data/store';
+import { brandOf, byId, capacityOf, packDone, packLate, useAuth, useStore, type State } from '../data/store';
 import type { Product } from '../data/types';
 import { VALIDATION_LABELS, VALIDATION_STEPS } from '../data/types';
 import { BrandLogo, Pill, ProductThumb, Tabs, ValidationCircuit, ValidationDot } from '../components/ui';
@@ -101,7 +101,7 @@ function DesignPage() {
   const [moveTo, setMoveTo] = useState<{ designer: string; week: string }>({ designer: '', week: '' });
   const canAssign = auth.can('pack.assign');
   const canPush = auth.can('dev.advance');
-  const brandName = (p: Product) => byId(state.brands, p.brandId).name;
+  const brandName = (p: Product) => brandOf(state.brands, p.brandId).name;
   const sorters: Record<SortBy, (a: Product, b: Product) => number> = {
     priorite: sortPacks,
     marque: (a, b) => brandName(a).localeCompare(brandName(b)) || sortPacks(a, b),
@@ -117,7 +117,7 @@ function DesignPage() {
   const s = q.trim().toLowerCase();
   const list = scope
     .filter((p) => matches(p, status))
-    .filter((p) => !s || `${p.ref} ${p.name} ${byId(state.suppliers, p.supplierId).name} ${byId(state.brands, p.brandId).name} ${p.collection} ${p.pack.type}`.toLowerCase().includes(s))
+    .filter((p) => !s || `${p.ref} ${p.name} ${byId(state.suppliers, p.supplierId).name} ${brandOf(state.brands, p.brandId).name} ${p.collection} ${p.pack.type}`.toLowerCase().includes(s))
     .sort(sorters[sortBy]);
   const sel = list.find((p) => p.id === selId) ?? scope.find((p) => p.id === selId);
   const done = scope.filter(packDone).length;
@@ -581,7 +581,7 @@ function PackRow({
         )}
       </span>
       <span className="pk-c-brand">
-        <BrandLogo brand={byId(state.brands, p.brandId)} size={9} />
+        <BrandLogo brand={brandOf(state.brands, p.brandId)} size={9} />
       </span>
       <span className="pk-c-sup">{byId(state.suppliers, p.supplierId).shortName}</span>
       <span className="pk-c-type">{p.pack.type}</span>
@@ -629,7 +629,7 @@ function PackPanel({ p }: { p: Product }) {
           {p.emoji}
         </div>
         <div className="col grow" style={{ alignItems: 'flex-end' }}>
-          <BrandLogo brand={byId(state.brands, p.brandId)} size={14} />
+          <BrandLogo brand={brandOf(state.brands, p.brandId)} size={14} />
           <span className="small">
             {sup.shortName} {sup.flag}
           </span>
@@ -702,7 +702,7 @@ function PackPanel({ p }: { p: Product }) {
       {sub === 'pack' && (
         <div className="grid2">
           <div className="thumb" style={{ height: 100, background: '#efe6da', fontWeight: 800, fontSize: 12, textAlign: 'center' }}>
-            {byId(state.brands, p.brandId).name}
+            {brandOf(state.brands, p.brandId).name}
             <br />v{p.pack.artworkVersions}
           </div>
           <div className="thumb" style={{ height: 100, background: '#f5f7f6', fontSize: 34 }}>
@@ -731,7 +731,7 @@ function PackPanel({ p }: { p: Product }) {
       )}
       {sub === 'brief' && (
         <div className="small">
-          Pack {p.pack.type.toLowerCase()} pour la marque {byId(state.brands, p.brandId).name}, collection {p.collection}. Rendu attendu le {fdate(p.pack.artworkDeadline)} (designer : {p.pack.designer}).
+          Pack {p.pack.type.toLowerCase()} pour la marque {brandOf(state.brands, p.brandId).name}, collection {p.collection}. Rendu attendu le {fdate(p.pack.artworkDeadline)} (designer : {p.pack.designer}).
         </div>
       )}
       {sub === 'fichiers' && <PackFiles p={p} />}

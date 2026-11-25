@@ -40,6 +40,7 @@ import {
   useAuth,
   useStore,
   type State,
+  brandOf,
 } from '../data/store';
 import type { Container, Proforma, ProformaStatus } from '../data/types';
 import { BrandLogo, ContainerStatusPill, PackPill, Pill, ProductThumb, ProformaStatusPill, Progress, Ring, Seg, SupplierLogo, Tabs } from '../components/ui';
@@ -253,7 +254,7 @@ function ProductsTab({ pf, state, mode }: { pf: Proforma; state: State; mode: 'g
                     </div>
                   </td>
                   <td>
-                    <BrandLogo brand={byId(state.brands, p.brandId)} size={10} />
+                    <BrandLogo brand={brandOf(state.brands, p.brandId)} size={10} />
                   </td>
                   <td className="num">{eur2(l.price)}</td>
                   <td className="num">{p.pcb}</td>
@@ -313,7 +314,7 @@ function ProductsTab({ pf, state, mode }: { pf: Proforma; state: State; mode: 'g
             <div className="row">
               <PackPill product={p} prefix />
               <div className="grow" />
-              <BrandLogo brand={byId(state.brands, p.brandId)} size={10} />
+              <BrandLogo brand={brandOf(state.brands, p.brandId)} size={10} />
             </div>
           </div>
         );

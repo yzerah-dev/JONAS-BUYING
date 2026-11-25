@@ -36,6 +36,8 @@ if (args.includes('--dump')) {
 }
 
 if (args.includes('--docs')) {
+  // La base de production est en service (vierge depuis le 25/11/2026) : n'y remettre les données de démo que sur demande explicite
+  if (!args.includes('--demo')) throw new Error('--docs charge les données de DÉMO (765 produits, proformas fictives) : ajoutez --demo pour confirmer. Rien n’a été envoyé.');
   for (let i = 0; i < docs.length; i += 300) {
     await call('/rest/v1/docs?on_conflict=collection,id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(docs.slice(i, i + 300)) });
     console.log(`documents ${Math.min(i + 300, docs.length)}/${docs.length}`);

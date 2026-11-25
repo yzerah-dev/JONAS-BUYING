@@ -9,7 +9,8 @@ les modifications en temps réel.
 1. **Créer les tables et les règles d'accès** : ouvrir le projet Supabase → *SQL Editor* → coller et exécuter
    `supabase/migrations/0001_jonas_buying.sql`.
 2. **Reprendre les données** (clé secrète du projet dans `SUPABASE_SERVICE_KEY`) :
-   `npm run seed:supabase -- --docs`  (passe par le proxy HTTPS de l'environnement : `NODE_USE_ENV_PROXY=1`)
+   *Base de production vierge depuis le 25/11/2026 : ne pas recharger la démo.* Pour une base de test seulement :
+   `npm run seed:supabase -- --docs --demo`  (passe par le proxy HTTPS de l'environnement : `NODE_USE_ENV_PROXY=1`)
 3. **Créer les comptes** : copier `scripts/members.example.json`, y mettre les vrais e-mails
    (un compte par utilisateur de l'application : `app_user_id`), puis
    `npm run seed:supabase -- --members scripts/members.json`

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Calendar, Check, ChevronDown, ChevronUp, Flame, Search, Users } from 'lucide-react';
-import { byId, capacityOf, useAuth, useStore, type State } from '../data/store';
+import { brandOf, byId, capacityOf, useAuth, useStore, type State } from '../data/store';
 import type { Product } from '../data/types';
 import { BrandLogo, Pill, ProductThumb } from '../components/ui';
 import { designerColor, toast } from '../components/ui-shared';
@@ -28,7 +28,7 @@ function DevelopmentPage() {
   const canAssign = auth.can('pack.assign');
   const [sortBy, setSortBy] = useState<'echeance' | 'marque' | 'collection' | 'type'>('echeance');
   const [dropKey, setDropKey] = useState<string | null>(null);
-  const brandName = (p: Product) => byId(state.brands, p.brandId).name;
+  const brandName = (p: Product) => brandOf(state.brands, p.brandId).name;
   const sortFn = (a: Product, b: Product) =>
     (sortBy === 'marque'
       ? brandName(a).localeCompare(brandName(b))
@@ -368,7 +368,7 @@ function Line({ p, state, showDesigner, canAct, colorOf, onOpen, onUrgent, onDon
         </small>
       </div>
       <span className="dev-brand">
-        <BrandLogo brand={byId(state.brands, p.brandId)} size={10} />
+        <BrandLogo brand={brandOf(state.brands, p.brandId)} size={10} />
       </span>
       <span className="dev-sup">{byId(state.suppliers, p.supplierId).shortName}</span>
       <span className="dev-num">

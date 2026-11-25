@@ -19,6 +19,7 @@ import {
   defaultForwarder,
   payments,
   proformaTotals,
+  brandOf,
 } from '../data/store';
 import { BrandLogo, ContainerStatusPill, Kpi, PackPill, Pill, ProductThumb, ProformaStatusPill, Ring, Seg, ValidationCircuit } from '../components/ui';
 import { toast } from '../components/ui-shared';
@@ -180,7 +181,7 @@ export function PortalProducts() {
                 </td>
                 <td>{p.name}</td>
                 <td>
-                  <BrandLogo brand={byId(state.brands, p.brandId)} size={9} />
+                  <BrandLogo brand={brandOf(state.brands, p.brandId)} size={9} />
                 </td>
                 <td className="num">{eur2(p.pa)}</td>
                 <td className="num">{p.pcb}</td>
@@ -374,7 +375,7 @@ export function PortalPacks() {
                     {t('packs.deadline', { type: td(p.pack.type), date: fdate(p.pack.artworkDeadline) })}
                   </div>
                 </div>
-                <BrandLogo brand={byId(state.brands, p.brandId)} size={10} />
+                <BrandLogo brand={brandOf(state.brands, p.brandId)} size={10} />
               </div>
               <ValidationCircuit product={p} />
               <div className="row wrap">

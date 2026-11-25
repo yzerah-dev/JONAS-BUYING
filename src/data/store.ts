@@ -1641,6 +1641,9 @@ export const CONTAINER_STATUS_LABEL: Record<ContainerStatus, string> = {
 // Sélecteurs / règles de calcul
 
 export const byId = <T extends { id: string }>(list: T[], id: string) => list.find((x) => x.id === id)!;
+/** Marque d'un produit ; une marque absente de la liste (base vierge) s'affiche sans bloquer l'écran */
+export const brandOf = (brands: Brand[], id: string): Brand =>
+  brands.find((b) => b.id === id) ?? { id, name: id === 'jonas' ? 'JONAS' : id ? id.toUpperCase() : '—', tagline: '' };
 
 export function lineCbm(p: Product, qty: number) {
   return (qty / p.pcb) * p.cbmCarton;

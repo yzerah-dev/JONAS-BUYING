@@ -29,6 +29,7 @@ import {
   useAuth,
   useStore,
   type State,
+  brandOf,
 } from '../data/store';
 import { DEV_STAGES, type Product } from '../data/types';
 import { SITES } from '../data/seed';
@@ -48,7 +49,7 @@ export default function ProductDetail() {
   const p = state.products[idx];
   if (!p) return <div className="card empty">Produit introuvable.</div>;
   const q = productQuantities(state, p.id);
-  const brand = byId(state.brands, p.brandId);
+  const brand = brandOf(state.brands, p.brandId);
   const go = (d: number) => navigate(`/produits/${state.products[(idx + d + state.products.length) % state.products.length].id}`);
 
   return (
@@ -178,7 +179,7 @@ function InfoCard({ p, state }: { p: Product; state: State }) {
     <Card title="Informations produit" icon={<Tag size={18} className="green" />}>
       <dl className="kv">
         <dt>Marque</dt>
-        <dd>{byId(state.brands, p.brandId).name}</dd>
+        <dd>{brandOf(state.brands, p.brandId).name}</dd>
         <dt>Réf. interne</dt>
         <dd>{p.ref}</dd>
         <dt>EAN</dt>

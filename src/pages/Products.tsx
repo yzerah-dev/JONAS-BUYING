@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LayoutGrid, List, Search } from 'lucide-react';
-import { byId, packState, productQuantities, useStore } from '../data/store';
+import { brandOf, byId, packState, productQuantities, useStore } from '../data/store';
 import { BrandLogo, PackPill, Pill, ProductThumb, Seg } from '../components/ui';
 import { eur2, num, weekLabel } from '../lib/format';
 import Combobox from '../components/Combobox';
@@ -111,7 +111,7 @@ export default function Products() {
                 {p.emoji}
               </div>
               <div className="row">
-                <BrandLogo brand={byId(state.brands, p.brandId)} size={10} />
+                <BrandLogo brand={brandOf(state.brands, p.brandId)} size={10} />
                 <div className="grow" />
                 {!p.developed && <Pill color="violet">En dév.</Pill>}
               </div>
@@ -180,7 +180,7 @@ export default function Products() {
                     </div>
                   </td>
                   <td>
-                    <BrandLogo brand={byId(state.brands, p.brandId)} size={10} />
+                    <BrandLogo brand={brandOf(state.brands, p.brandId)} size={10} />
                   </td>
                   <td>{byId(state.suppliers, p.supplierId).shortName}</td>
                   <td className="num">{eur2(p.pa)}</td>
