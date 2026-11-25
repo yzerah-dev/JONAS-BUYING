@@ -801,7 +801,13 @@ function PackPanel({ p }: { p: Product }) {
           </button>
         )}
         {!done && auth.allowed({ type: 'rejectPack', productId: p.id }) && (
-          <button className="btn danger" onClick={() => dispatch({ type: 'rejectPack', productId: p.id })}>
+          <button
+            className="btn danger"
+            onClick={() => {
+              const reason = window.prompt('Demande de modification pour le designer (obligatoire) :');
+              if (reason?.trim()) dispatch({ type: 'rejectPack', productId: p.id, reason });
+            }}
+          >
             <X size={15} /> Refuser
           </button>
         )}

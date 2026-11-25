@@ -163,7 +163,7 @@ export default function PackFiles({ p, round, onRound }: { p: Product; round?: P
       }
       dispatch({ type: 'addPackFiles', productId: p.id, kind, files: metas });
       const title = SECTIONS.find((s) => s.kind === kind)!.title;
-      toast(kind === 'pack' ? `Pack V${Math.max(0, ...packs.map((f) => f.version ?? 0)) + 1} envoyé en validation` : `${metas.length} fichier(s) ajouté(s) : ${title}`);
+      toast(kind === 'pack' ? `Pack V${Math.max(p.pack.artworkVersions, ...packs.map((f) => f.version ?? 0)) + 1} envoyé en validation` : `${metas.length} fichier(s) ajouté(s) : ${title}`);
     } catch {
       toast('Envoi impossible : espace de stockage insuffisant ou refusé.');
     } finally {

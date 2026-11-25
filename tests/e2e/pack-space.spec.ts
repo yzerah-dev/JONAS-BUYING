@@ -16,9 +16,10 @@ test('Design & Pack : trois ronds (die cut, pack, documents) puis la validation'
   await expect(round('Pack')).toHaveAccessibleName('Pack : à uploader');
   await expect(round('Documents')).toHaveAccessibleName('Documents : à uploader');
   // La validation est en dessous des ronds
-  const yRounds = (await space.locator('.ps-rounds').boundingBox())!.y;
-  const yValid = (await page.locator('.ps-validation').boundingBox())!.y;
-  expect(yValid).toBeGreaterThan(yRounds);
+  // La validation est visible : chaque valideur et son état
+  const valid = page.getByRole('region', { name: 'Validation du pack' });
+  await expect(valid.locator('.pk-vlist li')).toHaveCount(4);
+  for (const who of ['David', 'Direction', 'Moinard', 'Fournisseur']) await expect(valid).toContainText(who);
 
   // Die cut : déposé → rond vert
   await round('Die cut').click();
@@ -59,9 +60,9 @@ test('Design & Pack : trois ronds (die cut, pack, documents) puis la validation'
   await expect(next).toContainText('Déposer le pack');
   const [chooser] = await Promise.all([page.waitForEvent('filechooser'), next.getByRole('button', { name: 'Déposer et passer en validation' }).click()]);
   await chooser.setFiles(file('pack-v1.ai'));
-  await expect(toast(page)).toContainText('Pack V1 envoyé en validation');
+  await expect(toast(page)).toContainText(/Pack V\d+ envoyé en validation/);
   await expect(page.locator('.pk-steps li.done')).toHaveCount(2);
-  await expect(next).toContainText('Pack V1 en validation');
+  await expect(next).toContainText(/Pack V\d+ en validation/);
   await space.getByLabel('Déposer : Dossier pack').setInputFiles([file('rendu.png', 'image/png'), file('source.psd')]);
   await expect(round('Pack')).toHaveAccessibleName('Pack : uploadé');
   await expect(space.locator('.ps-round.ok')).toHaveCount(3);
@@ -83,7 +84,7 @@ test('Design & Pack : trois ronds (die cut, pack, documents) puis la validation'
     await loginAs(page, 'David');
     await go(page, 'produits/CP-T001');
     await page.getByRole('button', { name: 'Design & Pack' }).click();
-    await expect(next).toContainText('Valider le pack V1');
+    await expect(next).toContainText(/Valider le pack V\d+/);
     await next.getByRole('button', { name: 'Valider le pack' }).click();
     await expect(toast(page)).toContainText('Pack validé');
   }
@@ -124,4 +125,46 @@ test('portail fournisseur : dépôt du die cut et des fiches qualité, télécha
   await expect(page.getByRole('region', { name: 'Die cut' })).toContainText(`diecut-${ref}.pdf`);
   await page.getByRole('tab', { name: 'Documents : uploadé' }).click();
   await expect(page.getByRole('region', { name: 'Fiches qualité' })).toContainText('composition.pdf');
+});
+
+test('refuser le pack avec une demande de modification écrite : le designer la voit et redépose', async ({ page }) => {
+  await resetApp(page);
+  await loginAs(page, 'David');
+  await go(page, 'produits/CP-C042');
+  await page.getByRole('button', { name: 'Design & Pack' }).click();
+  const next = page.getByRole('region', { name: 'Prochaine action' });
+  await next.getByRole('button', { name: 'Refuser et demander une modification' }).click();
+  const send = next.getByRole('button', { name: 'Envoyer la demande de modification' });
+  await expect(send).toBeDisabled();
+  await next.getByLabel('Demande de modification').fill('Logo plus grand, fond blanc, ajouter « 100 % EVA ».');
+  await send.click();
+  await expect(toast(page)).toContainText('demande de modification envoyée au designer');
+  const valid = page.getByRole('region', { name: 'Validation du pack' });
+  await expect(valid.locator('.pk-rejection')).toContainText('Logo plus grand, fond blanc');
+  await expect(valid.locator('.pk-vh').first()).toContainText('modifications demandées : Logo plus grand');
+  // David n'a plus à valider tant que le designer n'a pas redéposé
+  await expect(next.getByRole('button', { name: 'Valider le pack' })).toHaveCount(0);
+  await expect(valid.locator('.pk-vlist li.pending')).toContainText('Attend la nouvelle version du designer');
+
+  // Le designer voit la demande en prochaine action et dépose une nouvelle version
+  const designer = await page.evaluate(() => {
+    const k = Object.keys(localStorage).find((x) => x.startsWith('jonas-buying-state'))!;
+    return JSON.parse(localStorage.getItem(k)!).products.find((p: { id: string }) => p.id === 'CP-C042').pack.designer as string;
+  });
+  await loginAs(page, designer);
+  await go(page, 'produits/CP-C042');
+  await page.getByRole('button', { name: 'Design & Pack' }).click();
+  await expect(next).toContainText('Modifications demandées');
+  await expect(next).toContainText('Logo plus grand, fond blanc');
+  const [chooser] = await Promise.all([page.waitForEvent('filechooser'), next.getByRole('button', { name: 'Déposer la nouvelle version' }).click()]);
+  await chooser.setFiles(file('pack-v2.ai'));
+  await expect(toast(page)).toContainText('envoyé en validation');
+  await expect(next).not.toContainText('Modifications demandées');
+  await expect(valid.locator('.pk-rejection')).toBeVisible(); // la demande reste visible pendant la nouvelle validation
+  await expect(valid.locator('.pk-vlist li.pending')).toContainText('À valider — c’est son tour');
+  // David peut de nouveau valider
+  await loginAs(page, 'David');
+  await go(page, 'produits/CP-C042');
+  await page.getByRole('button', { name: 'Design & Pack' }).click();
+  await expect(next.getByRole('button', { name: 'Valider le pack' })).toBeVisible();
 });

@@ -133,7 +133,7 @@ export type Action =
   | { type: 'payDeposit'; id: string }
   | { type: 'payBalance'; id: string }
   | { type: 'validatePack'; productId: string }
-  | { type: 'rejectPack'; productId: string }
+  | { type: 'rejectPack'; productId: string; /** Demande de modification écrite */ reason?: string }
   | { type: 'requestDieCut'; productId: string }
   | { type: 'receiveDieCut'; productId: string }
   | { type: 'uploadArtwork'; productId: string }
@@ -1083,8 +1083,11 @@ function applyAction(s: State, a: Action): State {
     case 'rejectPack':
       return mapP(s, a.productId, (p) => {
         const v = { ...p.pack.validations };
+        const step = VALIDATION_STEPS.find((st) => v[st].state !== 'done');
         VALIDATION_STEPS.forEach((st, i) => (v[st] = i === 0 ? { state: 'pending' } : { state: 'todo' }));
-        return { ...p, pack: { ...p.pack, validations: v } };
+        const version = Math.max(p.pack.artworkVersions, ...(p.pack.files ?? []).filter((f) => f.kind === 'pack').map((f) => f.version ?? 0));
+        const rejection = a.reason?.trim() ? { at: nowStamp(), by: me, step: step ? VALIDATION_LABELS[step] : '', reason: a.reason.trim(), version } : p.pack.rejection;
+        return { ...p, pack: { ...p.pack, validations: v, rejection } };
       });
     case 'requestDieCut':
       return mapP(s, a.productId, (p) => ({ ...p, pack: { ...p.pack, dieCut: 'requested' } }));
@@ -1544,7 +1547,8 @@ function applyAction(s: State, a: Action): State {
       return mapP(s, a.productId, (p) => {
         const files = p.pack.files ?? [];
         const stamp = nowStamp();
-        let version = Math.max(0, ...files.filter((f) => f.kind === 'pack').map((f) => f.version ?? 0));
+        // Numérotation à la suite des versions déjà déclarées (pas de V1 après une V3)
+        let version = Math.max(p.pack.artworkVersions, ...files.filter((f) => f.kind === 'pack').map((f) => f.version ?? 0));
         const added: PackFile[] = a.files.map((f) => ({
           ...f,
           kind: a.kind,
@@ -1703,7 +1707,7 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
       return { target: ref(a.productId), text: `Pack validé${st ? ` (étape ${VALIDATION_LABELS[st]})` : ''}` };
     }
     case 'rejectPack':
-      return { target: ref(a.productId), text: 'Pack refusé, retour au designer' };
+      return { target: ref(a.productId), text: `Pack refusé, retour au designer${a.reason?.trim() ? ` — modifications demandées : ${a.reason.trim()}` : ''}` };
     case 'requestDieCut':
       return { target: ref(a.productId), text: 'Die cut demandé' };
     case 'receiveDieCut':

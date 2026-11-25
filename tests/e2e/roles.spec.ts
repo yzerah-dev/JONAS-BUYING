@@ -43,7 +43,7 @@ test.describe('Rôles et visibilité des modules', () => {
   });
 
   test('circuit de validation du pack : chaque rôle ne valide que son étape', async ({ page }) => {
-    const validateButton = () => page.getByRole('button', { name: /Valider l’étape en cours/ });
+    const validateButton = () => page.getByRole('region', { name: 'Prochaine action' }).getByRole('button', { name: 'Valider le pack' });
     const openPack = async (who: string) => {
       await loginAs(page, who);
       await go(page, 'produits/CP-C042');
@@ -62,6 +62,12 @@ test.describe('Rôles et visibilité des modules', () => {
 
     await openPack('Logistique');
     await expect(validateButton()).toHaveCount(0);
+    // La validation se voit : 3 étapes validées, au tour du fournisseur, historique des décisions
+    const valid = page.getByRole('region', { name: 'Validation du pack' });
+    await expect(valid).toContainText('3 / 4 validé(s)');
+    await expect(valid.locator('.pk-vlist li.done')).toHaveCount(3);
+    await expect(valid.locator('.pk-vlist li.pending')).toContainText('Fournisseur');
+    await expect(valid.locator('.pk-vh')).toHaveCount(3);
   });
 
   test('le pilote accède aux paramètres', async ({ page }) => {
@@ -79,7 +85,7 @@ test('fournisseur : validation du pack forwardé dans le portail', async ({ page
     await loginAs(page, who);
     await go(page, 'produits/CP-C042');
     await page.getByRole('button', { name: 'Design & Pack' }).click();
-    await page.getByRole('button', { name: /Valider l’étape en cours/ }).click();
+    await page.getByRole('region', { name: 'Prochaine action' }).getByRole('button', { name: 'Valider le pack' }).click();
   }
   // Forward par la designer (ABIR) depuis l'Espace Designer, semaine S01
   await loginAs(page, 'ABIR');

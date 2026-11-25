@@ -26,7 +26,6 @@ import {
   containerEtd,
   packDone,
   productQuantities,
-  useAuth,
   useStore,
   type State,
   brandOf,
@@ -248,8 +247,6 @@ function PriceCard({ p, q }: { p: Product; q: number }) {
 }
 
 function DesignCard({ p, full }: { p: Product; full?: boolean }) {
-  const { dispatch } = useStore();
-  const auth = useAuth();
   const late = p.pack.artworkDeadline < TODAY && !packDone(p);
   return (
     <Card title={full ? 'Design & pack' : 'Pack'} icon={<Palette size={18} className="green" />} action={<PackPill product={p} />}>
@@ -276,15 +273,12 @@ function DesignCard({ p, full }: { p: Product; full?: boolean }) {
           <PackFlow p={p} />
         </div>
       )}
-      <div className="ps-validation">
-        <div className="ps-validation-title">Validation du pack</div>
-        <ValidationCircuit product={p} />
-        {full && !packDone(p) && auth.allowed({ type: 'validatePack', productId: p.id }) && (
-          <button className="btn primary mt" onClick={() => dispatch({ type: 'validatePack', productId: p.id })}>
-            <Check size={15} /> Valider l’étape en cours
-          </button>
-        )}
-      </div>
+      {!full && (
+        <div className="ps-validation">
+          <div className="ps-validation-title">Validation du pack</div>
+          <ValidationCircuit product={p} />
+        </div>
+      )}
     </Card>
   );
 }
