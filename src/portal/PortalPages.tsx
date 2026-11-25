@@ -23,7 +23,7 @@ import {
 } from '../data/store';
 import ProductPhotoEdit from '../components/ProductPhotoEdit';
 import PhotoImport from '../components/PhotoImport';
-import { BrandLogo, ContainerStatusPill, Kpi, PackPill, Pill, ProductThumb, ProformaStatusPill, Ring, Seg, ValidationCircuit } from '../components/ui';
+import { BrandLogo, ContainerStatusPill, Kpi, PackPill, Pill, ProductThumb, ProformaStatusPill, Ring, Seg, ValidationCircuit, PA } from '../components/ui';
 import { toast } from '../components/ui-shared';
 import type { Proforma } from '../data/types';
 import BookingEntry from '../components/BookingEntry';
@@ -127,7 +127,7 @@ export function PortalProducts() {
   const developed = products.filter((p) => p.developed);
   const todo = products.filter((p) => !p.developed);
   const { t, td, fmt } = useT();
-  const { dec, eur2 } = fmt;
+  const { dec } = fmt;
   return (
     <>
       <div className="page-head">
@@ -190,7 +190,7 @@ export function PortalProducts() {
                 <td>
                   <BrandLogo brand={brandOf(state.brands, p.brandId)} size={9} />
                 </td>
-                <td className="num">{eur2(p.pa)}</td>
+                <td className="num"><PA product={p} /></td>
                 <td className="num">{p.pcb}</td>
                 <td className="num">{dec(p.cbmCarton, 3)}</td>
                 <td className="small">{p.ean}</td>

@@ -12,6 +12,9 @@ const numFmt = new Intl.NumberFormat('fr-FR');
 
 export const eur = (n: number) => eurFmt.format(n);
 export const eur2 = (n: number) => eur2Fmt.format(n);
+/** Montant dans sa devise, sans conversion : « 30,50 USD », « 6,83 € » (jusqu'à 4 décimales) */
+export const money = (n: number, currency: string) =>
+  new Intl.NumberFormat('fr-FR', { style: 'currency', currency, currencyDisplay: currency === 'EUR' ? 'symbol' : 'code', minimumFractionDigits: 2, maximumFractionDigits: 4 }).format(n);
 export const num = (n: number) => numFmt.format(Math.round(n));
 export const dec = (n: number, d = 1) =>
   new Intl.NumberFormat('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d }).format(n);

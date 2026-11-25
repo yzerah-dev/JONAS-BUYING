@@ -3,8 +3,8 @@ import { CONTAINER_COLOR, PROFORMA_COLOR, PROFORMA_ICON, onToast } from './ui-sh
 import { Check, Circle, Clock } from 'lucide-react';
 import type { Brand, ContainerStatus, Product, ProformaStatus, Supplier, ValidationStep } from '../data/types';
 import { VALIDATION_STEPS } from '../data/types';
-import { packLate, packState, type PackState } from '../data/store';
-import { initials } from '../lib/format';
+import { packLate, packState, purchasePrice, useStore, type PackState } from '../data/store';
+import { initials, money } from '../lib/format';
 import { useT } from '../i18n/context';
 import { useBlobUrl } from '../lib/blobUrl';
 
@@ -78,6 +78,13 @@ export function ProductThumb({ product, size = 44 }: { product: Product; size?: 
       <ProductPic product={product} />
     </div>
   );
+}
+
+/** Prix d'achat (PA) dans la devise du fournisseur, tel que sur la proforma : jamais converti */
+export function PA({ product }: { product: Pick<Product, 'id'> }) {
+  const { state } = useStore();
+  const pa = purchasePrice(state, product.id);
+  return <>{money(pa.price, pa.currency)}</>;
 }
 
 /** Photo du produit (remplit son cadre), ou son pictogramme tant qu'il n'a pas de photo */

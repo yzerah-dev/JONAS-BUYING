@@ -2,8 +2,8 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LayoutGrid, List, Search } from 'lucide-react';
 import { brandOf, byId, packState, productQuantities, useStore } from '../data/store';
-import { BrandLogo, ProductPic, PackPill, Pill, ProductThumb, Seg } from '../components/ui';
-import { eur2, num, weekLabel } from '../lib/format';
+import { BrandLogo, ProductPic, PackPill, Pill, ProductThumb, Seg, PA } from '../components/ui';
+import { num, weekLabel } from '../lib/format';
 import Combobox from '../components/Combobox';
 import PhotoImport from '../components/PhotoImport';
 
@@ -124,7 +124,7 @@ export default function Products() {
               <div className="mini-grid">
                 <div>
                   <div className="l">PA</div>
-                  <div className="v">{eur2(p.pa)}</div>
+                  <div className="v"><PA product={p} /></div>
                 </div>
                 <div>
                   <div className="l">PCB</div>
@@ -185,7 +185,7 @@ export default function Products() {
                     <BrandLogo brand={brandOf(state.brands, p.brandId)} size={10} />
                   </td>
                   <td>{byId(state.suppliers, p.supplierId).shortName}</td>
-                  <td className="num">{eur2(p.pa)}</td>
+                  <td className="num"><PA product={p} /></td>
                   <td className="num">{p.pcb}</td>
                   <td>
                     <PackPill product={p} />

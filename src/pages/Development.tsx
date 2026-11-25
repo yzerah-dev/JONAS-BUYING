@@ -3,10 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Calendar, Check, ChevronDown, ChevronUp, Flame, Search, Users } from 'lucide-react';
 import { brandOf, byId, capacityOf, useAuth, useStore, type State } from '../data/store';
 import type { Product } from '../data/types';
-import { BrandLogo, Pill, ProductThumb } from '../components/ui';
+import { BrandLogo, Pill, ProductThumb, PA } from '../components/ui';
 import { designerColor, toast } from '../components/ui-shared';
 import { pressable } from '../lib/a11y';
-import { TODAY, diffDays, eur2, fshort, fstamp, initials, num, weekKey, weekLabel, weekRange } from '../lib/format';
+import { TODAY, diffDays, fshort, fstamp, initials, num, weekKey, weekLabel, weekRange } from '../lib/format';
 
 type Tab = 'designer' | 'semaine' | 'urgent';
 
@@ -373,7 +373,7 @@ function Line({ p, state, showDesigner, canAct, colorOf, onOpen, onUrgent, onDon
       <span className="dev-sup">{byId(state.suppliers, p.supplierId).shortName}</span>
       <span className="dev-num">
         <small>PA</small>
-        {eur2(p.pa)}
+        <PA product={p} />
       </span>
       <span className="dev-num">
         <small>Cible</small>

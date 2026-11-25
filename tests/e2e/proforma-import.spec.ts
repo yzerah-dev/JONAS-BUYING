@@ -227,4 +227,16 @@ test('proforma Excel .xls (en-tête sur deux lignes) : produits créés avec la 
   expect(trolley.ref).not.toBe('71727');
   expect(eanOk(trolley.ean)).toBe(true);
   expect(trolley.ean).not.toBe(lug.ean);
+
+  // PA affiché dans la devise du fournisseur, tel que sur la proforma (jamais converti en euros)
+  await loginAs(page, 'David');
+  await go(page, 'produits/LTM007');
+  await expect(page.locator('.kpis').first()).toContainText('30,50 USD');
+  await expect(page.locator('dl.kv').filter({ hasText: 'PA unitaire' })).toContainText('30,50 USD');
+  await go(page, 'produits');
+  await page.getByPlaceholder(/Réf\., désignation/).fill('LTM007');
+  await expect(page.locator('.pcard', { hasText: 'LTM007' })).toContainText('30,50 USD');
+  // Produit d'un fournisseur en euros : inchangé
+  await page.getByPlaceholder(/Réf\., désignation/).fill('CP-T001');
+  await expect(page.locator('.pcard', { hasText: 'CP-T001' })).toContainText('€');
 });

@@ -592,7 +592,7 @@ export function jonasCodesFor(s: State, supplierId: string, given: { ref?: strin
  * Transforme les lignes lues sur une proforma en lignes de proforma : crée les nouveaux produits
  * (rayon, marque et designer habituels du fournisseur, pack à définir, à développer).
  */
-function materializeLines(s: State, supplierId: string, lines: ImportLine[], etd: ISODate, fx: number) {
+function materializeLines(s: State, supplierId: string, lines: ImportLine[], etd: ISODate, fx: number, currency: Currency) {
   const mine = s.products.filter((p) => p.supplierId === supplierId);
   const most = <K extends keyof Product>(k: K, fallback: Product[K]) => {
     const count = new Map<Product[K], number>();
@@ -628,6 +628,7 @@ function materializeLines(s: State, supplierId: string, lines: ImportLine[], etd
       emoji: most('emoji', '📦'),
       tint: '#eef1f5',
       pa: Math.round(l.price * fx * 100) / 100,
+      paSupplier: { price: l.price, currency },
       pcb: n.pcb,
       cbmCarton: n.cbmCarton,
       weight: 0.5,
@@ -664,6 +665,19 @@ function withMaterialized(products: Product[], mat: { created: Product[]; photos
  * Dernier prix payé d'un produit : sa ligne sur la dernière proforma signée (sinon la dernière tout court),
  * converti dans la devise donnée. À défaut, le prix d'achat de la fiche produit.
  */
+/**
+ * PA affiché : prix de la ligne de la dernière proforma (signée de préférence), dans la devise de cette proforma,
+ * sans conversion. À défaut, le prix d'achat d'origine du produit, puis le PA en euros de la fiche.
+ */
+export function purchasePrice(s: State, productId: string): { price: number; currency: Currency; from?: string } {
+  const withLine = s.proformas.filter((p) => p.lines.some((l) => l.productId === productId)).sort((a, b) => b.date.localeCompare(a.date));
+  const pf = withLine.find((p) => p.status !== 'a_signer') ?? withLine[0];
+  if (pf) return { price: pf.lines.find((x) => x.productId === productId)!.price, currency: pf.currency ?? supplierTerms(s, pf.supplierId).currency, from: pf.id };
+  const p = s.products.find((x) => x.id === productId);
+  if (p?.paSupplier) return { ...p.paSupplier };
+  return { price: p?.pa ?? 0, currency: 'EUR' };
+}
+
 export function lastPricePaid(s: State, productId: string, currency: Currency): { price: number; from?: string; date?: ISODate } {
   const fx = (c: Currency) => s.settings.fx[c] ?? 1;
   const withLine = s.proformas
@@ -874,7 +888,7 @@ function applyAction(s: State, a: Action): State {
       const u = currentUser(s);
       const bySupplier = isSupplier(u);
       const terms = supplierTerms(s, a.supplierId);
-      const mat = materializeLines(s, a.supplierId, a.lines, a.etd, fxRate(s, terms.currency));
+      const mat = materializeLines(s, a.supplierId, a.lines, a.etd, fxRate(s, terms.currency), terms.currency);
       const pf: Proforma = {
         id: a.id,
         supplierId: a.supplierId,
@@ -930,7 +944,7 @@ function applyAction(s: State, a: Action): State {
       }));
     case 'uploadProforma': {
       const pf0 = s.proformas.find((x) => x.id === a.id)!;
-      const mat = a.lines ? materializeLines(s, pf0.supplierId, a.lines, pf0.etd, fxRate(s, pf0.currency ?? 'EUR')) : null;
+      const mat = a.lines ? materializeLines(s, pf0.supplierId, a.lines, pf0.etd, fxRate(s, pf0.currency ?? 'EUR'), pf0.currency ?? 'EUR') : null;
       const next = mapPF(s, a.id, (pf) => {
         const versions = pf.versions ?? [];
         const signed = signedVersion(pf);

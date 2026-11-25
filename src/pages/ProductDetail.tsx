@@ -30,15 +30,16 @@ import {
   useStore,
   type State,
   brandOf,
+  purchasePrice,
 } from '../data/store';
 import { DEV_STAGES, type Product } from '../data/types';
 import { SITES } from '../data/seed';
 import PackFiles from '../components/PackFiles';
 import ProductGallery from '../components/ProductGallery';
 import ProductDescription from '../components/ProductDescription';
-import { BrandLogo, ProductPic, ContainerStatusPill, PackPill, Pill, ProformaStatusPill, Progress, Tabs, ValidationCircuit } from '../components/ui';
+import { BrandLogo, ProductPic, ContainerStatusPill, PackPill, Pill, ProformaStatusPill, Progress, Tabs, ValidationCircuit, PA } from '../components/ui';
 import { toast } from '../components/ui-shared';
-import { dec, eur, eur2, fdate, fshort, num, weekLabel } from '../lib/format';
+import { dec, eur, fdate, fshort, money, num, weekLabel } from '../lib/format';
 
 type Tab = 'overview' | 'design' | 'dev' | 'commandes' | 'production' | 'logistique' | 'stock' | 'docs';
 
@@ -95,7 +96,7 @@ export default function ProductDetail() {
         </div>
         <div className="grow" />
         <div className="kpis" style={{ gridTemplateColumns: 'repeat(5, minmax(100px, 1fr))' }}>
-          <Stat l="PA" v={eur2(p.pa)} />
+          <Stat l="PA" v={money(purchasePrice(state, p.id).price, purchasePrice(state, p.id).currency)} />
           <Stat l="PCB" v={String(p.pcb)} />
           <Stat l="Qté totale" v={num(q.ordered)} />
           <Stat l="En transit" v={num(q.inTransit)} />
@@ -225,7 +226,7 @@ function PriceCard({ p, q }: { p: Product; q: number }) {
     <Card title="Prix & conditionnement" icon={<Boxes size={18} className="green" />}>
       <dl className="kv">
         <dt>PA unitaire</dt>
-        <dd>{eur2(p.pa)}</dd>
+        <dd><PA product={p} /></dd>
         <dt>PCB</dt>
         <dd>{p.pcb}</dd>
         <dt>Poids unitaire</dt>
