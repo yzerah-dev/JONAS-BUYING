@@ -76,13 +76,24 @@ export interface Pack {
   startedAt?: string;
   /** Date de début annoncée par le designer */
   plannedStart?: ISODate;
-  /** Fichiers uploadés : versions du pack et dossier créa */
+  /** Fichiers uploadés : brief, die cut, ancien pack, pack (versions), dossier pack, fiches qualité */
   files?: PackFile[];
+  /** Brief marketing pour le designer */
+  brief?: string;
 }
+
+/**
+ * Rubriques de l'espace pack :
+ * brief (photos d'inspiration), diecut, oldpack (ancien pack), pack (versions du designer),
+ * crea (dossier pack du designer), quality (MSDS, fiche composition…)
+ */
+export type PackFileKind = 'brief' | 'diecut' | 'oldpack' | 'pack' | 'crea' | 'quality';
 
 export interface PackFile {
   id: string; // clé du contenu dans le stockage de fichiers
-  kind: 'pack' | 'crea';
+  kind: PackFileKind;
+  /** Fiches qualité : type de document (MSDS, fiche composition…) */
+  docType?: string;
   name: string;
   /** Chemin relatif dans le dossier créa (ex. « Rendus/vue-face.jpg ») */
   path: string;

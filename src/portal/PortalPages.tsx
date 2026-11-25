@@ -23,6 +23,7 @@ import {
 } from '../data/store';
 import ProductPhotoEdit from '../components/ProductPhotoEdit';
 import PhotoImport from '../components/PhotoImport';
+import SupplierPackFiles from './SupplierPackFiles';
 import { BrandLogo, ContainerStatusPill, Kpi, PackPill, Pill, ProductThumb, ProformaStatusPill, Ring, Seg, ValidationCircuit, PA } from '../components/ui';
 import { toast } from '../components/ui-shared';
 import type { Proforma } from '../data/types';
@@ -392,22 +393,8 @@ export function PortalPacks() {
                 {p.pack.sentToSupplier ? <Pill color="blue">{t('packs.received', { v: p.pack.artworkVersions })}</Pill> : <Pill color="grey">{t('packs.preparing')}</Pill>}
               </div>
               <div className="row wrap">
-                {p.pack.sentToSupplier && (
-                  <button className="btn sm" onClick={() => toast(t('packs.downloadToast'))}>
-                    <Download size={13} /> {t('packs.download')}
-                  </button>
-                )}
-                {p.pack.dieCut === 'requested' && (
-                  <button
-                    className="btn sm primary"
-                    onClick={() => {
-                      dispatch({ type: 'receiveDieCut', productId: p.id });
-                      toast(t('packs.dieCutToast'));
-                    }}
-                  >
-                    <Upload size={13} /> {t('packs.sendDieCut')}
-                  </button>
-                )}
+                {/* Fichiers : télécharger le pack JONAS ; déposer die cut, ancien pack, fiches qualité */}
+                <SupplierPackFiles product={p} label={p.pack.dieCut === 'requested' ? t('packs.sendDieCut') : undefined} />
                 <div className="grow" />
                 {canValidate && (
                   <>

@@ -73,16 +73,15 @@ test('upload du pack (versions) et du dossier créa, téléchargements et persis
   await row.click();
 
   const panel = page.locator('.pf-files');
-  const inputs = panel.locator('input[type=file]');
-  await inputs.nth(0).setInputFiles(files.v1);
+  await panel.getByLabel('Déposer : Pack', { exact: true }).setInputFiles(files.v1);
   await expect(panel).toContainText('pack_v1.ai');
-  await inputs.nth(0).setInputFiles(files.v2);
-  await expect(panel).toContainText('2 versions');
-  await inputs.nth(2).setInputFiles(files.folder);
-  await expect(toast(page)).toHaveText('4 fichier(s) ajouté(s) au dossier créa');
+  await panel.getByLabel('Déposer : Pack', { exact: true }).setInputFiles(files.v2);
+  await expect(panel.getByRole('region', { name: 'Pack', exact: true })).toContainText('V2');
+  await panel.getByLabel('Déposer un dossier : Dossier pack').setInputFiles(files.folder);
+  await expect(toast(page)).toHaveText('4 fichier(s) ajouté(s) : Dossier pack');
 
   await expect(panel).toContainText('pack_v2.ai');
-  await expect(panel).toContainText('4 fichiers');
+  await expect(panel.getByRole('region', { name: 'Dossier pack' })).toContainText('4 fichier(s)');
   await expect(panel).toContainText('Dossier crea AB/Rendus');
   await expect(page.locator('.pf-file-thumb')).toHaveCount(2);
   // Le pack déposé passe en attente de validation
@@ -98,16 +97,16 @@ test('upload du pack (versions) et du dossier créa, téléchargements et persis
 
   // Téléchargement de l'ensemble en zip
   const [zip] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: /Tout télécharger/ }).click()]);
-  expect(zip.suggestedFilename()).toBe(`${ref}_dossier_crea.zip`);
+  expect(zip.suggestedFilename()).toBe(`${ref}_dossier_pack.zip`);
   const z = await JSZip.loadAsync(readFileSync(await zip.path()));
   const entries = Object.keys(z.files).filter((k) => !k.endsWith('/'));
   expect(entries).toEqual(
     expect.arrayContaining([
-      'PACK_pack_v2.ai',
-      'Dossier créa/Dossier crea AB/brief.txt',
-      'Dossier créa/Dossier crea AB/Rendus/vue-face.png',
-      'Dossier créa/Dossier crea AB/Rendus/vue-dos.png',
-      'Dossier créa/Dossier crea AB/Sources/pack_AB.psd',
+      '4 - Pack/pack_v2.ai',
+      '5 - Dossier pack/Dossier crea AB/brief.txt',
+      '5 - Dossier pack/Dossier crea AB/Rendus/vue-face.png',
+      '5 - Dossier pack/Dossier crea AB/Rendus/vue-dos.png',
+      '5 - Dossier pack/Dossier crea AB/Sources/pack_AB.psd',
     ]),
   );
 

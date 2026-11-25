@@ -22,6 +22,7 @@ import type {
   Forwarder,
   JournalEntry,
   PackFile,
+  PackFileKind,
   ProformaStatus,
   ReceptionLine,
   Settings,
@@ -193,7 +194,8 @@ export type Action =
   | { type: 'reassignPack'; productId: string; designer?: string; weekOf?: ISODate }
   | { type: 'startPack'; productId: string }
   | { type: 'planPack'; productId: string; date: ISODate | null }
-  | { type: 'addPackFiles'; productId: string; kind: 'pack' | 'crea'; files: Omit<PackFile, 'kind' | 'version' | 'uploadedAt' | 'uploadedBy'>[] }
+  | { type: 'setPackBrief'; productId: string; brief: string }
+  | { type: 'addPackFiles'; productId: string; kind: PackFileKind; files: Omit<PackFile, 'kind' | 'version' | 'uploadedAt' | 'uploadedBy'>[] }
   | { type: 'removePackFile'; productId: string; fileId: string }
   | { type: 'setCapacity'; designer: string; capacity: number | null }
   | { type: 'setDefaultCapacity'; capacity: number }
@@ -318,7 +320,13 @@ export function isAllowed(s: State, a: Action): boolean {
       // Une marque utilisée par un produit ne peut pas être retirée
       return canEditProduct(u) && a.brands.every((b) => b.id && b.name.trim()) && s.products.every((p) => p.brandId === 'jonas' || a.brands.some((b) => b.id === p.brandId) || !s.brands.some((b) => b.id === p.brandId));
     case 'addPackFiles':
-    case 'removePackFile':
+      return canPackFiles(s, u, a.productId, a.kind);
+    case 'removePackFile': {
+      const f = s.products.find((x) => x.id === a.productId)?.pack.files?.find((x) => x.id === a.fileId);
+      return !!f && canPackFiles(s, u, a.productId, f.kind);
+    }
+    case 'setPackBrief':
+      return canEditProduct(u) && s.products.some((x) => x.id === a.productId);
     case 'startPack':
     case 'planPack': {
       // Le designer du pack (ou le Pilote) annonce son démarrage
@@ -1544,7 +1552,13 @@ function applyAction(s: State, a: Action): State {
           uploadedAt: stamp,
           uploadedBy: me,
         }));
-        const pack = { ...p.pack, files: [...files, ...added], startedAt: p.pack.startedAt ?? stamp };
+        // Seul le travail du designer (pack, dossier) vaut démarrage du pack ; un die cut déposé = reçu
+        const pack = {
+          ...p.pack,
+          files: [...files, ...added],
+          startedAt: a.kind === 'pack' || a.kind === 'crea' ? (p.pack.startedAt ?? stamp) : p.pack.startedAt,
+          dieCut: a.kind === 'diecut' ? ('received' as const) : p.pack.dieCut,
+        };
         if (a.kind === 'pack') {
           // Nouvelle version du pack = soumise au circuit (David)
           const v = { ...pack.validations };
@@ -1553,6 +1567,8 @@ function applyAction(s: State, a: Action): State {
         }
         return { ...p, pack };
       });
+    case 'setPackBrief':
+      return mapP(s, a.productId, (p) => ({ ...p, pack: { ...p.pack, brief: a.brief.trim() || undefined } }));
     case 'removePackFile':
       return mapP(s, a.productId, (p) => ({ ...p, pack: { ...p.pack, files: (p.pack.files ?? []).filter((f) => f.id !== a.fileId) } }));
     case 'reassignPack':
@@ -1772,8 +1788,12 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
       return { target: ref(a.productId), text: 'Pack commencé' };
     case 'planPack':
       return { target: ref(a.productId), text: a.date ? `Début prévu le ${a.date}` : 'Début prévu retiré' };
-    case 'addPackFiles':
-      return { target: ref(a.productId), text: a.kind === 'pack' ? `Pack uploadé (${a.files[0]?.name ?? ''})` : `${a.files.length} fichier(s) ajouté(s) au dossier créa` };
+    case 'addPackFiles': {
+      const where: Record<PackFileKind, string> = { brief: 'au brief marketing', diecut: 'au die cut', oldpack: 'à l’ancien pack', pack: '', crea: 'au dossier pack', quality: 'aux fiches qualité' };
+      return { target: ref(a.productId), text: a.kind === 'pack' ? `Pack uploadé (${a.files[0]?.name ?? ''})` : `${a.files.length} fichier(s) ajouté(s) ${where[a.kind]}` };
+    }
+    case 'setPackBrief':
+      return { target: ref(a.productId), text: 'Brief marketing mis à jour' };
     case 'removePackFile':
       return { target: ref(a.productId), text: 'Fichier supprimé' };
     case 'setUserRole':
@@ -1864,6 +1884,19 @@ export function listValues(s: State, key: ListKey): string[] {
 }
 /** Nombre de produits qui utilisent une valeur de liste */
 export const listUsage = (s: State, key: ListKey, v: string) => s.products.filter((p) => PRODUCT_FIELD[key](p)?.toLowerCase() === v.toLowerCase()).length;
+
+/**
+ * Espace pack : qui dépose quoi.
+ * Brief : marketing (Pilote, Direction, acheteurs). Die cut, ancien pack, fiches qualité : idem + le fournisseur du produit.
+ * Pack et dossier pack : le designer du produit (et le Pilote).
+ */
+export function canPackFiles(s: State, u: User, productId: string, kind: PackFileKind) {
+  const p = s.products.find((x) => x.id === productId);
+  if (!p || !u.active) return false;
+  if (kind === 'pack' || kind === 'crea') return u.role === 'pilote' || (u.role === 'designer' && u.designerName === p.pack.designer);
+  if (kind === 'brief') return canEditProduct(u);
+  return canEditProduct(u) || (isSupplier(u) && u.supplierId === p.supplierId);
+}
 
 /** Fiches produit : Pilote, Direction et acheteurs */
 export const canEditProduct = (u: User) => u.active && ['pilote', 'direction', 'acheteur'].includes(u.role);

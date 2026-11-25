@@ -8,7 +8,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Container as Ctn,
-  Download,
   Factory,
   FileText,
   FlaskConical,
@@ -40,9 +39,8 @@ import ProductGallery from '../components/ProductGallery';
 import ProductDescription from '../components/ProductDescription';
 import ProductEdit from '../components/ProductEdit';
 import ProductInfoView from '../components/ProductInfoView';
-import { BrandLogo, ProductPic, ContainerStatusPill, PackPill, Pill, ProformaStatusPill, Progress, Tabs, ValidationCircuit, PA } from '../components/ui';
-import { toast } from '../components/ui-shared';
-import { dec, eur, fdate, fshort, money, num, weekLabel } from '../lib/format';
+import { BrandLogo, ContainerStatusPill, PackPill, Pill, ProformaStatusPill, Progress, Tabs, ValidationCircuit, PA } from '../components/ui';
+import { TODAY, dec, eur, fdate, fshort, money, num, weekLabel } from '../lib/format';
 
 type Tab = 'info' | 'overview' | 'design' | 'dev' | 'commandes' | 'production' | 'logistique' | 'stock' | 'docs';
 
@@ -252,54 +250,39 @@ function PriceCard({ p, q }: { p: Product; q: number }) {
 function DesignCard({ p, full }: { p: Product; full?: boolean }) {
   const { dispatch } = useStore();
   const auth = useAuth();
-  const steps = ['Brief', 'Design', 'Pack'];
+  const late = p.pack.artworkDeadline < TODAY && !packDone(p);
   return (
-    <Card title="Flux de design & validations" icon={<Palette size={18} className="green" />} action={<PackPill product={p} />}>
-      <div className="row mb small">
-        {steps.map((s) => (
-          <Pill key={s} color="green" icon={<Check size={12} />}>
-            {s}
-          </Pill>
-        ))}
-        <span className="muted">Type de pack : </span>
-        <b>{p.pack.type}</b>
+    <Card title={full ? 'Design & pack' : 'Pack'} icon={<Palette size={18} className="green" />} action={<PackPill product={p} />}>
+      <div className="ps-facts">
+        <div>
+          <small>Type de pack</small>
+          <b>{p.pack.type}</b>
+        </div>
+        <div>
+          <small>Designer</small>
+          <b>{p.pack.designer}</b>
+        </div>
+        <div>
+          <small>Date limite artwork</small>
+          <b className={late ? 'red' : ''}>{fdate(p.pack.artworkDeadline)}</b>
+        </div>
+        <div>
+          <small>Version du pack</small>
+          <b>{p.pack.artworkVersions ? `V${p.pack.artworkVersions}` : '—'}</b>
+        </div>
       </div>
+      <div className="small bold mt">Validation du pack</div>
       <ValidationCircuit product={p} />
-      <div className="grid3 mt">
-        <div className="thumb" style={{ height: 90, background: '#f1ebe2', fontSize: 13, fontWeight: 800 }}>
-          📦 Pack v{p.pack.artworkVersions}
-        </div>
-        <div className="thumb" style={{ height: 90, background: '#f5f7f6', fontSize: 13, fontWeight: 800 }}>
-          ✂️ Die cut {p.pack.dieCut === 'received' ? '(reçu)' : p.pack.dieCut === 'requested' ? '(demandé)' : '(—)'}
-        </div>
-        <div className="thumb" style={{ height: 90, background: p.tint, fontSize: 44 }}>
-          <ProductPic product={p} />
-        </div>
-      </div>
-      <div className="row wrap mt">
-        <button className="btn sm" onClick={() => toast('Téléchargement Pack (AI) – démo')}>
-          <Download size={13} /> Pack (AI)
+      {full && !packDone(p) && auth.allowed({ type: 'validatePack', productId: p.id }) && (
+        <button className="btn primary sm mt" onClick={() => dispatch({ type: 'validatePack', productId: p.id })}>
+          <Check size={13} /> Valider l’étape en cours
         </button>
-        <button className="btn sm" disabled={p.pack.dieCut !== 'received'} onClick={() => toast('Téléchargement Die cut (PDF) – démo')}>
-          <Download size={13} /> Die cut (PDF)
-        </button>
-        <button className="btn sm" onClick={() => toast('Téléchargement Rendus (JPG) – démo')}>
-          <Download size={13} /> Rendus (JPG)
-        </button>
-        {full && !packDone(p) && auth.allowed({ type: 'validatePack', productId: p.id }) && (
-          <button className="btn primary sm" onClick={() => dispatch({ type: 'validatePack', productId: p.id })}>
-            <Check size={13} /> Valider l’étape en cours
-          </button>
-        )}
-      </div>
+      )}
       {full && (
         <div className="mt">
           <PackFiles p={p} />
         </div>
       )}
-      <div className="small muted mt">
-        Designer : <b>{p.pack.designer}</b> · Date limite artwork : <b className={p.pack.artworkDeadline < '2026-11-14' && !packDone(p) ? 'red' : ''}>{fdate(p.pack.artworkDeadline)}</b>
-      </div>
     </Card>
   );
 }
