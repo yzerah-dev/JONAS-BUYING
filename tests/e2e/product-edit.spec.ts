@@ -15,6 +15,7 @@ test('fiche produit : tous les champs modifiables par l’acheteur, contrôles, 
   await resetApp(page);
   await loginAs(page, 'David');
   await go(page, 'produits/CP-T001');
+  await page.getByRole('button', { name: 'Vue d’ensemble' }).click();
   await page.getByRole('button', { name: 'Modifier la fiche' }).first().click();
   const dlg = page.getByRole('dialog', { name: 'Modifier la fiche CP-T001' });
   await dlg.locator('#pe-name').fill('Tong femme paillettes or');
@@ -54,17 +55,20 @@ test('fiche produit : tous les champs modifiables par l’acheteur, contrôles, 
   expect(p).toMatchObject({ devStage: 2, devDeadline: '2027-01-15', nextAction: 'Recevoir l’échantillon', targetQty: 12000 });
   expect(p.pack).toMatchObject({ type: 'Polybag', designer: 'ROLAND', artworkDeadline: '2026-12-20' });
   expect(brands.find((b) => b.id === p.brandId)?.name).toBe('LITTLE MARCEL');
-  // Onglet « Informations produit » (ouvert par défaut) : tout en grand
-  await expect(page.getByRole('region', { name: 'Achat & conditionnement' })).toContainText('2,15 USD');
-  await expect(page.getByRole('region', { name: 'Identification' })).toContainText('LITTLE MARCEL');
-  await expect(page.getByRole('region', { name: 'Identification' })).toContainText('TX-501');
-  await expect(page.getByRole('region', { name: 'Classement' })).toContainText('Plage');
-  await expect(page.getByRole('region', { name: 'Développement & pack' })).toContainText('3 / 7 — Échantillon');
-  await expect(page.getByRole('region', { name: 'Développement & pack' })).toContainText('Polybag');
+  // Onglet « Informations produit » : tout en grand
+  await page.getByRole('button', { name: 'Informations produit' }).click();
+  await expect(page.locator('#pi-pa')).toHaveValue('2.15');
+  await expect(page.locator('#pi-currency')).toHaveValue('USD');
+  await expect(page.locator('#pi-brand')).toHaveValue('LITTLE MARCEL');
+  await expect(page.locator('#pi-supplierRef')).toHaveValue('TX-501');
+  await expect(page.locator('#pi-rayon')).toHaveValue('Plage');
+  await expect(page.locator('#pi-devStage')).toHaveValue('2');
+  await expect(page.locator('#pi-packType')).toHaveValue('Polybag');
   await expect(page.locator('.pi-complete')).toHaveText('Fiche complète');
 
   // Les nouvelles valeurs rejoignent les listes : proposées sur une autre fiche, et visibles dans Paramètres
   await go(page, 'produits/CP-C042');
+  await page.getByRole('button', { name: 'Vue d’ensemble' }).click();
   await page.getByRole('button', { name: 'Modifier la fiche' }).first().click();
   await expect(page.locator('#pe-rayon option', { hasText: 'Plage' })).toHaveCount(1);
   await expect(page.locator('#pe-brand option', { hasText: 'LITTLE MARCEL' })).toHaveCount(1);
@@ -72,6 +76,7 @@ test('fiche produit : tous les champs modifiables par l’acheteur, contrôles, 
   await go(page, 'produits/CP-T001');
 
   // Réf. déjà prise par un autre produit : refusée
+  await page.getByRole('button', { name: 'Vue d’ensemble' }).click();
   await page.getByRole('button', { name: 'Modifier la fiche' }).first().click();
   await page.locator('#pe-ref').fill('CP-C042');
   await page.getByRole('dialog').getByRole('button', { name: 'Enregistrer' }).click();
@@ -82,11 +87,13 @@ test('fiche produit : tous les champs modifiables par l’acheteur, contrôles, 
   for (const who of ['ABIR', 'Logistique']) {
     await loginAs(page, who);
     await go(page, 'produits/CP-T001');
+    await page.getByRole('button', { name: 'Vue d’ensemble' }).click();
     await expect(page.getByRole('button', { name: 'Modifier la fiche' })).toHaveCount(0);
   }
   // Direction : oui
   await loginAs(page, 'Rudy Zerah');
   await go(page, 'produits/CP-T001');
+  await page.getByRole('button', { name: 'Vue d’ensemble' }).click();
   await expect(page.getByRole('button', { name: 'Modifier la fiche' }).first()).toBeVisible();
 });
 
@@ -164,6 +171,7 @@ test('Paramètres : listes de la fiche produit (marques, rayons…) ajoutées, r
   await card.getByLabel('Nouvelle valeur : Types de pack').fill('Filet');
   await card.getByRole('button', { name: 'Ajouter' }).click();
   await go(page, 'produits/CP-T001');
+  await page.getByRole('button', { name: 'Vue d’ensemble' }).click();
   await page.getByRole('button', { name: 'Modifier la fiche' }).first().click();
   await expect(page.locator('#pe-packType option', { hasText: 'Filet' })).toHaveCount(1);
   await expect(page.locator('#pe-brand option', { hasText: 'LITTLE MARCEL' })).toHaveCount(1);
@@ -218,4 +226,53 @@ test('page « Listes produit » : vision d’ensemble, produits concernés, reno
   await go(page, 'listes');
   await expect(page.getByRole('region', { name: 'Rayons' })).toBeVisible();
   await expect(page.getByLabel('Renommer Parfumerie')).toHaveCount(0);
+});
+
+test('« Informations produit » : modification directe des champs, enregistrés en les quittant', async ({ page }) => {
+  await resetApp(page);
+  await loginAs(page, 'David');
+  await go(page, 'produits/CP-T001');
+  const info = page.locator('.pi-view');
+  // Texte : enregistré en quittant le champ (Entrée)
+  await info.locator('#pi-name').fill('Tong femme paillettes dorées');
+  await info.locator('#pi-name').press('Enter');
+  await expect(toast(page)).toContainText('Désignation enregistré(e)');
+  await expect(page.locator('main h2').first()).toHaveText('Tong femme paillettes dorées');
+  // Échap : annule
+  await info.locator('#pi-nextAction').fill('xxx');
+  await info.locator('#pi-nextAction').press('Escape');
+  await expect(info.locator('#pi-nextAction')).not.toHaveValue('xxx');
+  // Listes : enregistrées au choix ; « Autre… » pour une nouvelle valeur
+  await info.locator('#pi-material').selectOption('Polyester');
+  await expect(toast(page)).toContainText('Matière enregistré(e)');
+  await info.locator('#pi-rayon').selectOption({ label: '➕ Autre… (nouvelle valeur)' });
+  await info.locator('#pi-rayon').fill('Plage');
+  await info.locator('#pi-rayon').press('Enter');
+  await expect(toast(page)).toContainText('Rayon enregistré(e)');
+  await expect(info.locator('#pi-rayon')).toHaveValue('Plage');
+  await info.locator('#pi-designer').selectOption('ROLAND');
+  await info.locator('#pi-devStage').selectOption({ label: '4 / 7 — Validation' });
+  // Nombres, PA et devise
+  await info.locator('#pi-pcb').fill('48');
+  await info.locator('#pi-pcb').blur();
+  await info.locator('#pi-pa').fill('2,35');
+  await info.locator('#pi-pa').press('Enter');
+  await info.locator('#pi-currency').selectOption('USD');
+  await expect(page.locator('.kpis').first()).toContainText('2,35 USD');
+  // Refus : EAN invalide → message et valeur d'avant
+  const ean = await info.locator('#pi-ean').inputValue();
+  await info.locator('#pi-ean').fill('123');
+  await info.locator('#pi-ean').press('Enter');
+  await expect(toast(page)).toContainText('EAN 123 invalide');
+  await expect(info.locator('#pi-ean')).toHaveValue(ean);
+
+  const p = await product(page, 'CP-T001');
+  expect(p.p).toMatchObject({ name: 'Tong femme paillettes dorées', material: 'Polyester', rayon: 'Plage', pcb: 48, devStage: 3, paSupplier: { price: 2.35, currency: 'USD' } });
+  expect(p.p.pack.designer).toBe('ROLAND');
+
+  // Designer : lecture seule (pas de champs)
+  await loginAs(page, 'ABIR');
+  await go(page, 'produits/CP-T001');
+  await expect(page.locator('.pi-view input, .pi-view select')).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Classement' })).toContainText('Plage');
 });
