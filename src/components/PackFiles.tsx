@@ -256,7 +256,7 @@ export default function PackFiles({ p, round, onRound }: { p: Product; round?: P
           {f.name}
         </b>
         <small>
-          {fsize(f.size)} · {fstamp(f.uploadedAt)} · {f.uploadedBy}
+          {fsize(f.size)} · {fstamp(f.uploadedAt)}
         </small>
       </span>
       <span className="ps-ok" aria-hidden>
@@ -307,6 +307,8 @@ export default function PackFiles({ p, round, onRound }: { p: Product; round?: P
   };
   const done = (kind: PackFileKind) => (kind === 'brief' ? !!p.pack.brief || of('brief').length > 0 : of(kind).length > 0);
 
+  /** Rubrique sans fichier (brief : sans photo) */
+  const isEmpty = (kind: PackFileKind) => (kind === 'pack' ? packs.length === 0 : of(kind).length === 0);
   const section = (kind: PackFileKind, actions: ReactNode, children: ReactNode) => {
     const s = SECTIONS.find((x) => x.kind === kind)!;
     return (
@@ -315,11 +317,19 @@ export default function PackFiles({ p, round, onRound }: { p: Product; round?: P
           <b>{s.title}</b>
           <span className={`ps-status ${done(kind) ? 'ok' : kind === 'oldpack' ? '' : 'todo'}`}>{status(kind)}</span>
           <div className="grow" />
-          {actions}
+          {/* Rubrique vide : on dépose depuis la grande zone ; sinon le bouton sert à en ajouter */}
+          <span className={`ps-actions ${isEmpty(kind) ? 'hide-btn' : ''}`}>{actions}</span>
         </header>
-        <div className="ps-who">Déposé par : {s.who}</div>
         {children}
-        {can(kind) && <div className="pf-hint">{s.hint} Glissez-déposez ici.</div>}
+        {isEmpty(kind) &&
+          (can(kind) ? (
+            <button type="button" className="ps-empty" title={s.hint} onClick={() => inputs.current[kind]?.click()}>
+              <Upload size={20} />
+              <span>{kind === 'brief' ? 'Photos d’inspiration' : 'Glisser ou cliquer'}</span>
+            </button>
+          ) : kind === 'brief' ? null : (
+            <div className="ps-empty ro">{kind === 'oldpack' ? 'Nouveau pack' : 'Rien pour l’instant'}</div>
+          ))}
       </section>
     );
   };
@@ -370,10 +380,10 @@ export default function PackFiles({ p, round, onRound }: { p: Product; round?: P
             {canBrief ? (
               <textarea
                 className="input ps-brief"
-                rows={4}
+                rows={2}
                 id="ps-brief"
                 aria-label="Texte du brief marketing"
-                placeholder="Cible, positionnement, univers, couleurs, mentions obligatoires, prix de vente visé…"
+                placeholder="Écrire le brief : cible, univers, couleurs, mentions, prix…"
                 value={brief}
                 onChange={(e) => setBrief(e.target.value)}
                 onBlur={() => {
@@ -385,7 +395,7 @@ export default function PackFiles({ p, round, onRound }: { p: Product; round?: P
             ) : p.pack.brief ? (
               <p className="ps-brief-text">{p.pack.brief}</p>
             ) : (
-              <p className="muted small">Pas encore de brief écrit.</p>
+              <p className="ps-brief-text muted">Pas de brief écrit.</p>
             )}
             {of('brief').length > 0 && (
               <div className="ps-inspis">
@@ -409,16 +419,6 @@ export default function PackFiles({ p, round, onRound }: { p: Product; round?: P
           pick('diecut', 'Déposer le die cut', { multiple: true }),
           <>
             {of('diecut').map((f) => fileLine(f))}
-            {!of('diecut').length && <p className="muted small">{p.pack.dieCut === 'requested' ? 'Demandé au fournisseur, pas encore reçu.' : 'Pas encore de die cut.'}</p>}
-          </>,
-        )}
-
-        {open === 'pack' && section(
-          'oldpack',
-          pick('oldpack', "Déposer l'ancien pack", { multiple: true }),
-          <>
-            {of('oldpack').map((f) => fileLine(f))}
-            {!of('oldpack').length && <p className="muted small">Aucun : nouveau pack.</p>}
           </>,
         )}
 
@@ -433,7 +433,6 @@ export default function PackFiles({ p, round, onRound }: { p: Product; round?: P
                 {fileLine(f, <span className={`pf-ver ${i === 0 ? 'on' : ''}`}>V{f.version}</span>)}
               </div>
             ))}
-            {!packs.length && <p className="muted small">Pas encore de pack déposé.</p>}
           </>,
         )}
 
@@ -469,7 +468,14 @@ export default function PackFiles({ p, round, onRound }: { p: Product; round?: P
                 {list.map((f) => fileLine(f))}
               </div>
             ))}
-            {!crea.length && <p className="muted small">Pas encore de fichiers.</p>}
+          </>,
+        )}
+
+        {open === 'pack' && section(
+          'oldpack',
+          pick('oldpack', "Déposer l'ancien pack", { multiple: true }),
+          <>
+            {of('oldpack').map((f) => fileLine(f))}
           </>,
         )}
 
@@ -494,7 +500,6 @@ export default function PackFiles({ p, round, onRound }: { p: Product; round?: P
                 {quality.filter((f) => (f.docType ?? 'Autre') === t).map((f) => fileLine(f))}
               </div>
             ))}
-            {!quality.length && <p className="muted small">Pas encore de fiche qualité.</p>}
           </>,
         )}
       </div>

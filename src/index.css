@@ -1853,3 +1853,23 @@ select.pi-input { cursor: pointer; }
 .pk-week.open .pf-week-head { background: var(--mint-band, #e9f6f0); }
 .ps-round-col { display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .ps-dl { font-weight: 700; }
+
+/* Documents du pack : rubriques minimalistes */
+.pk-docs .ps-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.pk-docs .ps-grid.single { grid-template-columns: 1fr; }
+@media (max-width: 760px) { .pk-docs .ps-grid { grid-template-columns: 1fr; } }
+.pk-docs .ps-section { border: 1px solid var(--line, #e3e7e5); border-style: solid; background: #fff; border-radius: 16px; padding: 12px 14px; box-shadow: var(--shadow); display: grid; gap: 8px; align-content: start; }
+.pk-docs .ps-section.over { border-color: var(--green); background: var(--green-soft); }
+.pk-docs .ps-section header { gap: 8px; }
+.pk-docs .ps-section header b { font-size: 15px; font-weight: 800; }
+.ps-actions { display: inline-flex; gap: 6px; align-items: center; }
+.ps-actions.hide-btn .btn { display: none; }
+.ps-empty { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 64px; border: 2px dashed #cfdcd6; border-radius: 12px; background: #fafcfb; color: var(--green-dark); font-weight: 700; font-size: 14px; cursor: pointer; width: 100%; }
+.ps-empty:hover { border-color: var(--green); background: var(--green-soft); }
+.ps-empty.ro { cursor: default; color: var(--muted); font-weight: 600; border-color: #e3e7e5; }
+.pk-docs .ps-brief { font-size: 14px; min-height: 0; }
+.pk-docs .pf-file { border: 1px solid var(--line, #eef1ef); border-radius: 10px; padding: 6px 8px; background: #fbfcfc; }
+.pk-docs .pf-file + .pf-file { margin-top: 6px; }
+.pk-docs .pf-file-name small { font-size: 11px; }
+.pk-docs .ps-inspi { width: 110px; height: 110px; }
+.pk-docs .pf-folder-name { font-size: 12px; }
