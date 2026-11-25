@@ -13,7 +13,12 @@ les modifications en temps réel.
 3. **Créer les comptes** : copier `scripts/members.example.json`, y mettre les vrais e-mails
    (un compte par utilisateur de l'application : `app_user_id`), puis
    `npm run seed:supabase -- --members scripts/members.json`
-   Comptes créés sans mot de passe : connexion par lien e-mail (ou « mot de passe oublié »).
+   Comptes créés sans mot de passe : première connexion par lien e-mail, puis menu utilisateur →
+   « Définir mon mot de passe ».
+5. **E-mails de connexion** : l'envoi par défaut de Supabase ne sert qu'aux tests (très peu d'e-mails par
+   heure, et seulement vers les membres de l'équipe du projet Supabase). Configurer un SMTP
+   (*Authentication → Emails → SMTP Settings*) et, une fois l'application en ligne, son adresse dans
+   *Authentication → URL Configuration* (Site URL + Redirect URLs).
 4. **Relier l'application** : au build, définir
    - `VITE_SUPABASE_URL` = `https://ulwsixiywyikyjanbidk.supabase.co`
    - `VITE_SUPABASE_ANON_KEY` = la clé **publique** du projet (anon / publishable — jamais la clé secrète)

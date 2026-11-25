@@ -74,7 +74,7 @@ create policy docs_insert on public.docs for insert to authenticated
   with check (
     public.can_write_doc(collection, supplier_id, forwarder)
     -- journal : tout compte actif peut ajouter une entrée, signée de son identifiant (posé par le déclencheur)
-    or (collection = 'journal' and public.my_member() is not null and updated_by = auth.uid())
+    or (collection = 'journal' and (public.my_member()).user_id is not null and updated_by = auth.uid())
   );
 
 create policy docs_update on public.docs for update to authenticated

@@ -41,8 +41,15 @@ export async function pushDocs(upserts: Doc[], deletes: { collection: Collection
   const journal = upserts.filter((d) => d.collection === 'journal');
   const others = upserts.filter((d) => d.collection !== 'journal');
   if (journal.length) {
-    const { error } = await supabase().from('docs').upsert(journal, { onConflict: 'collection,id', ignoreDuplicates: true });
-    if (error) throw error;
+    // Insert simple (pas d'upsert : la base n'autorise que l'ajout). Si une entrée est déjà en base
+    // (nouvel essai après une coupure), on les reprend une par une en ignorant les doublons.
+    const { error } = await supabase().from('docs').insert(journal);
+    if (error?.code === '23505') {
+      for (const d of journal) {
+        const { error: e } = await supabase().from('docs').insert(d);
+        if (e && e.code !== '23505') throw e;
+      }
+    } else if (error) throw error;
   }
   for (let i = 0; i < others.length; i += 500) {
     const { error } = await supabase().from('docs').upsert(others.slice(i, i + 500), { onConflict: 'collection,id' });

@@ -64,6 +64,20 @@ export default function UserSwitcher() {
       {open && remoteEnabled() && (
         <div className="card menu">
           <div className="menu-title">{me.name}</div>
+          <div
+            className="menu-row"
+            onClick={async () => {
+              // Après une première connexion par lien e-mail : choisir son mot de passe
+              const password = window.prompt('Nouveau mot de passe (8 caractères minimum)');
+              if (!password) return;
+              if (password.length < 8) return window.alert('Mot de passe trop court (8 caractères minimum).');
+              const { error } = await supabase().auth.updateUser({ password });
+              window.alert(error ? `Erreur : ${error.message}` : 'Mot de passe enregistré.');
+              setOpen(false);
+            }}
+          >
+            Définir mon mot de passe
+          </div>
           <div className="menu-row" onClick={() => supabase().auth.signOut()}>
             Se déconnecter
           </div>
