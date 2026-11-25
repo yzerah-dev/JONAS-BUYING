@@ -232,7 +232,11 @@ test('proforma Excel .xls (en-tête sur deux lignes) : produits créés avec la 
   await loginAs(page, 'David');
   await go(page, 'produits/LTM007');
   await expect(page.locator('.kpis').first()).toContainText('30,50 USD');
-  await expect(page.locator('dl.kv').filter({ hasText: 'PA unitaire' })).toContainText('30,50 USD');
+  await expect(page.getByRole('region', { name: 'Achat & conditionnement' })).toContainText('30,50 USD');
+  await expect(page.getByRole('region', { name: 'Achat & conditionnement' })).toContainText('d\'après la proforma');
+  // Nouveau produit : ce qui reste à compléter est signalé
+  await expect(page.locator('.pi-complete')).toContainText('à compléter');
+  await expect(page.getByRole('region', { name: 'Classement' }).locator('.pi-todo').first()).toBeVisible();
   await go(page, 'produits');
   await page.getByPlaceholder(/Réf\., désignation/).fill('LTM007');
   await expect(page.locator('.pcard', { hasText: 'LTM007' })).toContainText('30,50 USD');

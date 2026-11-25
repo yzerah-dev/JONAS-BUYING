@@ -608,7 +608,7 @@ export function jonasCodesFor(s: State, supplierId: string, given: { ref?: strin
  * Transforme les lignes lues sur une proforma en lignes de proforma : crée les nouveaux produits
  * (rayon, marque et designer habituels du fournisseur, pack à définir, à développer).
  */
-function materializeLines(s: State, supplierId: string, lines: ImportLine[], etd: ISODate, fx: number, currency: Currency) {
+function materializeLines(s: State, supplierId: string, lines: ImportLine[], etd: ISODate, fx: number, currency: Currency, pfId?: string) {
   const mine = s.products.filter((p) => p.supplierId === supplierId);
   const most = <K extends keyof Product>(k: K, fallback: Product[K]) => {
     const count = new Map<Product[K], number>();
@@ -619,12 +619,12 @@ function materializeLines(s: State, supplierId: string, lines: ImportLine[], etd
   // Produits existants sans photo : photo lue sur la proforma
   const photos = new Map<string, ProductPhoto>();
   // PA de la fiche : celui de cette proforma (devise du fournisseur)
-  const prices = new Map<string, { price: number; currency: Currency }>();
+  const prices = new Map<string, { price: number; currency: Currency; from?: string }>();
   const codes = jonasCodesFor(s, supplierId, lines.filter((l) => !l.productId).map((l) => ({ ref: l.newProduct?.ref, ean: l.newProduct?.ean })));
   const out: ProformaLine[] = lines.map((l) => {
     if (l.productId) {
       if (l.photo) photos.set(l.productId, l.photo);
-      prices.set(l.productId, { price: l.price, currency });
+      prices.set(l.productId, { price: l.price, currency, from: pfId });
       return { productId: l.productId, qty: l.qty, price: l.price };
     }
     const n = l.newProduct!;
@@ -647,7 +647,7 @@ function materializeLines(s: State, supplierId: string, lines: ImportLine[], etd
       emoji: most('emoji', '📦'),
       tint: '#eef1f5',
       pa: Math.round(l.price * fx * 100) / 100,
-      paSupplier: { price: l.price, currency },
+      paSupplier: { price: l.price, currency, from: pfId },
       pcb: n.pcb,
       cbmCarton: n.cbmCarton,
       weight: 0.5,
@@ -675,7 +675,7 @@ function materializeLines(s: State, supplierId: string, lines: ImportLine[], etd
 }
 
 /** Catalogue après une proforma lue : nouveaux produits, et photos des produits existants qui n'en avaient pas */
-function withMaterialized(products: Product[], mat: { created: Product[]; photos: Map<string, ProductPhoto>; prices: Map<string, { price: number; currency: Currency }>; fx: number }) {
+function withMaterialized(products: Product[], mat: { created: Product[]; photos: Map<string, ProductPhoto>; prices: Map<string, { price: number; currency: Currency; from?: string }>; fx: number }) {
   const out = products.map((p) => {
     const photo = !p.photo && mat.photos.get(p.id);
     const pa = mat.prices.get(p.id);
@@ -914,7 +914,7 @@ function applyAction(s: State, a: Action): State {
       const u = currentUser(s);
       const bySupplier = isSupplier(u);
       const terms = supplierTerms(s, a.supplierId);
-      const mat = materializeLines(s, a.supplierId, a.lines, a.etd, fxRate(s, terms.currency), terms.currency);
+      const mat = materializeLines(s, a.supplierId, a.lines, a.etd, fxRate(s, terms.currency), terms.currency, a.id);
       const pf: Proforma = {
         id: a.id,
         supplierId: a.supplierId,
@@ -970,7 +970,7 @@ function applyAction(s: State, a: Action): State {
       }));
     case 'uploadProforma': {
       const pf0 = s.proformas.find((x) => x.id === a.id)!;
-      const mat = a.lines ? materializeLines(s, pf0.supplierId, a.lines, pf0.etd, fxRate(s, pf0.currency ?? 'EUR'), pf0.currency ?? 'EUR') : null;
+      const mat = a.lines ? materializeLines(s, pf0.supplierId, a.lines, pf0.etd, fxRate(s, pf0.currency ?? 'EUR'), pf0.currency ?? 'EUR', pf0.id) : null;
       const next = mapPF(s, a.id, (pf) => {
         const versions = pf.versions ?? [];
         const signed = signedVersion(pf);
@@ -1013,7 +1013,7 @@ function applyAction(s: State, a: Action): State {
       if (pf1 && doc1?.lines?.length && signedVersion(pf1)) {
         const cur = pf1.currency ?? 'EUR';
         const price = new Map(doc1.lines.map((l) => [l.productId, l.price]));
-        s = { ...s, products: s.products.map((p) => (price.has(p.id) ? { ...p, paSupplier: { price: price.get(p.id)!, currency: cur }, pa: Math.round(price.get(p.id)! * fxRate(s, cur) * 100) / 100 } : p)) };
+        s = { ...s, products: s.products.map((p) => (price.has(p.id) ? { ...p, paSupplier: { price: price.get(p.id)!, currency: cur, from: pf1.id }, pa: Math.round(price.get(p.id)! * fxRate(s, cur) * 100) / 100 } : p)) };
       }
       return mapPF(s, a.id, (pf) => {
         const doc = pendingVersion(pf)!;

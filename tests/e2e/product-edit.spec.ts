@@ -54,8 +54,14 @@ test('fiche produit : tous les champs modifiables par l’acheteur, contrôles, 
   expect(p).toMatchObject({ devStage: 2, devDeadline: '2027-01-15', nextAction: 'Recevoir l’échantillon', targetQty: 12000 });
   expect(p.pack).toMatchObject({ type: 'Polybag', designer: 'ROLAND', artworkDeadline: '2026-12-20' });
   expect(brands.find((b) => b.id === p.brandId)?.name).toBe('LITTLE MARCEL');
-  await expect(page.locator('dl.kv').filter({ hasText: 'PA unitaire' })).toContainText('2,15 USD');
-  await expect(page.locator('dl.kv').filter({ hasText: 'Marque' })).toContainText('LITTLE MARCEL');
+  // Onglet « Informations produit » (ouvert par défaut) : tout en grand
+  await expect(page.getByRole('region', { name: 'Achat & conditionnement' })).toContainText('2,15 USD');
+  await expect(page.getByRole('region', { name: 'Identification' })).toContainText('LITTLE MARCEL');
+  await expect(page.getByRole('region', { name: 'Identification' })).toContainText('TX-501');
+  await expect(page.getByRole('region', { name: 'Classement' })).toContainText('Plage');
+  await expect(page.getByRole('region', { name: 'Développement & pack' })).toContainText('3 / 7 — Échantillon');
+  await expect(page.getByRole('region', { name: 'Développement & pack' })).toContainText('Polybag');
+  await expect(page.locator('.pi-complete')).toHaveText('Fiche complète');
 
   // Les nouvelles valeurs rejoignent les listes : proposées sur une autre fiche, et visibles dans Paramètres
   await go(page, 'produits/CP-C042');

@@ -153,7 +153,7 @@ export interface Product {
   /** Autres photos (galerie : dos, détail, packaging…) */
   photos?: ProductPhoto[];
   /** Prix d'achat dans la devise du fournisseur, tel que sur la proforma (jamais converti) */
-  paSupplier?: { price: number; currency: Currency };
+  paSupplier?: { price: number; currency: Currency; /** Proforma d'où vient le prix (sinon saisi sur la fiche) */ from?: string };
   /** Description : anglais tel que reçu du fournisseur, français retravaillé par JONAS */
   description?: { en?: string; fr?: string };
   tint: string;

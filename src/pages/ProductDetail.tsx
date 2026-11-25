@@ -13,6 +13,7 @@ import {
   FileText,
   FlaskConical,
   History,
+  Info,
   LayoutGrid,
   Palette,
   ShoppingCart,
@@ -38,17 +39,18 @@ import PackFiles from '../components/PackFiles';
 import ProductGallery from '../components/ProductGallery';
 import ProductDescription from '../components/ProductDescription';
 import ProductEdit from '../components/ProductEdit';
+import ProductInfoView from '../components/ProductInfoView';
 import { BrandLogo, ProductPic, ContainerStatusPill, PackPill, Pill, ProformaStatusPill, Progress, Tabs, ValidationCircuit, PA } from '../components/ui';
 import { toast } from '../components/ui-shared';
 import { dec, eur, fdate, fshort, money, num, weekLabel } from '../lib/format';
 
-type Tab = 'overview' | 'design' | 'dev' | 'commandes' | 'production' | 'logistique' | 'stock' | 'docs';
+type Tab = 'info' | 'overview' | 'design' | 'dev' | 'commandes' | 'production' | 'logistique' | 'stock' | 'docs';
 
 export default function ProductDetail() {
   const { id } = useParams();
   const { state } = useStore();
   const navigate = useNavigate();
-  const [tab, setTab] = useState<Tab>('overview');
+  const [tab, setTab] = useState<Tab>('info');
   const idx = state.products.findIndex((p) => p.id === id);
   const p = state.products[idx];
   if (!p) return <div className="card empty">Produit introuvable.</div>;
@@ -111,6 +113,7 @@ export default function ProductDetail() {
         value={tab}
         onChange={setTab}
         tabs={[
+          { id: 'info', label: 'Informations produit', icon: <Info size={16} /> },
           { id: 'overview', label: 'Vue d’ensemble', icon: <LayoutGrid size={16} /> },
           { id: 'design', label: 'Design & Pack', icon: <Palette size={16} /> },
           { id: 'dev', label: 'Développement', icon: <FlaskConical size={16} /> },
@@ -122,6 +125,7 @@ export default function ProductDetail() {
         ]}
       />
 
+      {tab === 'info' && <ProductInfoView product={p} />}
       {tab === 'overview' && (
         <div className="split3">
           <div className="col gap-lg">
