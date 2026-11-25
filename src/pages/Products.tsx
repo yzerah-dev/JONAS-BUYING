@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LayoutGrid, List, Search } from 'lucide-react';
-import { brandOf, byId, packState, productQuantities, useStore } from '../data/store';
-import { BrandLogo, ProductPic, PackPill, Pill, ProductThumb, Seg, PA } from '../components/ui';
+import { brandOf, byId, matchTrack, packTrack, productQuantities, TRACK_ORDER, useStore, type TrackFilter } from '../data/store';
+import PackTrackDots from '../components/PackTrack';
+import { BrandLogo, ProductPic, Pill, ProductThumb, Seg, PA } from '../components/ui';
 import { num, weekLabel } from '../lib/format';
 import Combobox from '../components/Combobox';
 import PhotoImport from '../components/PhotoImport';
@@ -15,6 +16,7 @@ export default function Products() {
   const [q, setQ] = useState('');
   const [limit, setLimit] = useState(60);
   const [f, setF] = useState({ brand: 'all', rayon: 'all', supplier: 'all', collection: 'all', pack: 'all', dev: 'all', flow: 'all' });
+  const [sortBy, setSortBy] = useState<'ref' | 'pack'>('ref');
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLSelectElement>) => setF({ ...f, [k]: e.target.value });
 
   const rows = useMemo(() => {
@@ -26,12 +28,17 @@ export default function Products() {
       .filter(({ p }) => f.rayon === 'all' || p.rayon === f.rayon)
       .filter(({ p }) => f.supplier === 'all' || p.supplierId === f.supplier)
       .filter(({ p }) => f.collection === 'all' || p.collection === f.collection)
-      .filter(({ p }) => f.pack === 'all' || packState(p) === f.pack)
+      .filter(({ p }) => matchTrack(p, f.pack as TrackFilter))
       .filter(({ p }) => f.dev === 'all' || (f.dev === 'dev' ? p.developed : !p.developed))
       .filter(({ qty }) =>
         f.flow === 'all' ? true : f.flow === 'commande' ? qty.open - qty.inTransit > 0 : f.flow === 'transit' ? qty.inTransit > 0 : qty.stock > 0,
+      )
+      .sort((a, b) =>
+        sortBy === 'pack'
+          ? TRACK_ORDER[packTrack(a.p).status] - TRACK_ORDER[packTrack(b.p).status] || Number(packTrack(b.p).dieCutMissing) - Number(packTrack(a.p).dieCutMissing) || a.p.ref.localeCompare(b.p.ref)
+          : 0,
       );
-  }, [state, q, f]);
+  }, [state, q, f, sortBy]);
 
   const rayons = [...new Set(state.products.map((p) => p.rayon))];
   const collections = [...new Set(state.products.map((p) => p.collection))];
@@ -86,11 +93,17 @@ export default function Products() {
             options={[{ id: 'all', label: 'Tous les fournisseurs' }, ...state.suppliers.map((s) => ({ id: s.id, label: s.shortName, sub: `${s.flag} ${s.city}`, keywords: s.name }))]}
           />
         </div>
-        <select className="input" value={f.pack} onChange={set('pack')}>
-          <option value="all">État de pack</option>
-          <option value="ok">OK</option>
-          <option value="en_cours">En cours</option>
-          <option value="a_faire">À faire</option>
+        <select className="input" aria-label="Statut du pack" value={f.pack} onChange={set('pack')}>
+          <option value="all">Statut du pack</option>
+          <option value="diecut">Die cut manquant</option>
+          <option value="a_faire">Pack à faire</option>
+          <option value="attente">Pack en attente de validation</option>
+          <option value="a_refaire">Pack à refaire</option>
+          <option value="valide">Pack validé</option>
+        </select>
+        <select className="input" aria-label="Trier" value={sortBy} onChange={(e) => setSortBy(e.target.value as 'ref' | 'pack')}>
+          <option value="ref">Trier : par défaut</option>
+          <option value="pack">Trier : statut du pack</option>
         </select>
         <select className="input" value={f.dev} onChange={set('dev')}>
           <option value="all">Développé / en dév.</option>
@@ -146,7 +159,7 @@ export default function Products() {
                 </div>
               </div>
               <div className="row">
-                <PackPill product={p} prefix />
+                <PackTrackDots p={p} />
                 <div className="grow" />
                 <span className="small muted">Prochain chgt</span>
                 <span className="bold">{qty.nextArrival ? weekLabel(qty.nextArrival) : '—'}</span>
@@ -164,7 +177,7 @@ export default function Products() {
                 <th>Fournisseur</th>
                 <th className="num">PA</th>
                 <th className="num">PCB</th>
-                <th>État pack</th>
+                <th>Suivi pack</th>
                 <th className="num">Commandé</th>
                 <th className="num">En transit</th>
                 <th className="num">En stock</th>
@@ -190,7 +203,7 @@ export default function Products() {
                   <td className="num"><PA product={p} /></td>
                   <td className="num">{p.pcb}</td>
                   <td>
-                    <PackPill product={p} />
+                    <PackTrackDots p={p} />
                   </td>
                   <td className="num">{num(qty.ordered)}</td>
                   <td className="num">{num(qty.inTransit)}</td>

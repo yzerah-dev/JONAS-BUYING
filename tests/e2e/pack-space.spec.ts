@@ -294,3 +294,20 @@ test('Espace Designer (ABIR) : suivi pack visible sur chaque ligne, filtre et tr
   await page.locator('#pk-sort').selectOption('pack');
   await expect(page.locator('#pk-sort')).toHaveValue('pack');
 });
+
+test('Total – Produits : filtrer et trier par statut du pack', async ({ page }) => {
+  await resetApp(page);
+  await loginAs(page, 'David');
+  await go(page, 'produits');
+  await page.getByLabel('Statut du pack').selectOption('valide');
+  const cards = page.locator('.pcard');
+  await expect(cards.first()).toBeVisible();
+  const n = await cards.count();
+  await expect(page.locator('.pcard .trk[data-k="valide"]')).toHaveCount(n);
+  await page.getByLabel('Statut du pack').selectOption('diecut');
+  await expect(page.locator('.pcard').first().locator('.trk[data-k="diecut"]')).toBeVisible();
+  // Tri : les packs à refaire / en attente d'abord, les validés à la fin
+  await page.getByLabel('Statut du pack').selectOption('all');
+  await page.getByLabel('Trier').selectOption('pack');
+  await expect(page.locator('.pcard').first().locator('.trk[data-k="valide"]')).toHaveCount(0);
+});
