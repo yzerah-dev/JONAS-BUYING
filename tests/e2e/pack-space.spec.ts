@@ -286,3 +286,35 @@ test('Total – Produits : filtrer et trier par statut du pack', async ({ page }
   await page.getByLabel('Trier').selectOption('pack');
   await expect(page.locator('.pcard').first().locator('.trk[data-k="valide"]')).toHaveCount(0);
 });
+
+test('bouton Télécharger sous chaque rond : die cut, pack (dernière version), documents', async ({ page }) => {
+  await resetApp(page);
+  await loginAs(page, 'David');
+  await go(page, 'produits/CP-T001');
+  await page.getByRole('button', { name: 'Design & Pack' }).click();
+  const space = page.locator('.pack-space');
+  // Rien d'uploadé : pas de bouton
+  await expect(space.getByRole('button', { name: /^Télécharger : / })).toHaveCount(0);
+  await space.getByRole('tab', { name: /^Die cut :/ }).click();
+  await space.getByLabel('Déposer : Die cut').setInputFiles([file('diecut.pdf', 'application/pdf'), file('diecut.dxf')]);
+  await space.getByRole('tab', { name: /^Documents :/ }).click();
+  await space.getByLabel('Déposer : Fiches qualité').setInputFiles(file('msds.pdf', 'application/pdf'));
+  // Die cut (2 fichiers) : .zip
+  const [z] = await Promise.all([page.waitForEvent('download'), space.getByRole('button', { name: 'Télécharger : Die cut' }).click()]);
+  expect(z.suggestedFilename()).toBe('CP-T001_die-cut.zip');
+  // Documents (1 fichier) : le fichier lui-même
+  const [d] = await Promise.all([page.waitForEvent('download'), space.getByRole('button', { name: 'Télécharger : Documents' }).click()]);
+  expect(d.suggestedFilename()).toBe('msds.pdf');
+  // Pack : la dernière version déposée par le designer
+  const designer = await page.evaluate(() => {
+    const k = Object.keys(localStorage).find((x) => x.startsWith('jonas-buying-state'))!;
+    return JSON.parse(localStorage.getItem(k)!).products.find((p: { id: string }) => p.id === 'CP-T001').pack.designer as string;
+  });
+  await loginAs(page, designer);
+  await go(page, 'produits/CP-T001');
+  await page.getByRole('button', { name: 'Design & Pack' }).click();
+  await space.getByLabel('Déposer : Pack', { exact: true }).setInputFiles(file('pack-v1.ai'));
+  await space.getByLabel('Déposer : Pack', { exact: true }).setInputFiles(file('pack-v2.ai'));
+  const [pk] = await Promise.all([page.waitForEvent('download'), space.getByRole('button', { name: 'Télécharger : Pack' }).click()]);
+  expect(pk.suggestedFilename()).toBe('pack-v2.ai');
+});

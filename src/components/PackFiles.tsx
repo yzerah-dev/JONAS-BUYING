@@ -171,6 +171,26 @@ export default function PackFiles({ p, round, onRound }: { p: Product; round?: P
     }
   }
 
+  /** Télécharger un rond : die cut (tous), pack (dernière version), documents (toutes les fiches qualité) */
+  async function downloadRound(r: Round) {
+    const list = r === 'diecut' ? of('diecut') : r === 'pack' ? packs.slice(0, 1) : of('quality');
+    if (list.length === 1) return download(list[0]);
+    setBusy('Préparation du .zip…');
+    try {
+      const items = [];
+      for (const f of list) {
+        const blob = await getBlob(f.id);
+        if (blob) items.push({ path: r === 'docs' && f.docType ? `${f.docType}/${f.name}` : f.name, blob });
+      }
+      if (!items.length) return toast('Fichiers introuvables sur cet appareil.');
+      const zip = await zipBlobs(items);
+      const r2 = await saveBlob(zip, `${p.ref}_${r === 'diecut' ? 'die-cut' : 'documents'}.zip`);
+      if (r2 === 'unavailable') toast('Téléchargement non disponible dans cette vue.');
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function download(f: PackFile) {
     const blob = await getBlob(f.id);
     if (!blob) return toast('Fichier introuvable sur cet appareil.');
@@ -323,11 +343,18 @@ export default function PackFiles({ p, round, onRound }: { p: Product; round?: P
         {ROUNDS.map((r) => {
           const ok = roundDone(r.id);
           return (
-            <button key={r.id} type="button" role="tab" aria-selected={open === r.id} aria-label={`${r.label} : ${ok ? 'uploadé' : 'à uploader'}`} className={`ps-round ${ok ? 'ok' : 'todo'} ${open === r.id ? 'open' : ''}`} onClick={() => setOpen(r.id)}>
-              <span className="ps-circle">{ok ? <Check size={34} strokeWidth={3} /> : <r.icon size={30} />}</span>
-              <b>{r.label}</b>
-              <small>{ok ? roundStatus(r.id) : 'À uploader'}</small>
-            </button>
+            <div key={r.id} className="ps-round-col">
+              <button type="button" role="tab" aria-selected={open === r.id} aria-label={`${r.label} : ${ok ? 'uploadé' : 'à uploader'}`} className={`ps-round ${ok ? 'ok' : 'todo'} ${open === r.id ? 'open' : ''}`} onClick={() => setOpen(r.id)}>
+                <span className="ps-circle">{ok ? <Check size={34} strokeWidth={3} /> : <r.icon size={30} />}</span>
+                <b>{r.label}</b>
+                <small>{ok ? roundStatus(r.id) : 'À uploader'}</small>
+              </button>
+              {ok && (
+                <button type="button" className="btn sm ps-dl" aria-label={`Télécharger : ${r.label}`} onClick={() => downloadRound(r.id)} disabled={!!busy}>
+                  <Download size={14} /> Télécharger
+                </button>
+              )}
+            </div>
           );
         })}
       </div>
