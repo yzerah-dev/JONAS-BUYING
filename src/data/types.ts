@@ -118,6 +118,13 @@ export interface ProductPatch {
   material?: string;
   sizes?: string;
   paSupplier?: { price: number; currency: Currency };
+  packType?: string;
+  designer?: string;
+  artworkDeadline?: ISODate;
+  devStage?: number;
+  devDeadline?: ISODate;
+  nextAction?: string;
+  targetQty?: number;
   pcb?: number;
   weight?: number;
   cbmCarton?: number;
@@ -489,7 +496,12 @@ export interface Settings {
   /** Société JONAS : portée sur le tampon des proformas signées */
   company: Company;
   companyRev?: number;
+  /** Listes déroulantes de la fiche produit (valeurs proposées) */
+  lists?: Partial<Record<ListKey, string[]>>;
 }
+
+/** Listes de valeurs de la fiche produit, gérées dans Paramètres */
+export type ListKey = 'rayon' | 'collection' | 'gender' | 'material' | 'sizes' | 'packType';
 
 export interface Company {
   name: string;

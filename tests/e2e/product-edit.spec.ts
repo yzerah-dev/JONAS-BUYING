@@ -24,13 +24,25 @@ test('fiche produit : tous les champs modifiables par l’acheteur, contrôles, 
   await dlg.locator('#pe-ean').fill('3700000000013');
   await dlg.locator('#pe-ref').fill('CP-T001B');
   await dlg.locator('#pe-supplierRef').fill('tx-501');
+  // Listes déroulantes ; « Autre… » pour une nouvelle valeur (marque, rayon, collection)
+  await dlg.locator('#pe-brand').selectOption({ label: '➕ Autre… (nouvelle valeur)' });
   await dlg.locator('#pe-brand').fill('Little Marcel');
+  await dlg.locator('#pe-rayon').selectOption({ label: '➕ Autre… (nouvelle valeur)' });
   await dlg.locator('#pe-rayon').fill('Plage');
+  await dlg.locator('#pe-collection').selectOption({ label: '➕ Autre… (nouvelle valeur)' });
   await dlg.locator('#pe-collection').fill('Été 2027');
-  await dlg.locator('#pe-gender').fill('Femme');
-  await dlg.locator('#pe-material').fill('EVA');
+  await dlg.locator('#pe-gender').selectOption('Femme');
+  await dlg.locator('#pe-material').selectOption('EVA');
   await dlg.locator('#pe-pa').fill('2,15');
   await dlg.locator('#pe-currency').selectOption('USD');
+  // Développement & pack
+  await dlg.locator('#pe-devStage').selectOption({ label: '3. Échantillon' });
+  await dlg.locator('#pe-devDeadline').fill('2027-01-15');
+  await dlg.locator('#pe-nextAction').fill('Recevoir l’échantillon');
+  await dlg.locator('#pe-targetQty').fill('12000');
+  await dlg.locator('#pe-packType').selectOption('Polybag');
+  await dlg.locator('#pe-designer').selectOption('ROLAND');
+  await dlg.locator('#pe-artworkDeadline').fill('2026-12-20');
   await dlg.locator('#pe-pcb').fill('48');
   await dlg.locator('#pe-weight').fill('0,18');
   await dlg.locator('#pe-cbmCarton').fill('0.075');
@@ -39,9 +51,19 @@ test('fiche produit : tous les champs modifiables par l’acheteur, contrôles, 
 
   const { p, brands } = await product(page, 'CP-T001');
   expect(p).toMatchObject({ ref: 'CP-T001B', ean: '3700000000013', supplierRef: 'TX-501', name: 'Tong femme paillettes or', rayon: 'Plage', collection: 'Été 2027', gender: 'Femme', material: 'EVA', pcb: 48, weight: 0.18, cbmCarton: 0.075, paSupplier: { price: 2.15, currency: 'USD' } });
+  expect(p).toMatchObject({ devStage: 2, devDeadline: '2027-01-15', nextAction: 'Recevoir l’échantillon', targetQty: 12000 });
+  expect(p.pack).toMatchObject({ type: 'Polybag', designer: 'ROLAND', artworkDeadline: '2026-12-20' });
   expect(brands.find((b) => b.id === p.brandId)?.name).toBe('LITTLE MARCEL');
   await expect(page.locator('dl.kv').filter({ hasText: 'PA unitaire' })).toContainText('2,15 USD');
   await expect(page.locator('dl.kv').filter({ hasText: 'Marque' })).toContainText('LITTLE MARCEL');
+
+  // Les nouvelles valeurs rejoignent les listes : proposées sur une autre fiche, et visibles dans Paramètres
+  await go(page, 'produits/CP-C042');
+  await page.getByRole('button', { name: 'Modifier la fiche' }).first().click();
+  await expect(page.locator('#pe-rayon option', { hasText: 'Plage' })).toHaveCount(1);
+  await expect(page.locator('#pe-brand option', { hasText: 'LITTLE MARCEL' })).toHaveCount(1);
+  await page.getByRole('dialog').getByRole('button', { name: 'Annuler' }).click();
+  await go(page, 'produits/CP-T001');
 
   // Réf. déjà prise par un autre produit : refusée
   await page.getByRole('button', { name: 'Modifier la fiche' }).first().click();
@@ -109,4 +131,34 @@ test('fiches en Excel : export, modification dans Excel, import avec aperçu pui
   await page.getByRole('button', { name: 'Importer les fiches' }).click();
   await page.getByRole('dialog').getByLabel('Fichier des fiches produit').setInputFiles({ name: 'fiches2.xlsx', mimeType: '', buffer: Buffer.from(XLSX.write(bad, { type: 'buffer', bookType: 'xlsx' })) });
   await expect(page.getByRole('dialog')).toContainText('devise « GBP » inconnue');
+});
+
+test('Paramètres : listes de la fiche produit (marques, rayons…) ajoutées, retirées si inutilisées', async ({ page }) => {
+  await resetApp(page);
+  await loginAs(page, 'David');
+  await go(page, 'parametres');
+  const card = page.locator('.card', { hasText: 'Listes de la fiche produit' });
+  // Marque nouvelle
+  await card.getByLabel('Nouvelle marque').fill('Little Marcel');
+  await card.getByLabel('Signature de la marque').fill('Paris');
+  await card.getByRole('button', { name: 'Ajouter' }).click();
+  await expect(toast(page)).toContainText('Marque LITTLE MARCEL ajoutée');
+  await expect(card).toContainText('LITTLE MARCEL PARIS');
+  // Une marque utilisée ne se retire pas
+  await expect(card.getByLabel('Retirer la marque CAMILLE')).toBeDisabled();
+  // Matières : ajout, puis retrait (inutilisée)
+  await card.getByRole('tab', { name: 'Matières' }).click();
+  await card.getByLabel('Nouvelle valeur : Matières').fill('Paille');
+  await card.getByRole('button', { name: 'Ajouter' }).click();
+  await expect(card).toContainText('Paille');
+  await card.getByLabel('Retirer Paille').click();
+  await expect(card.locator('.list-chip', { hasText: 'Paille' })).toHaveCount(0);
+  // Proposée dans la fiche
+  await card.getByRole('tab', { name: 'Types de pack' }).click();
+  await card.getByLabel('Nouvelle valeur : Types de pack').fill('Filet');
+  await card.getByRole('button', { name: 'Ajouter' }).click();
+  await go(page, 'produits/CP-T001');
+  await page.getByRole('button', { name: 'Modifier la fiche' }).first().click();
+  await expect(page.locator('#pe-packType option', { hasText: 'Filet' })).toHaveCount(1);
+  await expect(page.locator('#pe-brand option', { hasText: 'LITTLE MARCEL' })).toHaveCount(1);
 });

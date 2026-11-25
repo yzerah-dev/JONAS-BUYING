@@ -1,3 +1,4 @@
+import ProductLists from '../components/ProductLists';
 import { useState } from 'react';
 import { CompanyStamp } from '../components/ProformaVersions';
 import { Check, Lock, RotateCcw, Users } from 'lucide-react';
@@ -192,6 +193,7 @@ export default function Settings() {
       <ZoomCard />
 
       <CompanyCard />
+      <ProductLists />
 
       <div className="card pad mb">
         <div className="card-title">Matrice des droits</div>

@@ -1,22 +1,48 @@
 import { useState } from 'react';
 import { Pencil, Save, X } from 'lucide-react';
-import { canEditProduct, currentUser, productPatchErrors, purchasePrice, useStore } from '../data/store';
-import type { Brand, Currency, Product, ProductPatch } from '../data/types';
+import { canEditProduct, currentUser, listValues, productPatchErrors, purchasePrice, useStore } from '../data/store';
+import { DEV_STAGES, type Brand, type Currency, type Product, type ProductPatch } from '../data/types';
 import { toast } from './ui-shared';
-import { brandFor, distinct } from '../lib/productSheet';
+import { brandFor } from '../lib/productSheet';
+import ListSelect from './ListSelect';
 
-type Form = Record<'ref' | 'ean' | 'supplierRef' | 'name' | 'brand' | 'supplierId' | 'rayon' | 'collection' | 'gender' | 'material' | 'sizes' | 'pa' | 'currency' | 'pcb' | 'weight' | 'cbmCarton', string>;
+type Key =
+  | 'ref'
+  | 'ean'
+  | 'supplierRef'
+  | 'name'
+  | 'brand'
+  | 'supplierId'
+  | 'rayon'
+  | 'collection'
+  | 'gender'
+  | 'material'
+  | 'sizes'
+  | 'pa'
+  | 'currency'
+  | 'pcb'
+  | 'weight'
+  | 'cbmCarton'
+  | 'packType'
+  | 'designer'
+  | 'artworkDeadline'
+  | 'devStage'
+  | 'devDeadline'
+  | 'nextAction'
+  | 'targetQty';
+type Form = Record<Key, string>;
 
 const num = (v: string) => Number(v.replace(',', '.').replace(/\s/g, ''));
 /** PA à 4 décimales au plus (les petits articles se négocient au dixième de centime) */
 const r4 = (n: number) => Math.round(n * 10000) / 10000;
 
-/** Bouton « Modifier la fiche » et formulaire : Pilote, Direction et acheteurs */
+/** Bouton « Modifier la fiche » et formulaire complet : Pilote, Direction et acheteurs */
 export default function ProductEdit({ product: p }: { product: Product }) {
   const { state, dispatch } = useStore();
   const [f, setF] = useState<Form | null>(null);
   if (!canEditProduct(currentUser(state))) return null;
   const brandName = (id: string) => state.brands.find((b) => b.id === id)?.name ?? (id === 'jonas' ? 'JONAS' : id.toUpperCase());
+  const designers = state.users.filter((u) => u.role === 'designer' && u.designerName).map((u) => u.designerName!);
   const open = () => {
     const pa = purchasePrice(state, p.id);
     setF({
@@ -36,13 +62,21 @@ export default function ProductEdit({ product: p }: { product: Product }) {
       pcb: String(p.pcb),
       weight: String(p.weight),
       cbmCarton: String(p.cbmCarton),
+      packType: p.pack.type,
+      designer: p.pack.designer,
+      artworkDeadline: p.pack.artworkDeadline,
+      devStage: String(p.devStage),
+      devDeadline: p.devDeadline,
+      nextAction: p.nextAction,
+      targetQty: String(p.targetQty),
     });
   };
   const save = () => {
     if (!f) return;
     const patch: ProductPatch = {};
-    const txt = (k: 'ref' | 'ean' | 'supplierRef' | 'name' | 'rayon' | 'collection' | 'gender' | 'material' | 'sizes', v: string, cur: string | undefined) => {
-      if (v.trim() !== (cur ?? '')) patch[k] = k === 'ref' || k === 'supplierRef' ? v.trim().toUpperCase() : v.trim();
+    const txt = (k: 'ref' | 'ean' | 'supplierRef' | 'name' | 'rayon' | 'collection' | 'gender' | 'material' | 'sizes' | 'packType' | 'designer' | 'artworkDeadline' | 'devDeadline' | 'nextAction', v: string, cur: string | undefined) => {
+      const x = k === 'ref' || k === 'supplierRef' ? v.trim().toUpperCase() : v.trim();
+      if (x !== (cur ?? '')) patch[k] = x;
     };
     txt('ref', f.ref, p.ref);
     txt('ean', f.ean.replace(/\s/g, ''), p.ean);
@@ -53,6 +87,11 @@ export default function ProductEdit({ product: p }: { product: Product }) {
     txt('gender', f.gender, p.gender);
     txt('material', f.material, p.material);
     txt('sizes', f.sizes, p.sizes);
+    txt('packType', f.packType, p.pack.type);
+    txt('designer', f.designer, p.pack.designer);
+    txt('artworkDeadline', f.artworkDeadline, p.pack.artworkDeadline);
+    txt('devDeadline', f.devDeadline, p.devDeadline);
+    txt('nextAction', f.nextAction, p.nextAction);
     if (f.supplierId !== p.supplierId) patch.supplierId = f.supplierId;
     const brands: Brand[] = [];
     if (f.brand.trim() && f.brand.trim().toLowerCase() !== brandName(p.brandId).toLowerCase()) {
@@ -65,6 +104,8 @@ export default function ProductEdit({ product: p }: { product: Product }) {
     if (num(f.pcb) !== p.pcb) patch.pcb = num(f.pcb);
     if (num(f.weight) !== p.weight) patch.weight = num(f.weight);
     if (num(f.cbmCarton) !== p.cbmCarton) patch.cbmCarton = num(f.cbmCarton);
+    if (Number(f.devStage) !== p.devStage) patch.devStage = Number(f.devStage);
+    if (num(f.targetQty) !== p.targetQty) patch.targetQty = num(f.targetQty);
     if (!Object.keys(patch).length) return setF(null);
     const items = [{ productId: p.id, patch }];
     const errs = productPatchErrors(state, items, brands);
@@ -73,17 +114,17 @@ export default function ProductEdit({ product: p }: { product: Product }) {
     toast(`Fiche ${patch.ref ?? p.ref} enregistrée`);
     setF(null);
   };
-  const field = (k: keyof Form, label: string, opts: { list?: string[]; type?: string; wide?: boolean } = {}) => (
+  const set = (k: Key) => (v: string) => setF({ ...f!, [k]: v });
+  const input = (k: Key, label: string, opts: { type?: 'num' | 'date'; wide?: boolean } = {}) => (
     <label htmlFor={`pe-${k}`} className={opts.wide ? 'bk-wide' : ''}>
       {label}
-      <input id={`pe-${k}`} className="input" inputMode={opts.type === 'num' ? 'decimal' : undefined} list={opts.list ? `pe-${k}-list` : undefined} value={f![k]} onChange={(e) => setF({ ...f!, [k]: e.target.value })} />
-      {opts.list && (
-        <datalist id={`pe-${k}-list`}>
-          {opts.list.map((v) => (
-            <option key={v} value={v} />
-          ))}
-        </datalist>
-      )}
+      <input id={`pe-${k}`} className="input" type={opts.type === 'date' ? 'date' : 'text'} inputMode={opts.type === 'num' ? 'decimal' : undefined} value={f![k]} onChange={(e) => set(k)(e.target.value)} />
+    </label>
+  );
+  const list = (k: Key, label: string, options: string[], extra: { allowNew?: boolean; empty?: string } = {}) => (
+    <label htmlFor={`pe-${k}`}>
+      {label}
+      <ListSelect id={`pe-${k}`} value={f![k]} options={options} onChange={set(k)} {...extra} />
     </label>
   );
   return (
@@ -106,21 +147,22 @@ export default function ProductEdit({ product: p }: { product: Product }) {
             <header className="rc-head">
               <div>
                 <h2>Modifier la fiche {p.ref}</h2>
-                <span className="muted small">Le PA est saisi dans la devise du fournisseur, tel que sur sa proforma.</span>
+                <span className="muted small">Listes : choisissez une valeur, ou « Autre… » pour en ajouter une. Les listes se gèrent aussi dans Paramètres.</span>
               </div>
               <button type="button" className="icon-btn" onClick={() => setF(null)} aria-label="Fermer">
                 <X size={20} />
               </button>
             </header>
             <div className="bk-form">
-              {field('name', 'Désignation', { wide: true })}
-              {field('ref', 'Réf. interne')}
-              {field('ean', 'EAN')}
-              {field('supplierRef', 'Réf. fournisseur')}
-              {field('brand', 'Marque (choisir ou saisir une nouvelle)', { list: [...state.brands.map((b) => b.name), 'JONAS'].filter((v, i, a) => a.indexOf(v) === i) })}
+              <h3 className="bk-wide pe-section">Produit</h3>
+              {input('name', 'Désignation', { wide: true })}
+              {input('ref', 'Réf. interne')}
+              {input('ean', 'EAN')}
+              {input('supplierRef', 'Réf. fournisseur')}
+              {list('brand', 'Marque', [...new Set(['JONAS', ...state.brands.map((b) => b.name), f.brand].filter(Boolean))])}
               <label htmlFor="pe-supplierId">
                 Fournisseur
-                <select id="pe-supplierId" className="input" value={f.supplierId} onChange={(e) => setF({ ...f, supplierId: e.target.value })}>
+                <select id="pe-supplierId" className="input" value={f.supplierId} onChange={(e) => set('supplierId')(e.target.value)}>
                   {state.suppliers.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name}
@@ -128,25 +170,38 @@ export default function ProductEdit({ product: p }: { product: Product }) {
                   ))}
                 </select>
               </label>
-              {field('rayon', 'Rayon', { list: distinct(state.products.map((x) => x.rayon)) })}
-              {field('collection', 'Collection', { list: distinct(state.products.map((x) => x.collection)) })}
-              {field('gender', 'Genre', { list: distinct(['Femme', 'Homme', 'Mixte', 'Enfant', ...state.products.map((x) => x.gender)]) })}
-              {field('material', 'Matière', { list: distinct(state.products.map((x) => x.material)) })}
-              {field('sizes', 'Tailles')}
+              {list('rayon', 'Rayon', listValues(state, 'rayon'))}
+              {list('collection', 'Collection', listValues(state, 'collection'))}
+              {list('gender', 'Genre', listValues(state, 'gender'))}
+              {list('material', 'Matière', listValues(state, 'material'))}
+              {list('sizes', 'Tailles', listValues(state, 'sizes'), { empty: '— Sans taille —' })}
+
+              <h3 className="bk-wide pe-section">Prix & conditionnement</h3>
               <div className="row" style={{ gap: 8, alignItems: 'flex-end' }}>
-                {field('pa', 'PA unitaire', { type: 'num' })}
-                <label htmlFor="pe-currency">
-                  Devise
-                  <select id="pe-currency" className="input" value={f.currency} onChange={(e) => setF({ ...f, currency: e.target.value })}>
-                    {['EUR', 'USD', 'CNY'].map((c) => (
-                      <option key={c}>{c}</option>
-                    ))}
-                  </select>
-                </label>
+                {input('pa', 'PA unitaire', { type: 'num' })}
+                {list('currency', 'Devise', ['EUR', 'USD', 'CNY'], { allowNew: false })}
               </div>
-              {field('pcb', 'PCB (pièces / carton)', { type: 'num' })}
-              {field('weight', 'Poids unitaire (kg)', { type: 'num' })}
-              {field('cbmCarton', 'CBM carton (m³)', { type: 'num' })}
+              {input('pcb', 'PCB (pièces / carton)', { type: 'num' })}
+              {input('weight', 'Poids unitaire (kg)', { type: 'num' })}
+              {input('cbmCarton', 'CBM carton (m³)', { type: 'num' })}
+
+              <h3 className="bk-wide pe-section">Développement & pack</h3>
+              <label htmlFor="pe-devStage">
+                Étape de développement
+                <select id="pe-devStage" className="input" value={f.devStage} onChange={(e) => set('devStage')(e.target.value)}>
+                  {DEV_STAGES.map((st, i) => (
+                    <option key={st} value={i}>
+                      {i + 1}. {st}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {input('devDeadline', 'Date limite développement', { type: 'date' })}
+              {input('nextAction', 'Prochaine action')}
+              {input('targetQty', 'Quantité cible', { type: 'num' })}
+              {list('packType', 'Type de pack', listValues(state, 'packType'))}
+              {list('designer', 'Designer', [...new Set([...designers, f.designer].filter(Boolean))], { allowNew: false })}
+              {input('artworkDeadline', 'Date limite artwork', { type: 'date' })}
             </div>
             <footer className="rc-foot">
               <span />

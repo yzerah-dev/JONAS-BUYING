@@ -41,6 +41,10 @@ const COLS = [
   { key: 'pcb', label: 'PCB', aliases: ['pcb', 'colisage', 'pcs carton'] },
   { key: 'weight', label: 'Poids unitaire (kg)', aliases: ['poids', 'poids unitaire', 'poids unitaire kg', 'weight'] },
   { key: 'cbmCarton', label: 'CBM carton', aliases: ['cbm carton', 'cbm', 'm3 carton', 'volume carton'] },
+  { key: 'packType', label: 'Type de pack', aliases: ['type de pack', 'pack', 'emballage', 'packing'] },
+  { key: 'designer', label: 'Designer', aliases: ['designer'] },
+  { key: 'targetQty', label: 'Quantité cible', aliases: ['quantite cible', 'qte cible', 'target qty'] },
+  { key: 'nextAction', label: 'Prochaine action', aliases: ['prochaine action', 'next action'] },
   { key: 'descFr', label: 'Description FR', aliases: ['description fr', 'description francais', 'description'] },
   { key: 'descEn', label: 'Description EN', aliases: ['description en', 'description anglais'] },
 ] as const;
@@ -77,6 +81,10 @@ export async function exportProducts(products: Product[], s: State, pa: (id: str
       pcb: p.pcb,
       weight: p.weight,
       cbmCarton: p.cbmCarton,
+      packType: p.pack.type,
+      designer: p.pack.designer,
+      targetQty: p.targetQty,
+      nextAction: p.nextAction,
       descFr: p.description?.fr ?? '',
       descEn: p.description?.en ?? '',
     };
@@ -180,6 +188,22 @@ export async function readProductSheet(file: Blob, s: State, pa: (id: string) =>
       const currency = (devCell || cur.currency) as Currency;
       if (!(price >= 0)) out.problems.push(`${line} (${p.ref}) : PA « ${paCell} » illisible`);
       else if (price !== Math.round(cur.price * 10000) / 10000 || currency !== cur.currency) patch.paSupplier = { price, currency };
+    }
+    const packType = cellText(get('packType'));
+    if (packType && packType !== p.pack.type) patch.packType = packType;
+    const designer = cellText(get('designer'));
+    if (designer) {
+      const d = s.users.find((x) => x.role === 'designer' && x.designerName && norm(x.designerName) === norm(designer));
+      if (!d) out.problems.push(`${line} (${p.ref}) : designer « ${designer} » inconnu`);
+      else if (d.designerName !== p.pack.designer) patch.designer = d.designerName;
+    }
+    const next = cellText(get('nextAction'));
+    if (next && next !== p.nextAction) patch.nextAction = next;
+    const tq = cellText(get('targetQty'));
+    if (tq) {
+      const n = toNum(tq);
+      if (!Number.isFinite(n)) out.problems.push(`${line} (${p.ref}) : quantité cible « ${tq} » illisible`);
+      else if (n !== p.targetQty) patch.targetQty = Math.round(n);
     }
     for (const k of ['pcb', 'weight', 'cbmCarton'] as const) {
       const v = cellText(get(k));

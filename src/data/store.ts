@@ -2,6 +2,7 @@ import { createContext, useContext } from 'react';
 import * as seed from './seed';
 import type {
   Brand,
+  ListKey,
   BookingProposal,
   Currency,
   ImportLine,
@@ -183,6 +184,8 @@ export type Action =
   /** Désignation (français, courte) et description (anglais du fournisseur / français JONAS) */
   | { type: 'setProductText'; productId: string; name: string; description: { en?: string; fr?: string } }
   /** Fiches produit modifiées (formulaire ou import Excel) ; marques créées au passage */
+  | { type: 'setList'; key: ListKey; values: string[] }
+  | { type: 'setBrands'; brands: Brand[] }
   | { type: 'updateProducts'; items: { productId: string; patch: ProductPatch }[]; brands?: Brand[]; source?: 'fiche' | 'excel' }
   | { type: 'markDeveloped'; productId: string }
   | { type: 'reassignPack'; productId: string; designer?: string; weekOf?: ISODate }
@@ -305,6 +308,11 @@ export function isAllowed(s: State, a: Action): boolean {
       return !!a.name.trim() && canEditProduct(u) && s.products.some((p) => p.id === a.productId);
     case 'updateProducts':
       return canEditProduct(u) && a.items.length > 0 && !productPatchErrors(s, a.items, a.brands).length;
+    case 'setList':
+      return canEditProduct(u);
+    case 'setBrands':
+      // Une marque utilisée par un produit ne peut pas être retirée
+      return canEditProduct(u) && a.brands.every((b) => b.id && b.name.trim()) && s.products.every((p) => p.brandId === 'jonas' || a.brands.some((b) => b.id === p.brandId) || !s.brands.some((b) => b.id === p.brandId));
     case 'addPackFiles':
     case 'removePackFile':
     case 'startPack':
@@ -1458,9 +1466,17 @@ function applyAction(s: State, a: Action): State {
     case 'updateProducts': {
       const brands = [...s.brands, ...(a.brands ?? []).filter((b) => !s.brands.some((x) => x.id === b.id))];
       const patches = new Map(a.items.map((i) => [i.productId, i.patch]));
+      // Valeurs nouvelles (rayon, collection…) : ajoutées aux listes déroulantes
+      const lists = { ...(s.settings.lists ?? {}) };
+      for (const { patch } of a.items)
+        for (const [k, v] of [['rayon', patch.rayon], ['collection', patch.collection], ['gender', patch.gender], ['material', patch.material], ['sizes', patch.sizes], ['packType', patch.packType]] as [ListKey, string | undefined][]) {
+          const cur = lists[k] ?? listValues(s, k);
+          if (v?.trim() && !cur.some((x) => x.toLowerCase() === v.trim().toLowerCase())) lists[k] = [...cur, v.trim()];
+        }
       return {
         ...s,
         brands,
+        settings: { ...s.settings, lists },
         products: s.products.map((p) => {
           const patch = patches.get(p.id);
           if (!patch) return p;
@@ -1472,11 +1488,22 @@ function applyAction(s: State, a: Action): State {
             next.description = en || fr ? { ...(en ? { en } : {}), ...(fr ? { fr } : {}) } : undefined;
           }
           if (patch.supplierRef !== undefined) next.supplierRef = patch.supplierRef.trim() || undefined;
+          // Champs du pack et du développement
+          const { packType, designer, artworkDeadline } = patch;
+          delete (next as Partial<ProductPatch>).packType;
+          delete (next as Partial<ProductPatch>).designer;
+          delete (next as Partial<ProductPatch>).artworkDeadline;
+          if (packType !== undefined || designer !== undefined || artworkDeadline !== undefined)
+            next.pack = { ...p.pack, ...(packType !== undefined ? { type: packType } : {}), ...(designer !== undefined ? { designer } : {}), ...(artworkDeadline !== undefined ? { artworkDeadline } : {}) };
           if (patch.sizes !== undefined) next.sizes = patch.sizes.trim() || undefined;
           return next;
         }),
       };
     }
+    case 'setList':
+      return { ...s, settings: { ...s.settings, lists: { ...(s.settings.lists ?? {}), [a.key]: [...new Set(a.values.map((v) => v.trim()).filter(Boolean))] } } };
+    case 'setBrands':
+      return { ...s, brands: a.brands.map((b) => ({ ...b, name: b.name.trim(), tagline: b.tagline.trim() })) };
     case 'setProductText':
       return mapP(s, a.productId, (p) => {
         const en = a.description.en?.trim();
@@ -1601,6 +1628,10 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
       return { target: a.productId, text: `Photos du produit : ${a.photos.length}` };
     case 'setProductText':
       return { target: a.productId, text: `Désignation et description mises à jour : ${a.name.trim()}` };
+    case 'setList':
+      return { text: `Liste « ${LIST_LABELS[a.key]} » : ${a.values.length} valeur(s)` };
+    case 'setBrands':
+      return { text: `Marques : ${a.brands.map((b) => b.name).join(', ') || 'aucune'}` };
     case 'updateProducts': {
       if (a.items.length === 1) {
         const fields = Object.keys(a.items[0].patch).map((k) => PATCH_LABELS[k as keyof ProductPatch] ?? k);
@@ -1784,6 +1815,36 @@ export const CONTAINER_STATUS_LABEL: Record<ContainerStatus, string> = {
 // ---------------------------------------------------------------------------
 // Sélecteurs / règles de calcul
 
+/** Libellés des listes de la fiche produit */
+export const LIST_LABELS: Record<ListKey, string> = { rayon: 'Rayons', collection: 'Collections', gender: 'Genres', material: 'Matières', sizes: 'Tailles', packType: 'Types de pack' };
+/** Valeurs proposées au départ (avant toute personnalisation dans Paramètres) */
+const DEFAULT_LISTS: Record<ListKey, string[]> = {
+  rayon: ['Accessoires', 'Bagagerie', 'Beauté', 'Chaussures', 'Divers', 'Jardin', 'Maison', 'Parfumerie'],
+  collection: ['Nouveauté', 'Permanent'],
+  gender: ['Femme', 'Homme', 'Mixte', 'Enfant', 'Bébé'],
+  material: ['À préciser', 'ABS', 'Bambou', 'Bois', 'Céramique', 'Coton', 'Cuir', 'EVA', 'Métal', 'Papier / carton', 'Plastique', 'Polycarbonate', 'Polyester', 'PVC', 'Textile', 'Verre'],
+  sizes: [],
+  packType: ['À définir', 'Bandeau', 'Boîte', 'Boîte + papier de soie', 'Carte + crochet', 'Carton imprimé', 'Coffret rigide', 'Étiquette volante', 'Étui', 'Hangtag', 'Polybag'],
+};
+const PRODUCT_FIELD: Record<ListKey, (p: Product) => string | undefined> = {
+  rayon: (p) => p.rayon,
+  collection: (p) => p.collection,
+  gender: (p) => p.gender,
+  material: (p) => p.material,
+  sizes: (p) => p.sizes,
+  packType: (p) => p.pack.type,
+};
+/** Valeurs d'une liste de la fiche : celles des Paramètres (sinon par défaut), plus celles déjà utilisées */
+export function listValues(s: State, key: ListKey): string[] {
+  const base = s.settings.lists?.[key] ?? DEFAULT_LISTS[key];
+  const used = s.products.map(PRODUCT_FIELD[key]).filter((v): v is string => !!v?.trim());
+  const out: string[] = [];
+  for (const v of [...base, ...used]) if (!out.some((x) => x.toLowerCase() === v.trim().toLowerCase())) out.push(v.trim());
+  return out;
+}
+/** Nombre de produits qui utilisent une valeur de liste */
+export const listUsage = (s: State, key: ListKey, v: string) => s.products.filter((p) => PRODUCT_FIELD[key](p)?.toLowerCase() === v.toLowerCase()).length;
+
 /** Fiches produit : Pilote, Direction et acheteurs */
 export const canEditProduct = (u: User) => u.active && ['pilote', 'direction', 'acheteur'].includes(u.role);
 
@@ -1800,6 +1861,13 @@ export const PATCH_LABELS: Record<keyof ProductPatch, string> = {
   material: 'Matière',
   sizes: 'Tailles',
   paSupplier: 'PA unitaire',
+  packType: 'Type de pack',
+  designer: 'Designer',
+  artworkDeadline: 'Date limite artwork',
+  devStage: 'Étape de développement',
+  devDeadline: 'Date limite développement',
+  nextAction: 'Prochaine action',
+  targetQty: 'Quantité cible',
   pcb: 'PCB',
   weight: 'Poids unitaire',
   cbmCarton: 'CBM carton',
@@ -1842,6 +1910,10 @@ export function productPatchErrors(s: State, items: { productId: string; patch: 
     if (patch.pcb !== undefined && !(Number.isInteger(patch.pcb) && patch.pcb > 0)) errs.push(`${tag} : PCB invalide`);
     if (patch.cbmCarton !== undefined && !(patch.cbmCarton > 0)) errs.push(`${tag} : CBM carton invalide`);
     if (patch.weight !== undefined && !(patch.weight >= 0)) errs.push(`${tag} : poids invalide`);
+    if (patch.designer !== undefined && !s.users.some((x) => x.role === 'designer' && x.designerName === patch.designer)) errs.push(`${tag} : designer inconnu`);
+    for (const d of [patch.artworkDeadline, patch.devDeadline]) if (d !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(d)) errs.push(`${tag} : date invalide`);
+    if (patch.devStage !== undefined && !(Number.isInteger(patch.devStage) && patch.devStage >= 0 && patch.devStage < DEV_STAGES.length)) errs.push(`${tag} : étape de développement invalide`);
+    if (patch.targetQty !== undefined && !(Number.isInteger(patch.targetQty) && patch.targetQty >= 0)) errs.push(`${tag} : quantité cible invalide`);
     if (patch.paSupplier && !(patch.paSupplier.price >= 0 && ['EUR', 'USD', 'CNY'].includes(patch.paSupplier.currency))) errs.push(`${tag} : PA invalide`);
   }
   return errs;
