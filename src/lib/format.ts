@@ -1,7 +1,10 @@
 import type { ISODate } from '../data/types';
 
-// Date "aujourd'hui" de référence de l'application (démo).
-export const TODAY: ISODate = '2026-11-14';
+// Date « aujourd'hui » de l'application : la vraie date (heure de Paris) sur la plateforme partagée ;
+// une date fixe en démo et dans les tests (données de démonstration datées autour de cette date).
+const DEMO_TODAY: ISODate = '2026-11-14';
+const shared = !!(import.meta.env?.VITE_SUPABASE_URL && import.meta.env?.VITE_SUPABASE_ANON_KEY);
+export const TODAY: ISODate = shared ? new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Paris' }) : DEMO_TODAY;
 
 const eurFmt = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
 const eur2Fmt = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2 });

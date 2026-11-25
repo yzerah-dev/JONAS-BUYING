@@ -125,6 +125,8 @@ export interface Product {
   photo?: ProductPhoto;
   /** Autres photos (galerie : dos, détail, packaging…) */
   photos?: ProductPhoto[];
+  /** Description : anglais tel que reçu du fournisseur, français retravaillé par JONAS */
+  description?: { en?: string; fr?: string };
   tint: string;
   pa: number; // prix d'achat unitaire €
   pcb: number; // pièces par carton

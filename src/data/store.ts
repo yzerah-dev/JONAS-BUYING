@@ -179,6 +179,8 @@ export type Action =
   | { type: 'setProductPhotos'; productId: string; photos: ProductPhoto[] }
   /** Import de photos en lot : ajoutées à la galerie de chaque produit (principale si le produit n'en a pas) */
   | { type: 'addProductPhotos'; items: { productId: string; photos: ProductPhoto[] }[] }
+  /** Désignation (français, courte) et description (anglais du fournisseur / français JONAS) */
+  | { type: 'setProductText'; productId: string; name: string; description: { en?: string; fr?: string } }
   | { type: 'markDeveloped'; productId: string }
   | { type: 'reassignPack'; productId: string; designer?: string; weekOf?: ISODate }
   | { type: 'startPack'; productId: string }
@@ -296,6 +298,9 @@ export function isAllowed(s: State, a: Action): boolean {
       return canEditPhotos(s, u, a.productId);
     case 'addProductPhotos':
       return a.items.length > 0 && a.items.every((i) => canEditPhotos(s, u, i.productId));
+    case 'setProductText':
+      // Fiche produit : équipe JONAS (hors finance, logistique et transitaires)
+      return !!a.name.trim() && !isSupplier(u) && u.active && !['transitaire', 'finance', 'logistique'].includes(u.role) && s.products.some((p) => p.id === a.productId);
     case 'addPackFiles':
     case 'removePackFile':
     case 'startPack':
@@ -612,6 +617,8 @@ function materializeLines(s: State, supplierId: string, lines: ImportLine[], etd
       ean,
       supplierRef: n.supplierRef?.trim().toUpperCase() || undefined,
       name: n.name.trim(),
+      // Désignation du fournisseur conservée telle quelle (description anglaise) ; la désignation peut ensuite être simplifiée en français
+      description: { en: n.name.trim() },
       brandId: most('brandId', 'jonas'),
       supplierId,
       rayon: most('rayon', 'Divers'),
@@ -1410,6 +1417,12 @@ function applyAction(s: State, a: Action): State {
       return mapP(s, a.productId, (p) => withPhotos(p, a.photo ? [a.photo, ...allPhotos(p).slice(1)] : allPhotos(p).slice(1)));
     case 'setProductPhotos':
       return mapP(s, a.productId, (p) => withPhotos(p, a.photos));
+    case 'setProductText':
+      return mapP(s, a.productId, (p) => {
+        const en = a.description.en?.trim();
+        const fr = a.description.fr?.trim();
+        return { ...p, name: a.name.trim(), description: en || fr ? { ...(en ? { en } : {}), ...(fr ? { fr } : {}) } : undefined };
+      });
     case 'addProductPhotos': {
       const add = new Map(a.items.map((i) => [i.productId, i.photos]));
       return { ...s, products: s.products.map((p) => (add.has(p.id) ? withPhotos(p, [...allPhotos(p), ...add.get(p.id)!]) : p)) };
@@ -1526,6 +1539,8 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
       return { target: a.productId, text: a.photo ? 'Photo du produit ajoutée' : 'Photo du produit retirée' };
     case 'setProductPhotos':
       return { target: a.productId, text: `Photos du produit : ${a.photos.length}` };
+    case 'setProductText':
+      return { target: a.productId, text: `Désignation et description mises à jour : ${a.name.trim()}` };
     case 'addProductPhotos': {
       const n = a.items.reduce((t, i) => t + i.photos.length, 0);
       return { target: a.items.length === 1 ? a.items[0].productId : undefined, text: `${n} photo(s) importée(s) pour ${a.items.length} produit(s)` };

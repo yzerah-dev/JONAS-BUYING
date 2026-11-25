@@ -35,6 +35,7 @@ import { DEV_STAGES, type Product } from '../data/types';
 import { SITES } from '../data/seed';
 import PackFiles from '../components/PackFiles';
 import ProductGallery from '../components/ProductGallery';
+import ProductDescription from '../components/ProductDescription';
 import { BrandLogo, ProductPic, ContainerStatusPill, PackPill, Pill, ProformaStatusPill, Progress, Tabs, ValidationCircuit } from '../components/ui';
 import { toast } from '../components/ui-shared';
 import { dec, eur, eur2, fdate, fshort, num, weekLabel } from '../lib/format';
@@ -101,6 +102,8 @@ export default function ProductDetail() {
           <Stat l="En stock" v={num(q.stock)} />
         </div>
       </div>
+
+      <ProductDescription product={p} />
 
       <Tabs<Tab>
         value={tab}

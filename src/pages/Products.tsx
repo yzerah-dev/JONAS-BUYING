@@ -118,7 +118,7 @@ export default function Products() {
                 {!p.developed && <Pill color="violet">En dév.</Pill>}
               </div>
               <div>
-                <span className="ref-tag">{p.ref}</span> <span className="bold">{p.name}</span>
+                <span className="ref-tag">{p.ref}</span> <span className="bold pcard-name">{p.name}</span>
                 <div className="muted small">{byId(state.suppliers, p.supplierId).shortName}</div>
               </div>
               <div className="mini-grid">
