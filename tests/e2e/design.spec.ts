@@ -16,8 +16,8 @@ test.describe('Espace Designer – planning et validation', () => {
     await expect(page.locator('.pk-plan tbody tr.total')).toContainText('Équipe');
   });
 
-  test('validation groupée des packs « À valider » (David)', async ({ page }) => {
-    await loginAs(page, 'David');
+  test('validation groupée des packs « À valider » (Direction)', async ({ page }) => {
+    await loginAs(page, 'Rudy Zerah');
     await go(page, 'design');
     await (await planCell(page, 'ABIR', 'S47')).click();
     await page.locator('.pk-chip', { hasText: 'À valider' }).click();
@@ -29,7 +29,7 @@ test.describe('Espace Designer – planning et validation', () => {
     await expect(btn).toContainText(String(n));
     await btn.click();
     await expect(toast(page)).toContainText(String(n));
-    // Plus rien à valider pour David sur cette case
+    // Plus rien à valider pour la Direction sur cette case
     await expect(page.locator('.pk-chip', { hasText: 'À valider' })).toBeDisabled();
   });
 });

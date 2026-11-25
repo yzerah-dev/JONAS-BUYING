@@ -50,10 +50,13 @@ test.describe('Rôles et visibilité des modules', () => {
       await page.getByRole('button', { name: 'Design & Pack' }).click();
     };
 
-    await openPack('Direction');
-    await expect(validateButton()).toHaveCount(0);
+    // Plus d'étape David : le pack uploadé est chez la Direction ; Moinard attend son tour
+    for (const who of ['David', 'Moinard']) {
+      await openPack(who);
+      await expect(validateButton()).toHaveCount(0);
+    }
 
-    for (const who of ['David', 'Direction', 'Moinard']) {
+    for (const who of ['Direction', 'Moinard']) {
       await openPack(who);
       await expect(validateButton(), `${who} doit pouvoir valider son étape`).toHaveCount(1);
       await validateButton().click();
@@ -64,10 +67,10 @@ test.describe('Rôles et visibilité des modules', () => {
     await expect(validateButton()).toHaveCount(0);
     // La validation se voit : 3 étapes validées, au tour du fournisseur, historique des décisions
     const valid = page.getByRole('region', { name: 'Validation du pack' });
-    await expect(valid).toContainText('3 / 4 validé(s)');
-    await expect(valid.locator('.pk-vlist li.done')).toHaveCount(3);
+    await expect(valid).toContainText('2 / 3 validé(s)');
+    await expect(valid.locator('.pk-vlist li.done')).toHaveCount(2);
     await expect(valid.locator('.pk-vlist li.pending')).toContainText('Fournisseur');
-    await expect(valid.locator('.pk-vh')).toHaveCount(3);
+    await expect(valid.locator('.pk-vh')).toHaveCount(2);
   });
 
   test('le pilote accède aux paramètres', async ({ page }) => {
@@ -81,7 +84,7 @@ test.describe('Rôles et visibilité des modules', () => {
 test('fournisseur : validation du pack forwardé dans le portail', async ({ page }) => {
   await resetApp(page);
   // Circuit interne complet sur CP-C042
-  for (const who of ['David', 'Direction', 'Moinard']) {
+  for (const who of ['Direction', 'Moinard']) {
     await loginAs(page, who);
     await go(page, 'produits/CP-C042');
     await page.getByRole('button', { name: 'Design & Pack' }).click();

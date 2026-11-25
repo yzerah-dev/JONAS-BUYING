@@ -68,7 +68,7 @@ const withDefaults = (def: Company, saved?: Partial<Company>): Company => ({
   gs1Prefix: saved?.gs1Prefix || def.gs1Prefix,
 });
 
-export const STORAGE_KEY = 'jonas-buying-state-v18';
+export const STORAGE_KEY = 'jonas-buying-state-v19';
 
 export const currentUser = (s: State): User => s.users.find((u) => u.id === s.currentUserId) ?? s.users[0];
 
@@ -668,7 +668,7 @@ function materializeLines(s: State, supplierId: string, lines: ImportLine[], etd
         type: 'À définir',
         designer: most('pack', mine[0]?.pack ?? ({ designer: 'ABIR' } as Product['pack'])).designer,
         artworkDeadline: deadline,
-        validations: { david: { state: 'pending' }, direction: { state: 'todo' }, moinard: { state: 'todo' }, fournisseur: { state: 'todo' } },
+        validations: { direction: { state: 'pending' }, moinard: { state: 'todo' }, fournisseur: { state: 'todo' } },
         dieCut: 'none',
         artworkVersions: 0,
         sentToSupplier: false,
@@ -1096,7 +1096,7 @@ function applyAction(s: State, a: Action): State {
     case 'uploadArtwork':
       return mapP(s, a.productId, (p) => {
         const v = { ...p.pack.validations };
-        if (VALIDATION_STEPS.every((st) => v[st].state === 'todo')) v.david = { state: 'pending' };
+        if (VALIDATION_STEPS.every((st) => v[st].state === 'todo')) v.direction = { state: 'pending' };
         return { ...p, pack: { ...p.pack, artworkVersions: p.pack.artworkVersions + 1, validations: v, startedAt: p.pack.startedAt ?? nowStamp() } };
       });
     case 'forwardPack':
@@ -1564,10 +1564,10 @@ function applyAction(s: State, a: Action): State {
           dieCut: a.kind === 'diecut' ? ('received' as const) : p.pack.dieCut,
         };
         if (a.kind === 'pack') {
-          // Nouvelle version du pack = soumise au circuit (David)
-          const v = { ...pack.validations };
-          if (VALIDATION_STEPS.every((st) => v[st].state === 'todo')) v.david = { state: 'pending' };
-          return { ...p, pack: { ...pack, validations: v, artworkVersions: Math.max(p.pack.artworkVersions, version) } };
+          // Nouvelle version du pack = soumise au circuit (Direction)
+          // Pack uploadé = envoyé en validation : le circuit (re)part de la Direction, la nouvelle version repasse chez chacun
+          const v = { direction: { state: 'pending' as const }, moinard: { state: 'todo' as const }, fournisseur: { state: 'todo' as const } };
+          return { ...p, pack: { ...pack, validations: v, sentToSupplier: false, artworkVersions: Math.max(p.pack.artworkVersions, version) } };
         }
         return { ...p, pack };
       });
@@ -2006,9 +2006,9 @@ export type PackState = 'ok' | 'en_cours' | 'a_faire';
 /** Un pack est terminé uniquement après les quatre validations. */
 export function packState(p: Product): PackState {
   const done = VALIDATION_STEPS.filter((s) => p.pack.validations[s].state === 'done').length;
-  if (done === 4) return 'ok';
-  if (done === 0 && p.pack.artworkVersions <= 1 && p.pack.validations.david.state === 'todo') return 'a_faire';
-  return done > 0 || p.pack.validations.david.state === 'pending' ? 'en_cours' : 'a_faire';
+  if (done === VALIDATION_STEPS.length) return 'ok';
+  if (done === 0 && p.pack.artworkVersions <= 1 && p.pack.validations.direction.state === 'todo') return 'a_faire';
+  return done > 0 || p.pack.validations.direction.state === 'pending' ? 'en_cours' : 'a_faire';
 }
 export function packDone(p: Product) {
   return packState(p) === 'ok';

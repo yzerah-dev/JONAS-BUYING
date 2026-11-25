@@ -88,7 +88,7 @@ export const fr = {
 
   // --- Packs
   'packs.title': 'Packs & die cuts',
-  'packs.sub': 'Circuit : David → Direction → Moinard → Fournisseur. Votre validation finalise le pack.',
+  'packs.sub': 'Circuit : Direction → Moinard → Fournisseur. Votre validation finalise le pack.',
   'packs.tab.validate': 'À valider ({n})',
   'packs.tab.diecut': 'Die cuts demandés ({n})',
   'packs.tab.all': 'Tous mes packs ({n})',
@@ -169,7 +169,6 @@ export const fr = {
   'pack.a_faire': 'À faire',
   'pack.prefix': 'État pack : ',
   'pack.late': ' · en retard',
-  'vs.david': VALIDATION_LABELS.david,
   'vs.direction': VALIDATION_LABELS.direction,
   'vs.moinard': VALIDATION_LABELS.moinard,
   'vs.fournisseur': VALIDATION_LABELS.fournisseur,
@@ -690,7 +689,7 @@ export const en: Record<Key, string> = {
   'proformas.loadingPlan': 'Loading plan',
 
   'packs.title': 'Packs & die cuts',
-  'packs.sub': 'Approval flow: David → Direction → Moinard → Supplier. Your approval finalises the pack.',
+  'packs.sub': 'Approval flow: Direction → Moinard → Supplier. Your approval finalises the pack.',
   'packs.tab.validate': 'To approve ({n})',
   'packs.tab.diecut': 'Requested die cuts ({n})',
   'packs.tab.all': 'All my packs ({n})',
@@ -767,7 +766,6 @@ export const en: Record<Key, string> = {
   'pack.a_faire': 'To do',
   'pack.prefix': 'Pack status: ',
   'pack.late': ' · late',
-  'vs.david': 'David',
   'vs.direction': 'Direction',
   'vs.moinard': 'Moinard',
   'vs.fournisseur': 'Supplier',

@@ -124,8 +124,10 @@ function ean(i: number) {
 }
 
 function validations(level: number, base: string): Record<ValidationStep, Validation> {
-  const steps: ValidationStep[] = ['david', 'direction', 'moinard', 'fournisseur'];
+  // Plus d'étape David : le niveau 0 (envoyé) et 1 donnent « chez la Direction »
+  const steps: ValidationStep[] = ['direction', 'moinard', 'fournisseur'];
   const out = {} as Record<ValidationStep, Validation>;
+  level = Math.max(0, level - 1);
   steps.forEach((s, i) => {
     if (i < level) out[s] = { state: 'done', date: addDays(base, i) };
     else if (i === level) out[s] = { state: 'pending' };
@@ -254,7 +256,7 @@ const FAMILIES: Family[] = [
 const pick = <T,>(a: T[]) => a[Math.floor(rnd() * a.length)];
 const minDate = (a: string, b: string) => (a < b ? a : b);
 const minDateMax = (a: string, floor: string) => (a > floor ? a : floor);
-const notStarted = (): Record<ValidationStep, Validation> => ({ david: { state: 'todo' }, direction: { state: 'todo' }, moinard: { state: 'todo' }, fournisseur: { state: 'todo' } });
+const notStarted = (): Record<ValidationStep, Validation> => ({ direction: { state: 'todo' }, moinard: { state: 'todo' }, fournisseur: { state: 'todo' } });
 
 let genSeq = 200;
 GEN_WEEKS.forEach((weekMonday, wi) => {
@@ -580,7 +582,7 @@ products.find((p) => p.id === 'AB-M026')!.stock.Meaux = 1800;
 // Équipe JONAS + un compte portail par fournisseur.
 export const users: User[] = [
   { id: 'yzerah', name: 'Yoni Zerah', email: 'yzerah@jonas.example', role: 'pilote', title: 'Pilote achats', active: true },
-  { id: 'david', name: 'David', email: 'david@jonas.example', role: 'acheteur', title: 'Chef de produit', validationStep: 'david', active: true },
+  { id: 'david', name: 'David', email: 'david@jonas.example', role: 'acheteur', title: 'Chef de produit', active: true },
   { id: 'direction', name: 'Rudy Zerah', email: 'rudy@jonas.example', role: 'direction', title: 'Direction générale', validationStep: 'direction', active: true },
   { id: 'direction-yoni', name: 'Yoni Zerah', email: 'yoni@jonas.example', role: 'direction', title: 'Direction générale', validationStep: 'direction', active: false }, // Yoni utilise le compte Pilote
   { id: 'moinard', name: 'Moinard', email: 'moinard@jonas.example', role: 'validateur', title: 'Validation pack', validationStep: 'moinard', active: true },

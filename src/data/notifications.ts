@@ -39,7 +39,7 @@ export function notificationsFor(s: State): Notice[] {
   if (u.designerName) {
     const mine = s.products.filter((p) => p.pack.designer === u.designerName && !packDone(p));
     const late = mine.filter(packLate);
-    const soon = mine.filter((p) => !p.pack.startedAt && p.pack.validations.david.state === 'todo' && p.pack.artworkDeadline >= TODAY && p.pack.artworkDeadline <= addDays(TODAY, 2));
+    const soon = mine.filter((p) => !p.pack.startedAt && p.pack.validations.direction.state === 'todo' && p.pack.artworkDeadline >= TODAY && p.pack.artworkDeadline <= addDays(TODAY, 2));
     const urgent = mine.filter((p) => p.urgent);
     if (urgent.length) add({ id: `urg-${u.id}-${urgent.map((p) => p.id).join(',')}`, level: 'red', title: `${urgent.length} pack(s) poussé(s) en urgent`, detail: urgent.slice(0, 4).map((p) => p.ref).join(', '), to: '/design' });
     if (soon.length) add({ id: `soon-${u.id}-${soon.length}`, level: 'orange', title: `${soon.length} pack(s) pas commencé(s) à J-2`, detail: 'Échéance dans moins de 2 jours', to: '/design' });

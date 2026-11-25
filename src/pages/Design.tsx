@@ -14,8 +14,8 @@ import { TODAY, addDays, fdate, fshort, fstamp, initials, weekKey, weekLabel, we
 function packStatus(p: Product): [string, string] {
   const v = p.pack.validations;
   if (packDone(p)) return ['Validé', 'green'];
-  if (v.david.state === 'todo') return p.pack.startedAt ? ['En création', 'violet'] : p.pack.plannedStart ? ['Début prévu', 'yellow'] : ['À traiter', 'grey'];
-  if (v.david.state === 'pending') return ['À valider', 'orange'];
+  if (v.direction.state === 'todo') return p.pack.startedAt ? ['En création', 'violet'] : p.pack.plannedStart ? ['Début prévu', 'yellow'] : ['À traiter', 'grey'];
+  if (v.direction.state === 'pending') return ['À valider', 'orange'];
   if (v.fournisseur.state === 'pending') return p.pack.sentToSupplier ? ['Chez fournisseur', 'blue'] : ['À envoyer', 'blue'];
   return ['En validation', 'orange'];
 }
@@ -200,7 +200,7 @@ function DesignPage() {
   const chosen = list.filter((p) => selected.has(p.id));
   const canValidate = chosen.filter((p) => !packDone(p) && auth.allowed({ type: 'validatePack', productId: p.id }));
   const canDieCut = chosen.filter((p) => p.pack.dieCut === 'none' && auth.allowed({ type: 'requestDieCut', productId: p.id }));
-  const canStart = chosen.filter((p) => !p.pack.startedAt && p.pack.validations.david.state === 'todo' && auth.allowed({ type: 'startPack', productId: p.id }));
+  const canStart = chosen.filter((p) => !p.pack.startedAt && p.pack.validations.direction.state === 'todo' && auth.allowed({ type: 'startPack', productId: p.id }));
   const canForward = chosen.filter((p) => p.pack.validations.moinard.state === 'done' && !p.pack.sentToSupplier && auth.allowed({ type: 'forwardPack', productId: p.id }));
   const bulk = (items: Product[], type: 'validatePack' | 'requestDieCut' | 'forwardPack', msg: string) => {
     items.forEach((p) => dispatch({ type, productId: p.id }));
@@ -479,7 +479,7 @@ function DesignPage() {
                         : undefined
                     }
                     onStart={
-                      !p.pack.startedAt && p.pack.validations.david.state === 'todo' && auth.allowed({ type: 'startPack', productId: p.id })
+                      !p.pack.startedAt && p.pack.validations.direction.state === 'todo' && auth.allowed({ type: 'startPack', productId: p.id })
                         ? () => {
                             dispatch({ type: 'startPack', productId: p.id });
                             toast(`${p.ref} : pack commencé`);
@@ -606,7 +606,7 @@ function PackRow({
         ) : (
           <Pill color={late ? 'red' : tone}>{late ? 'En retard' : label}</Pill>
         )}
-        {p.pack.startedAt && !packDone(p) && p.pack.validations.david.state === 'todo' && <small className="pk-when">depuis {fstamp(p.pack.startedAt)}</small>}
+        {p.pack.startedAt && !packDone(p) && p.pack.validations.direction.state === 'todo' && <small className="pk-when">depuis {fstamp(p.pack.startedAt)}</small>}
         {!p.pack.startedAt && p.pack.plannedStart && <small className="pk-when">prévu {fshort(p.pack.plannedStart)}</small>}
       </span>
     </div>

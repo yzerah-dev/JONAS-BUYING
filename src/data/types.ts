@@ -48,10 +48,10 @@ export interface Brand {
   tagline: string; // ex. PARIS
 }
 
-export type ValidationStep = 'david' | 'direction' | 'moinard' | 'fournisseur';
-export const VALIDATION_STEPS: ValidationStep[] = ['david', 'direction', 'moinard', 'fournisseur'];
+/** Circuit de validation du pack : un pack uploadé part directement chez la Direction, puis Moinard, puis le fournisseur */
+export type ValidationStep = 'direction' | 'moinard' | 'fournisseur';
+export const VALIDATION_STEPS: ValidationStep[] = ['direction', 'moinard', 'fournisseur'];
 export const VALIDATION_LABELS: Record<ValidationStep, string> = {
-  david: 'David',
   direction: 'Direction',
   moinard: 'Moinard',
   fournisseur: 'Fournisseur',

@@ -274,7 +274,7 @@ export default function Settings() {
           <ul className="small" style={{ paddingLeft: 18, margin: 0, lineHeight: 1.8 }}>
             <li>Capacité de référence : 69 m³ par 40HC (pilotage volumétrique, ne remplace pas une vérification physique).</li>
             <li>CBM d’une ligne = (quantité ÷ PCB) × CBM carton ; équivalent 40HC = CBM ÷ 69.</li>
-            <li>Un pack est terminé uniquement après les 4 validations : David → Direction → Moinard → Fournisseur.</li>
+            <li>Un pack uploadé part directement en validation : Direction → Moinard → Fournisseur. Il est terminé après ces 3 validations.</li>
             <li>Quantités suivies par commande, conteneur et réception (pas de double comptage).</li>
             <li>Vue conteneurs par ETA : arrivée prévue, révisée ou réelle dans la période, même si l’ETD est antérieure.</li>
             <li>Les changements de dates et de statuts sont historisés.</li>

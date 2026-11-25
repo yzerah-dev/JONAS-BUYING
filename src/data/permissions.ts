@@ -119,7 +119,7 @@ export const isForwarder = (u: User) => u.role === 'transitaire' && !!u.forwarde
 /** Page d'accueil selon le rôle : portail fournisseur, portail transitaire ou application JONAS */
 export const homeOf = (u: User) => (isSupplier(u) ? '/portail' : u.role === 'transitaire' ? '/transitaire/a-booker' : '/');
 
-/** Qui peut signer une étape du circuit David → Direction → Moinard → Fournisseur */
+/** Qui peut signer une étape du circuit Direction → Moinard → Fournisseur (le pack uploadé part chez la Direction) */
 export function canValidateStep(u: User, step: ValidationStep): boolean {
   if (!u.active) return false;
   if (u.role === 'pilote') return true; // arbitrage
