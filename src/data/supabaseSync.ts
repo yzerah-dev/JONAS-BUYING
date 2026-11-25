@@ -37,8 +37,15 @@ export async function loadDocs(): Promise<Doc[]> {
 
 /** Envoie les objets modifiés et supprimés */
 export async function pushDocs(upserts: Doc[], deletes: { collection: Collection; id: string }[]) {
-  for (let i = 0; i < upserts.length; i += 500) {
-    const { error } = await supabase().from('docs').upsert(upserts.slice(i, i + 500), { onConflict: 'collection,id' });
+  // Journal : ajout seul (la base refuse toute modification d'une entrée existante)
+  const journal = upserts.filter((d) => d.collection === 'journal');
+  const others = upserts.filter((d) => d.collection !== 'journal');
+  if (journal.length) {
+    const { error } = await supabase().from('docs').upsert(journal, { onConflict: 'collection,id', ignoreDuplicates: true });
+    if (error) throw error;
+  }
+  for (let i = 0; i < others.length; i += 500) {
+    const { error } = await supabase().from('docs').upsert(others.slice(i, i + 500), { onConflict: 'collection,id' });
     if (error) throw error;
   }
   for (const d of deletes) {

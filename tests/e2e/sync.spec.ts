@@ -30,3 +30,9 @@ test('suppression et changements reçus d’un autre utilisateur', () => {
   expect(removed.proformas.some((p) => p.id === pf.id)).toBe(false);
   expect(diffState(changed, removed).deletes).toEqual([{ collection: 'proformas', id: pf.id }]);
 });
+
+test('journal en ajout seul : jamais de suppression envoyée', () => {
+  const s = { ...load(), currentUserId: 'direction' };
+  const trimmed = { ...s, journal: s.journal.slice(1) };
+  expect(diffState(s, trimmed).deletes).toEqual([]);
+});

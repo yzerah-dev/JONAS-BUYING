@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Archive, Download, File as FileIcon, FileImage, FileText, Folder, FolderUp, Loader2, Trash2, Upload, X } from 'lucide-react';
 import { useAuth, useStore } from '../data/store';
 import type { PackFile, Product } from '../data/types';
-import { deleteBlob, newFileId, ext, fromDrop, fromInput, fsize, getBlob, putBlob, saveBlob, zipBlobs, type PickedFile } from '../lib/files';
+import { deleteBlob, newFileId, supplierScope, ext, fromDrop, fromInput, fsize, getBlob, putBlob, saveBlob, zipBlobs, type PickedFile } from '../lib/files';
 import { fstamp } from '../lib/format';
 import { toast } from './ui-shared';
 
@@ -57,7 +57,7 @@ export default function PackFiles({ p }: { p: Product }) {
     try {
       const metas = [];
       for (const [i, { file, path }] of picked.entries()) {
-        const id = newFileId(p.id, i);
+        const id = newFileId(supplierScope(p.supplierId), p.id, i);
         await putBlob(id, file);
         metas.push({ id, name: file.name, path, size: file.size, type: file.type });
       }

@@ -8,7 +8,9 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "build:shared": "tsc -b && vite build --mode supabase",
+    "dev:shared": "vite --mode supabase"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.4",

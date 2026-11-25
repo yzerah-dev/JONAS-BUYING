@@ -4,13 +4,16 @@
 //   npx tsx scripts/seed-supabase.ts --docs            → envoie les documents (produits, proformas, conteneurs…)
 //   npx tsx scripts/seed-supabase.ts --members FICHIER → crée les comptes (e-mail ↔ utilisateur de l'application)
 //
-// Variables : SUPABASE_URL (défaut : projet JONAS BUYING), SUPABASE_SERVICE_KEY (clé secrète ; dans cet
-// environnement le proxy peut l'ajouter lui-même à l'en-tête apikey).
+// Variables : SUPABASE_URL (défaut : projet JONAS BUYING ulwsixiywyikyjanbidk). La clé secrète n'est jamais
+// écrite : le proxy de l'environnement l'ajoute à l'en-tête apikey (valeur factice ici). SUPABASE_SERVICE_KEY
+// reste possible pour un poste local (clé sb_secret_… : en-tête apikey seul ; ancienne clé JWT : + Authorization).
 import { readFileSync, writeFileSync } from 'node:fs';
 import { load } from '../src/data/store';
 import { toDocs } from '../src/data/remote';
 
-const URL = process.env.SUPABASE_URL ?? 'https://szfopimewgercpkwtylu.supabase.co';
+const URL = process.env.SUPABASE_URL ?? 'https://ulwsixiywyikyjanbidk.supabase.co';
+// L'ancien projet appartient à une autre application : on refuse d'y écrire
+if (/szfopimewgercpkwtylu/.test(URL)) throw new Error('Projet Supabase interdit (autre application)');
 const KEY = process.env.SUPABASE_SERVICE_KEY ?? 'injected-by-proxy';
 const headers: Record<string, string> = { apikey: KEY, 'Content-Type': 'application/json' };
 if (process.env.SUPABASE_SERVICE_KEY?.startsWith('eyJ')) headers.Authorization = `Bearer ${KEY}`;
@@ -43,6 +46,9 @@ const mi = args.indexOf('--members');
 if (mi >= 0) {
   // [{ "email": "rudy@…", "app_user_id": "direction", "password": "facultatif" }]
   const list = JSON.parse(readFileSync(args[mi + 1], 'utf8')) as { email: string; app_user_id: string; password?: string }[];
+  // Aucun compte créé tant que la liste n'est pas complète
+  const missing = list.filter((m) => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(m.email ?? ''));
+  if (missing.length) throw new Error(`E-mails manquants ou invalides pour : ${missing.map((m) => m.app_user_id).join(', ')} — aucun compte créé.`);
   const users = load().users;
   for (const m of list) {
     const u = users.find((x) => x.id === m.app_user_id);

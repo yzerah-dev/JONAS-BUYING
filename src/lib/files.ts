@@ -27,8 +27,16 @@ async function tx<T>(mode: IDBTransactionMode, run: (s: IDBObjectStore) => IDBRe
   });
 }
 
-/** Identifiant unique d'un fichier stocké */
-export const newFileId = (productId: string, i: number) => `${productId}-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 7)}`;
+/**
+ * Identifiant unique d'un fichier stocké, qui est aussi son chemin dans le stockage partagé.
+ * Convention (règles d'accès de la base) :
+ *   suppliers/<supplierId>/…  fichiers liés à un fournisseur (proformas, commandes, packs) : équipe + ce fournisseur
+ *   forwarders/<transitaire>/… fichiers d'un transitaire (documents de ses conteneurs)     : équipe + ce transitaire
+ *   internal/…                fichiers internes JONAS                                     : équipe seulement
+ */
+export const newFileId = (scope: string, name: string, i: number) => `${scope}/${name}-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 7)}`;
+export const supplierScope = (supplierId: string) => `suppliers/${supplierId}`;
+export const forwarderScope = (forwarder: string) => `forwarders/${forwarder.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
 
 const localPut = (id: string, blob: Blob) => tx('readwrite', (s) => s.put(blob, id));
 const localGet = (id: string) => tx<Blob | undefined>('readonly', (s) => s.get(id) as IDBRequest<Blob | undefined>);

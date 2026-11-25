@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Loader2, Plus, Send, X } from 'lucide-react';
 import { currentUser, nextProformaId, supplierTerms, useAuth, useStore } from '../data/store';
 import { isSupplier } from '../data/permissions';
-import { newFileId, putBlob } from '../lib/files';
+import { newFileId, putBlob, supplierScope } from '../lib/files';
 import { TODAY, addDays } from '../lib/format';
 import { useT } from '../i18n';
 import { toast } from './ui-shared';
@@ -88,7 +88,7 @@ function NewProformaDialog({ onClose, onCreated }: { onClose: () => void; onCrea
     if (supplierSide && !file) return toast(t('np.needFile'));
     let f: { fileId: string; name: string; size: number; mime: string } | undefined;
     if (file) {
-      const fileId = newFileId(id, 0);
+      const fileId = newFileId(supplierScope(supplierId), id, 0);
       await putBlob(fileId, file);
       f = { fileId, name: file.name, size: file.size, mime: file.type };
     }
@@ -96,7 +96,7 @@ function NewProformaDialog({ onClose, onCreated }: { onClose: () => void; onCrea
     if (!supplierSide) {
       order = { source };
       if (orderFile && source !== 'saisie') {
-        const fileId = newFileId(id, 1);
+        const fileId = newFileId(supplierScope(supplierId), id, 1);
         await putBlob(fileId, orderFile);
         order.file = { fileId, name: orderFile.name, size: orderFile.size, mime: orderFile.type || 'application/octet-stream' };
       }

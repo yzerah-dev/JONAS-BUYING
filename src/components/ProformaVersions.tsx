@@ -3,7 +3,7 @@ import { Ban, Download, FilePen, FileText, Loader2, PenLine, Stamp, Upload, X } 
 import { byId, currentUser, pendingVersion, signedVersion, useAuth, useStore } from '../data/store';
 import { ROLE_DEFS } from '../data/permissions';
 import type { Company, ImportLine, Proforma, ProformaDoc } from '../data/types';
-import { getBlob, newFileId, putBlob, saveBlob, fsize } from '../lib/files';
+import { getBlob, newFileId, putBlob, saveBlob, fsize, supplierScope } from '../lib/files';
 import { purchaseOrderPdf, versionFileName, versionPdf } from '../lib/proformaPdf';
 import { addDays, diffDays, fdate, weekLabel, TODAY } from '../lib/format';
 import { useT } from '../i18n';
@@ -168,7 +168,7 @@ function UploadBox({ pf, revision, hasPending, open, setOpen }: { pf: Proforma; 
   const [review, setReview] = useState<{ file: File; lines: EditLine[] } | null>(null);
   const products = state.products.filter((p) => p.supplierId === pf.supplierId);
   const send = async (file: File, lines?: ImportLine[]) => {
-    const fileId = newFileId(pf.id, 0);
+    const fileId = newFileId(supplierScope(pf.supplierId), pf.id, 0);
     await putBlob(fileId, file);
     const n = (pf.versions ?? []).reduce((m, v) => Math.max(m, v.version), 0) + 1;
     dispatch({ type: 'uploadProforma', id: pf.id, fileId, name: file.name, size: file.size, mime: file.type, reason: revision ? reason.trim() : undefined, lines });

@@ -65,7 +65,8 @@ export function diffState(prev: State, next: State): { upserts: Doc[]; deletes: 
       seen.add(id);
       if (old.get(id) !== item) upserts.push({ collection: c, id, data: item });
     }
-    for (const id of old.keys()) if (!seen.has(id)) deletes.push({ collection: c, id });
+    // Journal en ajout seul dans la base : les entrées anciennes retirées de l'affichage restent en base
+    if (c !== 'journal') for (const id of old.keys()) if (!seen.has(id)) deletes.push({ collection: c, id });
   }
   if (prev.settings !== next.settings) upserts.push({ collection: 'settings', id: 'main', data: next.settings });
   return { upserts, deletes };

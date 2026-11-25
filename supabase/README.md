@@ -14,7 +14,7 @@ les modifications en temps réel.
    (un compte par utilisateur de l'application : `app_user_id`), puis
    `npx tsx scripts/seed-supabase.ts --members scripts/members.json`
 4. **Relier l'application** : au build, définir
-   - `VITE_SUPABASE_URL` = `https://szfopimewgercpkwtylu.supabase.co`
+   - `VITE_SUPABASE_URL` = `https://ulwsixiywyikyjanbidk.supabase.co`
    - `VITE_SUPABASE_ANON_KEY` = la clé **publique** du projet (anon / publishable — jamais la clé secrète)
 
 ## Ce qui change dans l'application reliée
