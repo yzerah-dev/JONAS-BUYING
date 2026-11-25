@@ -184,3 +184,25 @@ test('Développement = une seule page : ancienne adresse redirigée, PUSH URGENT
   await expect(toast(page)).toContainText(`${ref} marqué comme développé`);
 });
 
+
+test('vues par designer (toutes les semaines) et par semaine (tous les designers)', async ({ page }) => {
+  await resetApp(page);
+  await loginAs(page, 'David');
+  await go(page, 'design');
+  const views = page.getByRole('tablist', { name: 'Vue' });
+  // Par designer : ABIR, rangée semaine par semaine
+  await views.getByRole('tab', { name: 'Par designer' }).click();
+  await page.getByLabel('Designer').selectOption('ABIR');
+  await expect(page.locator('.pk-scope h2')).toContainText('ABIR · toutes les semaines');
+  await expect(page.locator('.pk-group-head').first()).toContainText('Semaine');
+  expect(await page.locator('.pk-group-head').count()).toBeGreaterThan(1);
+  // Par semaine : tous les designers, rangés designer par designer
+  await views.getByRole('tab', { name: 'Par semaine' }).click();
+  await expect(page.locator('.pk-scope h2')).toContainText('Toute l’équipe · Semaine');
+  const heads = await page.locator('.pk-group-head').allInnerTexts();
+  expect(heads.some((h) => h.includes('ABIR'))).toBe(true);
+  expect(heads.some((h) => h.includes('ROLAND'))).toBe(true);
+  // Designer × semaine : la case du planning
+  await views.getByRole('tab', { name: 'Designer × semaine' }).click();
+  await expect(page.locator('.pk-group-head')).toHaveCount(0);
+});

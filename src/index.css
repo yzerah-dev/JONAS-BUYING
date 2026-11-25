@@ -1840,3 +1840,8 @@ select.pi-input { cursor: pointer; }
   .pk-row .pk-c-val .trk-round svg { width: 15px; height: 15px; }
   .pk-head .pk-c-val { display: none; }
 }
+/* Développement : choix de la vue (par designer, par semaine, designer × semaine) */
+.pk-views { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.pk-view { height: 42px; padding: 0 18px; border-radius: 12px; border: 1px solid var(--line); background: #fff; font-weight: 700; font-size: 15px; cursor: pointer; }
+.pk-view.active { background: var(--grad, var(--green)); color: #fff; border-color: transparent; }
+.pk-view-pick { width: auto; height: 42px; min-width: 180px; }

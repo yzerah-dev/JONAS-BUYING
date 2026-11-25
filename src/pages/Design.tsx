@@ -91,6 +91,7 @@ function DesignPage() {
   }, [state.products]);
 
   const [designer, setDesigner] = useState(auth.user.designerName ?? 'all');
+  const [view, setView] = useState<'case' | 'designer' | 'semaine'>('case');
   const [week, setWeek] = useState(weekKey(TODAY));
   const [status, setStatus] = useState<StatusKey>('all');
   const [track, setTrack] = useState<TrackFilter>('all');
@@ -117,7 +118,14 @@ function DesignPage() {
   const cell = (d: string | 'all', wk: string) =>
     state.products.filter((p) => (d === 'all' || p.pack.designer === d) && weekKey(p.pack.artworkDeadline) === wk);
 
-  const scope = cell(designer, week);
+  // Vue : un designer sur toutes les semaines, une semaine pour tous les designers, ou une case du planning
+  const firstWeek = weeks[0]?.key ?? weekKey(TODAY);
+  const scope =
+    view === 'designer'
+      ? state.products.filter((p) => (designer === 'all' || p.pack.designer === designer) && weekKey(p.pack.artworkDeadline) >= firstWeek)
+      : view === 'semaine'
+        ? cell('all', week)
+        : cell(designer, week);
   const s = q.trim().toLowerCase();
   const list = scope
     .filter((p) => matches(p, status))
@@ -131,6 +139,20 @@ function DesignPage() {
 
   const shown = list.slice(0, limit);
   const groups: [string, Product[]][] = useMemo(() => {
+    // Vue par designer : rangée semaine par semaine ; vue par semaine : designer par designer
+    if (view === 'designer') {
+      const map = new Map<string, Product[]>();
+      for (const p of shown) {
+        const k = weekKey(p.pack.artworkDeadline);
+        map.set(k, [...(map.get(k) ?? []), p]);
+      }
+      return [...map.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([, items]) => [`Semaine ${weekLabel(items[0].pack.artworkDeadline).slice(1)} · ${weekRange(items[0].pack.artworkDeadline)}`, items]);
+    }
+    if (view === 'semaine') {
+      const map = new Map<string, Product[]>();
+      for (const p of shown) map.set(p.pack.designer, [...(map.get(p.pack.designer) ?? []), p]);
+      return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
+    }
     if (groupBy === 'none') return [['', shown]];
     const map = new Map<string, Product[]>();
     for (const p of shown) {
@@ -153,7 +175,7 @@ function DesignPage() {
     const entries = [...map.entries()];
     return groupBy === 'jour' || groupBy === 'statut' ? entries : entries.sort(([a], [b]) => a.localeCompare(b));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [list, limit, groupBy, state.suppliers, state.brands]);
+  }, [list, limit, groupBy, view, state.suppliers, state.brands]);
 
   // Réaffectation (administrateur) : glisser-déposer ou « Déplacer vers »
   const move = (ids: string[], toDesigner?: string, toWeekOf?: string) => {
@@ -186,6 +208,7 @@ function DesignPage() {
   const dragIds = (id: string) => (selected.has(id) ? [...selected] : [id]);
 
   const pick = (d: string | 'all', wk: string) => {
+    setView('case');
     setDesigner(d);
     setWeek(wk);
     setSelected(new Set());
@@ -291,17 +314,52 @@ function DesignPage() {
 
       <div className="split">
         <div className="col" style={{ gap: 12 }}>
+          {/* Choix de la vue */}
+          <div className="pk-views" role="tablist" aria-label="Vue">
+            {(
+              [
+                ['designer', 'Par designer'],
+                ['semaine', 'Par semaine'],
+                ['case', 'Designer × semaine'],
+              ] as const
+            ).map(([v, label]) => (
+              <button key={v} type="button" role="tab" aria-selected={view === v} className={`pk-view ${view === v ? 'active' : ''}`} onClick={() => (setView(v), setSelected(new Set()), setStatus('all'), setLimit(50))}>
+                {label}
+              </button>
+            ))}
+            {view !== 'semaine' && (
+              <select className="input pk-view-pick" aria-label="Designer" value={designer} onChange={(e) => setDesigner(e.target.value)}>
+                <option value="all">Toute l’équipe</option>
+                {designers.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+            )}
+            {view !== 'designer' && (
+              <select className="input pk-view-pick" aria-label="Semaine" value={week} onChange={(e) => setWeek(e.target.value)}>
+                {weeks.map((w) => (
+                  <option key={w.key} value={w.key}>
+                    Semaine {weekLabel(w.sample).slice(1)} · {weekRange(w.sample)}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
           <div className="pk-scope">
-            {designer !== 'all' && (
+            {designer !== 'all' && view !== 'semaine' && (
               <span className="dev-avatar lg" style={{ background: colorOf(designer) }}>
                 {initials(designer)}
               </span>
             )}
             <div>
               <h2>
-                {designer === 'all' ? 'Toute l’équipe' : designer} · Semaine {weekLabel(weekSample).slice(1)}
+                {view === 'semaine' ? 'Toute l’équipe' : designer === 'all' ? 'Toute l’équipe' : designer}
+                {view === 'designer' ? ' · toutes les semaines' : ` · Semaine ${weekLabel(weekSample).slice(1)}`}
               </h2>
-              <span className="muted">{weekRange(weekSample)}</span>
+              <span className="muted">{view === 'designer' ? 'Packs à venir, semaine par semaine' : weekRange(weekSample)}</span>
             </div>
             <div className="pk-scope-stats">
               <span>
@@ -316,7 +374,7 @@ function DesignPage() {
               <span className={late ? 'red' : ''}>
                 <b>{late}</b> en retard
               </span>
-              {designer !== 'all' && (
+              {designer !== 'all' && view === 'case' && (
                 <span className={scope.length > capacityOf(state, designer) ? 'red' : 'muted'}>
                   <b>{scope.length}</b>/{capacityOf(state, designer)} capacité
                 </span>
