@@ -2001,3 +2001,8 @@ select.pi-input { cursor: pointer; }
 }
 @media (max-width: 640px) { .np-line > .np-prod { grid-column: 1 / -1; } }
 .np-new .input, .np-line .input { width: 100%; min-width: 0; box-sizing: border-box; }
+
+/* Fenêtres : toujours entières dans l'écran (marge du haut comprise), en-tête et boutons toujours visibles */
+.bk-dialog { max-height: calc((100dvh - 10vh) / var(--z) - 24px); }
+.bk-dialog > .rc-head { position: sticky; top: 0; z-index: 3; background: var(--card, #fff); }
+.bk-dialog > .rc-foot { position: sticky; bottom: 0; z-index: 3; background: var(--card, #fff); box-shadow: 0 -6px 12px -8px rgba(10, 20, 16, 0.18); }
