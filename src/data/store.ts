@@ -54,7 +54,7 @@ export const DEFAULT_SETTINGS: Settings = {
   defaultCapacity: 40,
   capacity: {},
   fx: { EUR: 1, USD: 0.93, CNY: 0.128 },
-  company: { name: 'JONAS INTERNATIONAL', address: '189 rue d\'Aubervilliers', city: '75018 Paris', vat: 'FR50842235913', gs1Prefix: DEFAULT_GS1 },
+  company: { name: 'JONAS INTERNATIONAL', address: "189 rue d'Aubervilliers", city: '75018 Paris', vat: 'FR50842235913', gs1Prefix: DEFAULT_GS1 },
 };
 
 /** Version de l'adresse société par défaut : une hausse réapplique l'adresse par défaut aux navigateurs existants */
@@ -92,7 +92,19 @@ export function load(): State {
     if (raw) {
       const st = JSON.parse(raw) as State;
       // Compatibilité : anciens états sans paramètres ni journal
-      return { ...st, settings: { ...DEFAULT_SETTINGS, ...(st.settings ?? {}), company: COMPANY_REV > (st.settings?.companyRev ?? 0) ? { ...DEFAULT_SETTINGS.company, vat: st.settings?.company?.vat || DEFAULT_SETTINGS.company.vat } : withDefaults(DEFAULT_SETTINGS.company, st.settings?.company), companyRev: COMPANY_REV }, journal: st.journal ?? [] };
+      return {
+        ...st,
+        settings: {
+          ...DEFAULT_SETTINGS,
+          ...(st.settings ?? {}),
+          company:
+            COMPANY_REV > (st.settings?.companyRev ?? 0)
+              ? { ...DEFAULT_SETTINGS.company, vat: st.settings?.company?.vat || DEFAULT_SETTINGS.company.vat }
+              : withDefaults(DEFAULT_SETTINGS.company, st.settings?.company),
+          companyRev: COMPANY_REV,
+        },
+        journal: st.journal ?? [],
+      };
     }
   } catch {
     /* stockage indisponible */
@@ -230,9 +242,7 @@ function syncProformaStatuses(s: State): State {
       const cs = s.containers.filter((c) => c.allocations.some((a) => a.proformaId === pf.id));
       if (!cs.length) return pf;
       // statut = le moins avancé des conteneurs, si tout est affecté
-      const fullyAllocated = pf.lines.every(
-        (l) => allocatedQty(s, pf.id, l.productId) >= l.qty,
-      );
+      const fullyAllocated = pf.lines.every((l) => allocatedQty(s, pf.id, l.productId) >= l.qty);
       if (!fullyAllocated) return pf;
       const min = cs.map((c) => order.indexOf(c.status)).reduce((a, b) => Math.min(a, b), 99);
       const next = map[order[min]];
@@ -319,7 +329,11 @@ export function isAllowed(s: State, a: Action): boolean {
       return canEditProduct(u) && !!a.from.trim() && !!a.to.trim();
     case 'setBrands':
       // Une marque utilisée par un produit ne peut pas être retirée
-      return canEditProduct(u) && a.brands.every((b) => b.id && b.name.trim()) && s.products.every((p) => p.brandId === 'jonas' || a.brands.some((b) => b.id === p.brandId) || !s.brands.some((b) => b.id === p.brandId));
+      return (
+        canEditProduct(u) &&
+        a.brands.every((b) => b.id && b.name.trim()) &&
+        s.products.every((p) => p.brandId === 'jonas' || a.brands.some((b) => b.id === p.brandId) || !s.brands.some((b) => b.id === p.brandId))
+      );
     case 'addPackFiles':
       return canPackFiles(s, u, a.productId, a.kind);
     case 'removePackFile': {
@@ -380,13 +394,7 @@ export function isAllowed(s: State, a: Action): boolean {
       return !!pf?.order && !pf.versions?.length && pf.status === 'a_signer' && (can(u, 'proforma.edit') || can(u, 'proforma.sign'));
     }
     case 'setSupplierTerms':
-      return (
-        !!s.suppliers.find((x) => x.id === a.supplierId) &&
-        (can(u, 'finance.pay') || can(u, 'proforma.sign')) &&
-        a.terms.depositPct >= 0 &&
-        a.terms.depositPct <= 100 &&
-        a.terms.balanceDays >= 0
-      );
+      return !!s.suppliers.find((x) => x.id === a.supplierId) && (can(u, 'finance.pay') || can(u, 'proforma.sign')) && a.terms.depositPct >= 0 && a.terms.depositPct <= 100 && a.terms.balanceDays >= 0;
     case 'createProforma': {
       // JONAS (acheteurs, Direction) ou le fournisseur, qui joint alors sa proforma
       if (s.proformas.some((p) => p.id === a.id)) return false;
@@ -452,9 +460,11 @@ export function isAllowed(s: State, a: Action): boolean {
       // Le transitaire fait sa proposition ; s'il ne passe pas par l'appli, le fournisseur la saisit pour lui
       const pf = s.proformas.find((x) => x.id === a.proformaId);
       if (!pf || bookingStage(pf) !== 'transitaire') return false;
-      if (isForwarder(u)) { if (u.forwarder !== pf.booking!.forwarder) return false; }
-      else if (isSupplier(u)) { if (pf.supplierId !== u.supplierId) return false; }
-      else if (u.role !== 'pilote') return false;
+      if (isForwarder(u)) {
+        if (u.forwarder !== pf.booking!.forwarder) return false;
+      } else if (isSupplier(u)) {
+        if (pf.supplierId !== u.supplierId) return false;
+      } else if (u.role !== 'pilote') return false;
       return s.containers.some((c) => c.allocations.some((x) => x.proformaId === pf.id) && ['a_booker', 'booking_demande'].includes(c.status));
     }
     case 'acceptPlan': {
@@ -581,9 +591,7 @@ export function nextJonasCodes(s: State, supplierId: string, n: number): { ref: 
   let next = used.reduce((mx, m) => Math.max(mx, Number(m[2])), 0) + 1;
   const gs1 = (s.settings.company.gs1Prefix || DEFAULT_GS1).replace(/\D/g, '').slice(0, 11);
   const itemLen = 12 - gs1.length;
-  let item = s.products
-    .filter((p) => p.ean.length === 13 && p.ean.startsWith(gs1))
-    .reduce((mx, p) => Math.max(mx, Number(p.ean.slice(gs1.length, 12))), 0) + 1;
+  let item = s.products.filter((p) => p.ean.length === 13 && p.ean.startsWith(gs1)).reduce((mx, p) => Math.max(mx, Number(p.ean.slice(gs1.length, 12))), 0) + 1;
   const refs = new Set(s.products.map((p) => p.ref));
   const out: { ref: string; ean: string }[] = [];
   while (out.length < n) {
@@ -633,7 +641,11 @@ function materializeLines(s: State, supplierId: string, lines: ImportLine[], etd
   const photos = new Map<string, ProductPhoto>();
   // PA de la fiche : celui de cette proforma (devise du fournisseur)
   const prices = new Map<string, { price: number; currency: Currency; from?: string }>();
-  const codes = jonasCodesFor(s, supplierId, lines.filter((l) => !l.productId).map((l) => ({ ref: l.newProduct?.ref, ean: l.newProduct?.ean })));
+  const codes = jonasCodesFor(
+    s,
+    supplierId,
+    lines.filter((l) => !l.productId).map((l) => ({ ref: l.newProduct?.ref, ean: l.newProduct?.ean })),
+  );
   const out: ProformaLine[] = lines.map((l) => {
     if (l.productId) {
       if (l.photo) photos.set(l.productId, l.photo);
@@ -719,9 +731,7 @@ export function purchasePrice(s: State, productId: string): { price: number; cur
 
 export function lastPricePaid(s: State, productId: string, currency: Currency): { price: number; from?: string; date?: ISODate } {
   const fx = (c: Currency) => s.settings.fx[c] ?? 1;
-  const withLine = s.proformas
-    .filter((p) => p.lines.some((l) => l.productId === productId))
-    .sort((a, b) => b.date.localeCompare(a.date));
+  const withLine = s.proformas.filter((p) => p.lines.some((l) => l.productId === productId)).sort((a, b) => b.date.localeCompare(a.date));
   const pf = withLine.find((p) => p.status !== 'a_signer') ?? withLine[0];
   // 4 décimales : les petits articles se négocient au dixième de centime
   const round = (n: number) => Math.round(n * 10000) / 10000;
@@ -767,9 +777,7 @@ function applySplit(s: State, pfId: string, me: string): State {
   const part = family.reduce((m, p) => Math.max(m, p.split?.part ?? 1), 1) + 1;
   const childId = `${root}-${part}`;
   const nowOf = (productId: string, qty: number) => r.lines.find((x) => x.productId === productId)?.qtyNow ?? qty;
-  const nowLines = pf.lines
-    .map((l) => ({ ...l, qty: nowOf(l.productId, l.qty), cbm: l.cbm !== undefined ? (l.cbm * nowOf(l.productId, l.qty)) / l.qty : undefined }))
-    .filter((l) => l.qty > 0);
+  const nowLines = pf.lines.map((l) => ({ ...l, qty: nowOf(l.productId, l.qty), cbm: l.cbm !== undefined ? (l.cbm * nowOf(l.productId, l.qty)) / l.qty : undefined })).filter((l) => l.qty > 0);
   const laterLines = pf.lines
     .map((l) => ({ ...l, qty: l.qty - nowOf(l.productId, l.qty), cbm: l.cbm !== undefined ? (l.cbm * (l.qty - nowOf(l.productId, l.qty))) / l.qty : undefined }))
     .filter((l) => l.qty > 0);
@@ -845,8 +853,7 @@ export const bookingStage = (pf: Proforma): 'fournisseur' | 'transitaire' | 'val
 /** Côté JONAS : qui peut demander, accepter ou refuser un booking (logistique, acheteurs, pilote) */
 export const canAskBooking = (u: User) => can(u, 'logistics.booking') || can(u, 'logistics.plan');
 /** Transitaire habituel du fournisseur (celui de ses derniers conteneurs) */
-export const defaultForwarder = (s: State, supplierId: string): Forwarder =>
-  [...s.containers].reverse().find((c) => c.supplierId === supplierId && c.forwarder)?.forwarder ?? 'Logfret';
+export const defaultForwarder = (s: State, supplierId: string): Forwarder => [...s.containers].reverse().find((c) => c.supplierId === supplierId && c.forwarder)?.forwarder ?? 'Logfret';
 /** Proforma signée, pas encore partie, sans demande en cours ni réponse */
 export const canRequestBooking = (pf: Proforma) => !pf.booking && ['en_dev', 'en_production'].includes(pf.status);
 /** Containers d'une proforma (au moins une ligne chargée) */
@@ -866,11 +873,7 @@ function applyAction(s: State, a: Action): State {
     case 'setUserRole':
       return {
         ...s,
-        users: s.users.map((u) =>
-          u.id === a.userId
-            ? { ...u, role: a.role, validationStep: a.validationStep === null ? undefined : a.validationStep ?? u.validationStep }
-            : u,
-        ),
+        users: s.users.map((u) => (u.id === a.userId ? { ...u, role: a.role, validationStep: a.validationStep === null ? undefined : (a.validationStep ?? u.validationStep) } : u)),
       };
     case 'toggleUser':
       if (a.userId === s.currentUserId) return s;
@@ -1026,7 +1029,12 @@ function applyAction(s: State, a: Action): State {
       if (pf1 && doc1?.lines?.length && signedVersion(pf1)) {
         const cur = pf1.currency ?? 'EUR';
         const price = new Map(doc1.lines.map((l) => [l.productId, l.price]));
-        s = { ...s, products: s.products.map((p) => (price.has(p.id) ? { ...p, paSupplier: { price: price.get(p.id)!, currency: cur, from: pf1.id }, pa: Math.round(price.get(p.id)! * fxRate(s, cur) * 100) / 100 } : p)) };
+        s = {
+          ...s,
+          products: s.products.map((p) =>
+            price.has(p.id) ? { ...p, paSupplier: { price: price.get(p.id)!, currency: cur, from: pf1.id }, pa: Math.round(price.get(p.id)! * fxRate(s, cur) * 100) / 100 } : p,
+          ),
+        };
       }
       return mapPF(s, a.id, (pf) => {
         const doc = pendingVersion(pf)!;
@@ -1222,9 +1230,7 @@ function applyAction(s: State, a: Action): State {
       const next = mapPF(s, a.proformaId, (pf) => ({ ...pf, booking: undefined, history: [...pf.history, hist(me, 'Demande de booking annulée')] }));
       return {
         ...next,
-        containers: next.containers.map((c) =>
-          c.status === 'booking_demande' && c.allocations.some((x) => x.proformaId === a.proformaId) ? { ...c, status: 'a_booker' } : c,
-        ),
+        containers: next.containers.map((c) => (c.status === 'booking_demande' && c.allocations.some((x) => x.proformaId === a.proformaId) ? { ...c, status: 'a_booker' } : c)),
       };
     }
     case 'proposePfBooking': {
@@ -1253,7 +1259,10 @@ function applyAction(s: State, a: Action): State {
         },
         history: [
           ...pf.history,
-          hist(me, `Proposition de booking ${enteredBy === 'transitaire' ? `de ${pf.booking!.forwarder}` : `saisie pour ${pf.booking!.forwarder}`} : ${a.carrier} ${a.bookingNo}, départ ${a.etd}, arrivée ${a.eta}`),
+          hist(
+            me,
+            `Proposition de booking ${enteredBy === 'transitaire' ? `de ${pf.booking!.forwarder}` : `saisie pour ${pf.booking!.forwarder}`} : ${a.carrier} ${a.bookingNo}, départ ${a.etd}, arrivée ${a.eta}`,
+          ),
         ],
       }));
     }
@@ -1426,8 +1435,7 @@ function applyAction(s: State, a: Action): State {
     case 'receive': {
       const c = s.containers.find((x) => x.id === a.containerId)!;
       // Quantités reçues : saisies au contrôle, sinon conformes à l'attendu
-      const lines: ReceptionLine[] =
-        a.lines ?? c.allocations.map((al) => ({ proformaId: al.proformaId, productId: al.productId, expected: al.qty, received: al.qty }));
+      const lines: ReceptionLine[] = a.lines ?? c.allocations.map((al) => ({ proformaId: al.proformaId, productId: al.productId, expected: al.qty, received: al.qty }));
       const gaps = lines.filter((l) => l.received !== l.expected);
       let next = mapC(s, a.containerId, (x) => ({
         ...x,
@@ -1435,10 +1443,7 @@ function applyAction(s: State, a: Action): State {
         etaReal: TODAY,
         receivedOn: TODAY,
         reception: { at: nowStamp(), by: me, lines, note: a.note },
-        dateHistory: [
-          ...x.dateHistory,
-          hist(me, `Réceptionné à ${x.warehouse}${gaps.length ? ` · ${gaps.length} écart(s)` : ' · conforme'}${a.note ? ` · ${a.note}` : ''}`),
-        ],
+        dateHistory: [...x.dateHistory, hist(me, `Réceptionné à ${x.warehouse}${gaps.length ? ` · ${gaps.length} écart(s)` : ' · conforme'}${a.note ? ` · ${a.note}` : ''}`)],
       }));
       for (const l of lines) {
         next = mapP(next, l.productId, (p) => ({ ...p, stock: { ...p.stock, [c.warehouse]: (p.stock[c.warehouse] ?? 0) + l.received } }));
@@ -1489,7 +1494,14 @@ function applyAction(s: State, a: Action): State {
       // Valeurs nouvelles (rayon, collection…) : ajoutées aux listes déroulantes
       const lists = { ...(s.settings.lists ?? {}) };
       for (const { patch } of a.items)
-        for (const [k, v] of [['rayon', patch.rayon], ['collection', patch.collection], ['gender', patch.gender], ['material', patch.material], ['sizes', patch.sizes], ['packType', patch.packType]] as [ListKey, string | undefined][]) {
+        for (const [k, v] of [
+          ['rayon', patch.rayon],
+          ['collection', patch.collection],
+          ['gender', patch.gender],
+          ['material', patch.material],
+          ['sizes', patch.sizes],
+          ['packType', patch.packType],
+        ] as [ListKey, string | undefined][]) {
           const cur = lists[k] ?? listValues(s, k);
           if (v?.trim() && !cur.some((x) => x.toLowerCase() === v.trim().toLowerCase())) lists[k] = [...cur, v.trim()];
         }
@@ -1514,7 +1526,12 @@ function applyAction(s: State, a: Action): State {
           delete (next as Partial<ProductPatch>).designer;
           delete (next as Partial<ProductPatch>).artworkDeadline;
           if (packType !== undefined || designer !== undefined || artworkDeadline !== undefined)
-            next.pack = { ...p.pack, ...(packType !== undefined ? { type: packType } : {}), ...(designer !== undefined ? { designer } : {}), ...(artworkDeadline !== undefined ? { artworkDeadline } : {}) };
+            next.pack = {
+              ...p.pack,
+              ...(packType !== undefined ? { type: packType } : {}),
+              ...(designer !== undefined ? { designer } : {}),
+              ...(artworkDeadline !== undefined ? { artworkDeadline } : {}),
+            };
           if (patch.sizes !== undefined) next.sizes = patch.sizes.trim() || undefined;
           return next;
         }),
@@ -1840,8 +1857,45 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
   return null;
 }
 
+/**
+ * Lien packs → proforma : une proforma « En dev » passe « En production » dès que les packs
+ * de tous ses produits sont validés (Direction, Moinard, Fournisseur). Si un pack est rouvert
+ * (nouveau pack, refus, nouvelle version) avant le booking, elle revient « En dev ».
+ */
+export function syncPackStatuses(prev: State, next: State, a?: Action): State {
+  if (a?.type === 'setProformaStatus') return next; // un statut posé à la main reste tel quel
+  if (prev.products === next.products && prev.proformas === next.proformas) return next;
+  const before = new Map(prev.products.map((p) => [p.id, p]));
+  const ids = new Set(next.products.filter((p) => before.get(p.id) !== p).map((p) => p.id));
+  // proformas qui viennent d'entrer « En dev » (signature) : les packs sont peut-être déjà validés
+  const prevStatus = new Map(prev.proformas.map((pf) => [pf.id, pf.status]));
+  const entered = new Set(next.proformas.filter((pf) => pf.status === 'en_dev' && prevStatus.get(pf.id) !== 'en_dev').map((pf) => pf.id));
+  if (!ids.size && !entered.size) return next;
+  const doneNow = (id: string) => {
+    const p = next.products.find((x) => x.id === id);
+    return !!p && packDone(p);
+  };
+  let touched = false;
+  const proformas = next.proformas.map((pf) => {
+    if (!pf.lines.length || (!entered.has(pf.id) && !pf.lines.some((l) => ids.has(l.productId)))) return pf;
+    const allDone = pf.lines.every((l) => doneNow(l.productId));
+    if (pf.status === 'en_dev' && allDone) {
+      touched = true;
+      return { ...pf, status: 'en_production' as const, history: [...pf.history, hist('Système', `Tous les packs validés (${pf.lines.length}/${pf.lines.length}) : statut → En production`)] };
+    }
+    if (pf.status === 'en_production' && !pf.booking && !allDone) {
+      const reopened = pf.lines.map((l) => before.get(l.productId)).filter((p): p is Product => !!p && ids.has(p.id) && packDone(p) && !doneNow(p.id));
+      if (!reopened.length) return pf;
+      touched = true;
+      return { ...pf, status: 'en_dev' as const, history: [...pf.history, hist('Système', `Pack rouvert (${reopened.map((p) => p.ref).join(', ')}) : statut → En dev`)] };
+    }
+    return pf;
+  });
+  return touched ? { ...next, proformas } : next;
+}
+
 export function reducer(s: State, a: Action): State {
-  const next = applyAction(s, a);
+  const next = syncPackStatuses(s, applyAction(s, a), a);
   if (next === s) return s;
   const d = describe(s, a);
   if (!d) return next;
@@ -2048,8 +2102,7 @@ function canEditPhotos(s: State, u: User, productId: string) {
 
 export const byId = <T extends { id: string }>(list: T[], id: string) => list.find((x) => x.id === id)!;
 /** Marque d'un produit ; une marque absente de la liste (base vierge) s'affiche sans bloquer l'écran */
-export const brandOf = (brands: Brand[], id: string): Brand =>
-  brands.find((b) => b.id === id) ?? { id, name: id === 'jonas' ? 'JONAS' : id ? id.toUpperCase() : '—', tagline: '' };
+export const brandOf = (brands: Brand[], id: string): Brand => brands.find((b) => b.id === id) ?? { id, name: id === 'jonas' ? 'JONAS' : id ? id.toUpperCase() : '—', tagline: '' };
 
 export function lineCbm(p: Product, qty: number) {
   return (qty / p.pcb) * p.cbmCarton;
@@ -2122,10 +2175,7 @@ export function proformaTotals(s: State, pf: Proforma) {
 }
 
 export function allocatedQty(s: State, proformaId: string, productId: string) {
-  return s.containers.reduce(
-    (sum, c) => sum + c.allocations.filter((a) => a.proformaId === proformaId && a.productId === productId).reduce((x, a) => x + a.qty, 0),
-    0,
-  );
+  return s.containers.reduce((sum, c) => sum + c.allocations.filter((a) => a.proformaId === proformaId && a.productId === productId).reduce((x, a) => x + a.qty, 0), 0);
 }
 
 export function containerCbm(s: State, c: Container) {

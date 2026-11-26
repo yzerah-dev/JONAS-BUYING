@@ -110,7 +110,10 @@ test('portail fournisseur : dépôt du die cut et des fiches qualité, télécha
   // En anglais
   await page.getByRole('dialog').getByLabel('Fermer').click();
   await page.getByRole('button', { name: 'EN', exact: true }).click();
-  await page.locator('.gallery > .card', { hasText: ref }).getByRole('button', { name: /Files|Send die cut/ }).click();
+  await page
+    .locator('.gallery > .card', { hasText: ref })
+    .getByRole('button', { name: /Files|Send die cut/ })
+    .click();
   await expect(page.getByRole('dialog', { name: `Pack files — ${ref}` })).toContainText('Quality documents');
   await expect(page.getByRole('dialog')).toContainText('Composition sheet');
 
@@ -346,4 +349,41 @@ test('glisser-déposer un fichier directement sur un rond (die cut, documents, p
   await dropOn(/^Pack :/, 'pack.ai');
   await expect(toast(page)).toContainText('Seul le designer du produit dépose le pack');
   await expect(space.getByRole('tab', { name: 'Pack : à uploader' })).toBeVisible();
+});
+
+test('lien pack → proforma : dernier pack validé = « En production », nouveau pack demandé = retour « En dev »', async ({ page }) => {
+  await resetApp(page);
+  // PF-2026-0148 (En dev) : JO-J205 déjà validé partout, JO-J201 n'attend plus que le fournisseur
+  await page.evaluate(() => {
+    const k = Object.keys(localStorage).find((x) => x.startsWith('jonas-buying-state'))!;
+    const st = JSON.parse(localStorage.getItem(k)!);
+    const done = { state: 'done', date: '2026-11-20' };
+    for (const p of st.products) {
+      if (p.id === 'JO-J205') p.pack.validations = { direction: done, moinard: done, fournisseur: done };
+      if (p.id === 'JO-J201') p.pack.validations = { direction: done, moinard: done, fournisseur: { state: 'pending' } };
+    }
+    localStorage.setItem(k, JSON.stringify(st));
+  });
+  await page.reload();
+  await go(page, 'proformas/PF-2026-0148');
+  await expect(page.locator('main')).toContainText('En dev');
+  await loginAs(page, 'Yoni Zerah');
+  await go(page, 'produits/JO-J201');
+  await page.getByRole('button', { name: 'Design & Pack' }).click();
+  const next = page.getByRole('region', { name: 'Prochaine action' });
+  await next.getByRole('button', { name: 'Valider le pack' }).click();
+  await go(page, 'proformas/PF-2026-0148');
+  await expect(page.locator('main .pill, main [class*="status"]').first()).toContainText('En production');
+  await page.getByRole('button', { name: 'Historique' }).click();
+  await expect(page.locator('main')).toContainText('Tous les packs validés (2/2) : statut → En production');
+  // Un nouveau pack est demandé avant le booking : la proforma revient en dev
+  await go(page, 'produits/JO-J201');
+  await page.getByRole('button', { name: 'Design & Pack' }).click();
+  await next.getByRole('button', { name: 'Demander un nouveau pack' }).click();
+  await next.getByLabel('Demande de nouveau pack').fill('Nouvelle photo produit.');
+  await next.getByRole('button', { name: 'Envoyer la demande au designer' }).click();
+  await go(page, 'proformas/PF-2026-0148');
+  await expect(page.locator('main .pill, main [class*="status"]').first()).toContainText('En dev');
+  await page.getByRole('button', { name: 'Historique' }).click();
+  await expect(page.locator('main')).toContainText('Pack rouvert (JO-J201) : statut → En dev');
 });
