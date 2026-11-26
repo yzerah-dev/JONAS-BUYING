@@ -2,7 +2,7 @@
 import CFB from 'cfb';
 import { deflateSync } from 'node:zlib';
 import * as XLSX from 'xlsx';
-import { expect, go, loginAs, resetApp, test, toast } from './fixtures';
+import { expect, go, loginAs, resetApp, signAsDirection, test, toast } from './fixtures';
 import { sheetImages } from '../../src/lib/sheetImages';
 
 /** PNG 2×2 d'une couleur */
@@ -116,13 +116,21 @@ function xlsxWithImages(a: Buffer, b: Buffer) {
   const R = 'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
   add('xl/media/image1.png', a);
   add('xl/media/image2.png', b);
-  add('xl/drawings/drawing1.xml', `<xdr:wsDr xmlns:xdr="x" xmlns:a="a" ${R}><xdr:twoCellAnchor><xdr:from><xdr:col>9</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>5</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:pic><xdr:blipFill><a:blip r:embed="rId1"/></xdr:blipFill></xdr:pic></xdr:twoCellAnchor></xdr:wsDr>`);
+  add(
+    'xl/drawings/drawing1.xml',
+    `<xdr:wsDr xmlns:xdr="x" xmlns:a="a" ${R}><xdr:twoCellAnchor><xdr:from><xdr:col>9</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>5</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:pic><xdr:blipFill><a:blip r:embed="rId1"/></xdr:blipFill></xdr:pic></xdr:twoCellAnchor></xdr:wsDr>`,
+  );
   add('xl/drawings/_rels/drawing1.xml.rels', `<Relationships><Relationship Id="rId1" Target="../media/image1.png"/></Relationships>`);
-  add('xl/cellimages.xml', `<etc:cellImages xmlns:etc="e" xmlns:xdr="x" xmlns:a="a" ${R}><etc:cellImage><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="2" name="ID_PILLOW"/></xdr:nvPicPr><xdr:blipFill><a:blip r:embed="rId1"/></xdr:blipFill></xdr:pic></etc:cellImage></etc:cellImages>`);
+  add(
+    'xl/cellimages.xml',
+    `<etc:cellImages xmlns:etc="e" xmlns:xdr="x" xmlns:a="a" ${R}><etc:cellImage><xdr:pic><xdr:nvPicPr><xdr:cNvPr id="2" name="ID_PILLOW"/></xdr:nvPicPr><xdr:blipFill><a:blip r:embed="rId1"/></xdr:blipFill></xdr:pic></etc:cellImage></etc:cellImages>`,
+  );
   add('xl/_rels/cellimages.xml.rels', `<Relationships><Relationship Id="rId1" Target="media/image2.png"/></Relationships>`);
   // Cellule J7 : =DISPIMG("ID_PILLOW",1)
   const sheetEntry = CFB.find(zip, '/xl/worksheets/sheet1.xml')!;
-  const sheet = Buffer.from(sheetEntry.content as Uint8Array).toString().replace(/(<row r="7"[^>]*>)/, '$1<c r="J7" t="str"><f>_xlfn.DISPIMG(&quot;ID_PILLOW&quot;,1)</f><v>=DISPIMG("ID_PILLOW",1)</v></c>');
+  const sheet = Buffer.from(sheetEntry.content as Uint8Array)
+    .toString()
+    .replace(/(<row r="7"[^>]*>)/, '$1<c r="J7" t="str"><f>_xlfn.DISPIMG(&quot;ID_PILLOW&quot;,1)</f><v>=DISPIMG("ID_PILLOW",1)</v></c>');
   sheetEntry.content = Buffer.from(sheet);
   sheetEntry.size = sheetEntry.content.length;
   return Buffer.from(CFB.write(zip, { type: 'buffer', fileType: 'zip' }) as Uint8Array);
@@ -159,6 +167,7 @@ for (const kind of ['xls', 'xlsx'] as const) {
     await expect(dlg.locator('.np-line-wrap').nth(1).locator('.np-pic img')).toBeVisible();
     await dlg.getByRole('button', { name: 'Envoyer à JONAS' }).click();
     await expect(toast(page)).toContainText('envoyée à JONAS');
+    await signAsDirection(page, 'PF-2026-NINGBO-01');
 
     const size = async (ref: string) =>
       page.evaluate(async (ref) => {
@@ -198,16 +207,18 @@ test('noms de fichiers → produits : réf. JONAS, suffixes, EAN, réf. fourniss
   // Photo sans suffixe d'abord : elle devient la principale
   const names = got.map((g) => g[0]);
   expect(names.indexOf('LTM007.jpg')).toBeLessThan(names.indexOf('LTM007-2.jpg'));
-  expect([...got].sort((a, b) => String(a[0]).localeCompare(String(b[0])))).toEqual([
-    ['3700000000017.jpg', 'CP-T001', 'ean', null],
-    ['71726.jpg', 'LTM007', 'refFournisseur', null],
-    ['CP-T001 (3).webp', 'CP-T001', 'ref', null],
-    ['CP-T001.pdf', 'CP-T001', 'ref', 'type'],
-    ['inconnu.jpg', null, null, null],
-    ['LTM007.jpg', 'LTM007', 'ref', null],
-    ['LTM007-2.jpg', 'LTM007', 'ref', null],
-    ['ltm007_dos.png', 'LTM007', 'ref', null],
-  ].sort((a, b) => String(a[0]).localeCompare(String(b[0]))));
+  expect([...got].sort((a, b) => String(a[0]).localeCompare(String(b[0])))).toEqual(
+    [
+      ['3700000000017.jpg', 'CP-T001', 'ean', null],
+      ['71726.jpg', 'LTM007', 'refFournisseur', null],
+      ['CP-T001 (3).webp', 'CP-T001', 'ref', null],
+      ['CP-T001.pdf', 'CP-T001', 'ref', 'type'],
+      ['inconnu.jpg', null, null, null],
+      ['LTM007.jpg', 'LTM007', 'ref', null],
+      ['LTM007-2.jpg', 'LTM007', 'ref', null],
+      ['ltm007_dos.png', 'LTM007', 'ref', null],
+    ].sort((a, b) => String(a[0]).localeCompare(String(b[0]))),
+  );
 });
 
 const photoCount = (page: import('@playwright/test').Page, ref: string) =>

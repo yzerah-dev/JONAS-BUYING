@@ -78,7 +78,11 @@ test.describe('Commande JONAS en attente de proforma', () => {
     await expect(box).toContainText('JONAS vous a passé cette commande');
     const [po] = await Promise.all([page.waitForEvent('download'), box.getByRole('button', { name: 'Télécharger le bon de commande' }).click()]);
     expect(po.suggestedFilename()).toMatch(/_bon-de-commande\.pdf$/);
-    expect(readFileSync(await po.path()).subarray(0, 4).toString()).toBe('%PDF');
+    expect(
+      readFileSync(await po.path())
+        .subarray(0, 4)
+        .toString(),
+    ).toBe('%PDF');
     await page.getByLabel('Déposer la proforma').setInputFiles({ name: 'PI-TIDE.pdf', mimeType: 'application/pdf', buffer: await bcPdf([['CP-T001', 'Tong femme paillettes', 4000, 6.5]]) });
     await page.getByRole('dialog').getByRole('button', { name: 'Déposer sans les lignes' }).click();
     await expect(toast(page)).toContainText('Proforma v1 déposée');

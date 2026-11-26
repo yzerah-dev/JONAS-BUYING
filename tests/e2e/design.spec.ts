@@ -189,7 +189,6 @@ test('Développement = une seule page : ancienne adresse redirigée, PUSH URGENT
   await expect(toast(page)).toContainText(`${ref} marqué comme développé`);
 });
 
-
 test('vues claires : par semaine de deadline, par designer, par fournisseur', async ({ page }) => {
   await resetApp(page);
   await loginAs(page, 'David');

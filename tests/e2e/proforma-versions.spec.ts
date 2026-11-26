@@ -60,7 +60,7 @@ test.describe('Proforma déposée par le fournisseur', () => {
     // La Direction renseigne le tampon de la société, puis signe avec la date d'expédition demandée
     await loginAs(page, 'Rudy Zerah');
     await go(page, 'parametres');
-    await expect(page.locator('#co-address')).toHaveValue('189 rue d\'Aubervilliers');
+    await expect(page.locator('#co-address')).toHaveValue("189 rue d'Aubervilliers");
     await expect(page.locator('#co-city')).toHaveValue('75018 Paris');
     await page.locator('#co-vat').fill('FR12 345678901');
     await expect(page.locator('.pv-stamp')).toContainText('N° TVA intracom. : FR12 345678901');
@@ -80,7 +80,7 @@ test.describe('Proforma déposée par le fournisseur', () => {
     const pdf = await downloadVersion(page, 1);
     expect(pdf.name).toBe('PF-2026-0150_v1_signee.pdf');
     expect(pdf.text.startsWith('%PDF')).toBe(true);
-    for (const s of ['JONAS INTERNATIONAL', '189 rue d\'Aubervilliers', '75018 Paris', 'N° TVA intracom. : FR12 345678901', 'Rudy Zerah', 'Direction', '16/12/2026 (S51)'])
+    for (const s of ['JONAS INTERNATIONAL', "189 rue d'Aubervilliers", '75018 Paris', 'N° TVA intracom. : FR12 345678901', 'Rudy Zerah', 'Direction', '16/12/2026 (S51)'])
       expect(pdf.text).toContain(hex(s));
     expect(pdf.text).toMatch(new RegExp(hex('Bon pour accord, le ') + '[0-9A-F]{20}'));
   });

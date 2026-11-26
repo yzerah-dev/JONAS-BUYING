@@ -1,6 +1,7 @@
 import { Plus, Trash2 } from 'lucide-react';
 import { ProductPic } from './ui';
-import { jonasCodesFor, useStore } from '../data/store';
+import { currentUser, jonasCodesFor, useStore } from '../data/store';
+import { isSupplier } from '../data/permissions';
 import { emptyLine, jonasRefClash, toNum, type EditLine } from '../lib/editLines';
 import { useT } from '../i18n';
 import Combobox from './Combobox';
@@ -9,6 +10,7 @@ import Combobox from './Combobox';
 export default function LinesEditor({ supplierId, currency, lines, setLines }: { supplierId: string; currency: string; lines: EditLine[]; setLines: (l: EditLine[]) => void }) {
   const { state } = useStore();
   const { t, fmt, td } = useT();
+  const supplierSide = isSupplier(currentUser(state));
   const products = state.products.filter((p) => p.supplierId === supplierId);
   // Produits JONAS d'un autre fournisseur reconnus par leur référence : proposés aussi
   const others = state.products.filter((p) => p.supplierId !== supplierId && lines.some((l) => l.productId === p.id));
@@ -85,7 +87,7 @@ export default function LinesEditor({ supplierId, currency, lines, setLines }: {
           )}
           {l.productId === 'new' && (
             <div className="np-new">
-              <div className="np-codes small">{t('ex.jonasCodes', { ref: codeOf(i)?.ref ?? '', ean: codeOf(i)?.ean ?? '' })}</div>
+              <div className="np-codes small">{supplierSide ? t('ex.jonasCodesLater') : t('ex.jonasCodes', { ref: codeOf(i)?.ref ?? '', ean: codeOf(i)?.ean ?? '' })}</div>
               <label>
                 <small>{t('ex.ref')}</small>
                 <input aria-label={`${t('ex.ref')} ${i + 1}`} className="input" placeholder="—" value={l.ref ?? ''} onChange={(e) => set(i, { ref: e.target.value })} />

@@ -1,5 +1,5 @@
 import { PDFDocument, StandardFonts } from 'pdf-lib';
-import { expect, go, loginAs, resetApp, test, toast } from './fixtures';
+import { expect, go, loginAs, resetApp, signAsDirection, test, toast } from './fixtures';
 import type { Page } from '@playwright/test';
 import * as XLSX from 'xlsx';
 
@@ -56,7 +56,7 @@ test.describe('Proforma déposée : lignes lues, produits reconnus ou créés', 
     await expect(dlg.locator('.np-line-wrap').nth(1)).toContainText('Nouveau produit');
     // La référence lue est celle du fournisseur ; JONAS attribue sa référence et son EAN
     await expect(dlg.getByLabel('Réf. fournisseur 2')).toHaveValue('CP-T999');
-    const codes = (await dlg.locator('.np-codes').innerText()).match(/Réf\. JONAS (\S+) · EAN JONAS (\d{13})/)!;
+    await expect(dlg.locator('.np-codes')).toContainText('Réf. et EAN JONAS : attribués par JONAS à la signature');
     await expect(dlg.getByLabel('Désignation 2')).toHaveValue('Tong enfant arc-en-ciel');
     // Incomplet tant que le colisage du nouveau produit manque
     await dlg.getByRole('button', { name: 'Envoyer à JONAS' }).click();
@@ -64,15 +64,20 @@ test.describe('Proforma déposée : lignes lues, produits reconnus ou créés', 
     await dlg.getByLabel('Pcs/carton 2').fill('48');
     await dlg.getByLabel('m³/carton 2').fill('0,06');
     await dlg.getByRole('button', { name: 'Envoyer à JONAS' }).click();
-    await expect(toast(page)).toContainText('PF-2026-0154 envoyée à JONAS');
+    await expect(toast(page)).toContainText('PF-2026-TIDE-01 envoyée à JONAS');
+    // Le fournisseur ne voit pas le catalogue JONAS : codes provisoires, attribués par JONAS à la signature
+    const s0 = await state(page);
+    expect(s0.products.find((p) => p.supplierRef === 'CP-T999')!.ean).toBe('');
+    await signAsDirection(page, 'PF-2026-TIDE-01');
 
     const s = await state(page);
     const created = s.products.find((p) => p.supplierRef === 'CP-T999')!;
-    expect(created).toMatchObject({ ref: codes[1], ean: codes[2], name: 'Tong enfant arc-en-ciel', supplierId: 'tide', pcb: 48 });
+    expect(created).toMatchObject({ name: 'Tong enfant arc-en-ciel', supplierId: 'tide', pcb: 48 });
+    expect(created.ref).toMatch(/^[A-Z]+-[A-Z]*\d+$/);
     expect(created.ref).not.toBe('CP-T999');
     expect(eanOk(created.ean)).toBe(true);
     expect(s.products.filter((p) => p.ean === created.ean)).toHaveLength(1);
-    expect(s.proformas.find((p) => p.id === 'PF-2026-0154')!.lines).toEqual([
+    expect(s.proformas.find((p) => p.id === 'PF-2026-TIDE-01')!.lines).toEqual([
       { productId: 'CP-T001', qty: 6000, price: 6.83 },
       { productId: created.id, qty: 3000, price: 2.1 },
     ]);
@@ -104,7 +109,7 @@ test.describe('Proforma déposée : lignes lues, produits reconnus ou créés', 
     await expect(toast(page)).toContainText('1 nouveau(x) produit(s) créé(s)');
     const s1 = await state(page);
     const created = s1.products.find((p) => p.supplierRef === 'WZ-NEW01')!;
-    expect(eanOk(created.ean)).toBe(true);
+    expect(created.ean).toBe(''); // attribué par JONAS à la signature
     expect(s1.proformas.find((p) => p.id === 'PF-2026-0150')!.lines).toEqual([
       { productId: ref.id, qty: 1200, price: 3.5 },
       { productId: created.id, qty: 800, price: 5.25 },
@@ -112,7 +117,9 @@ test.describe('Proforma déposée : lignes lues, produits reconnus ou créés', 
     // Une nouvelle proforma avec la même référence fournisseur reconnaît le produit
     await page.getByRole('button', { name: 'Nouvelle proforma' }).click();
     const dlg2 = page.getByRole('dialog');
-    await dlg2.getByLabel(/Proforma du fournisseur/).setInputFiles({ name: 'PI-WZ-2.pdf', mimeType: 'application/pdf', buffer: await proformaPdf([['WZ-NEW01', 'Drap de plage rayé XXL', 500, 5.25]]) });
+    await dlg2
+      .getByLabel(/Proforma du fournisseur/)
+      .setInputFiles({ name: 'PI-WZ-2.pdf', mimeType: 'application/pdf', buffer: await proformaPdf([['WZ-NEW01', 'Drap de plage rayé XXL', 500, 5.25]]) });
     await expect(dlg2.locator('.np-line-wrap').first()).toContainText('Reconnu (réf.)');
   });
 
@@ -213,12 +220,14 @@ test('proforma Excel .xls (en-tête sur deux lignes) : produits créés avec la 
   await expect(dlg.getByLabel('Réf. fournisseur 1')).toHaveValue('71726');
   await expect(dlg.getByLabel('Pcs/carton 1')).toHaveValue('1');
   await expect(dlg.getByLabel('m³/carton 1')).toHaveValue('0.10878');
-  await expect(dlg.locator('.np-codes').nth(0)).toContainText('Réf. JONAS LTM007 · EAN JONAS 3701571431633');
+  await expect(dlg.locator('.np-codes').nth(0)).toContainText('attribués par JONAS à la signature');
   // Ligne 2 : sans réf. ni code-barres JONAS → attribués par JONAS
   await expect(dlg.getByLabel('Quantité 2')).toHaveValue('1000');
   await expect(dlg.getByLabel('Pcs/carton 2')).toHaveValue('2');
   await dlg.getByRole('button', { name: 'Envoyer à JONAS' }).click();
   await expect(toast(page)).toContainText('envoyée à JONAS');
+  // À la signature JONAS : réf. et code-barres JONAS lus sur la proforma repris (libres dans le catalogue)
+  await signAsDirection(page, 'PF-2026-NINGBO-01');
 
   const s = await state(page);
   const lug = s.products.find((p) => p.supplierRef === '71726')!;
@@ -234,7 +243,7 @@ test('proforma Excel .xls (en-tête sur deux lignes) : produits créés avec la 
   await expect(page.locator('.kpis').first()).toContainText('30,50 USD');
   await expect(page.locator('#pi-pa')).toHaveValue('30.5');
   await expect(page.locator('#pi-currency')).toHaveValue('USD');
-  await expect(page.getByRole('region', { name: 'Achat & conditionnement' })).toContainText('d\'après la proforma');
+  await expect(page.getByRole('region', { name: 'Achat & conditionnement' })).toContainText("d'après la proforma");
   // Nouveau produit : ce qui reste à compléter est signalé
   await expect(page.locator('.pi-complete')).toContainText('à compléter');
   await expect(page.getByRole('region', { name: 'Classement' }).locator('.todo').first()).toBeVisible();

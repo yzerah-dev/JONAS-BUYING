@@ -26,7 +26,7 @@ test.describe('Nouvelle proforma', () => {
     await go(page, 'portail/proformas');
     await page.getByRole('button', { name: 'Nouvelle proforma' }).click();
     const dlg = page.getByRole('dialog');
-    await expect(dlg).toContainText('Nouvelle proforma PF-2026-0154');
+    await expect(dlg).toContainText('Nouvelle proforma PF-2026-HORIZO-01');
     await page.locator('#np-title').fill('Coussins outdoor');
     await page.locator('#ln-prod-0').click();
     await page.getByRole('option').nth(1).click();
@@ -44,19 +44,19 @@ test.describe('Nouvelle proforma', () => {
     await expect(toast(page)).toContainText('Joignez votre proforma');
     await dlg.getByLabel(/Proforma du fournisseur/).setInputFiles({ name: 'PI-HORIZON-0154.pdf', mimeType: 'application/pdf', buffer: await pdf() });
     await dlg.getByRole('button', { name: 'Envoyer à JONAS' }).click();
-    await expect(toast(page)).toContainText('PF-2026-0154 envoyée à JONAS');
+    await expect(toast(page)).toContainText('PF-2026-HORIZO-01 envoyée à JONAS');
     await expect(page.locator('.pv-row')).toContainText('PI-HORIZON-0154.pdf');
 
     // JONAS la reçoit : notification et signature
     await loginAs(page, 'Rudy Zerah');
-    await go(page, 'proformas/PF-2026-0154');
+    await go(page, 'proformas/PF-2026-HORIZO-01');
     await expect(page.locator('.page-head')).toContainText('À signer');
     await page.locator('.page-head').getByRole('button', { name: 'Signer' }).click();
     await page.getByRole('button', { name: 'Signer et tamponner' }).click();
-    await expect(toast(page)).toContainText('PF-2026-0154 signée et tamponnée');
+    await expect(toast(page)).toContainText('PF-2026-HORIZO-01 signée et tamponnée');
     const pf = await page.evaluate(() => {
       const k = Object.keys(localStorage).find((x) => x.startsWith('jonas-buying-state'))!;
-      return JSON.parse(localStorage.getItem(k)!).proformas.find((p: { id: string }) => p.id === 'PF-2026-0154');
+      return JSON.parse(localStorage.getItem(k)!).proformas.find((p: { id: string }) => p.id === 'PF-2026-HORIZO-01');
     });
     expect(pf.currency).toBe('USD');
     expect(pf.depositPct).toBe(40);

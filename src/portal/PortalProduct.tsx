@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, FileText, Package, Search } from 'lucide-react';
+import { ArrowLeft, FileText, LayoutGrid, List, Package, Search } from 'lucide-react';
 import { brandOf } from '../data/store';
-import { BrandLogo, PA, PackPill, Pill, ProductThumb, ProformaStatusPill, Seg, ValidationCircuit } from '../components/ui';
+import { BrandLogo, PA, PackPill, Pill, ProductPic, ProductThumb, ProformaStatusPill, Seg, ValidationCircuit } from '../components/ui';
 import ProductPhotoEdit from '../components/ProductPhotoEdit';
 import ProductGallery from '../components/ProductGallery';
 import PhotoImport from '../components/PhotoImport';
@@ -21,6 +21,21 @@ export function PortalProducts() {
   const nav = useNavigate();
   const [tab, setTab] = useState<Tab>('all');
   const [q, setQ] = useState('');
+  const [view, setView] = useState<'liste' | 'galerie'>(() => {
+    try {
+      return localStorage.getItem('jonas-portal-products-view') === 'galerie' ? 'galerie' : 'liste';
+    } catch {
+      return 'liste';
+    }
+  });
+  const pickView = (v: 'liste' | 'galerie') => {
+    setView(v);
+    try {
+      localStorage.setItem('jonas-portal-products-view', v);
+    } catch {
+      /* préférence non mémorisée */
+    }
+  };
   const onOrder = new Set(proformas.filter((p) => p.status !== 'arrive').flatMap((p) => p.lines.map((l) => l.productId)));
   const lists: Record<Tab, typeof products> = {
     all: products,
@@ -52,9 +67,66 @@ export function PortalProducts() {
           <Search size={16} />
           <input className="input" type="search" value={q} placeholder={t('pp.search')} aria-label={t('pp.search')} onChange={(e) => setQ(e.target.value)} />
         </label>
+        <div className="grow" />
+        <Seg
+          value={view}
+          onChange={pickView}
+          options={[
+            { id: 'liste', label: t('pp.view.list'), icon: <List size={15} /> },
+            { id: 'galerie', label: t('pp.view.gallery'), icon: <LayoutGrid size={15} /> },
+          ]}
+        />
       </div>
       {list.length === 0 ? (
         <div className="card empty">{t('pp.empty')}</div>
+      ) : view === 'galerie' ? (
+        <div className="gallery pp-gallery">
+          {list.map((p) => (
+            <div
+              key={p.id}
+              className="pcard"
+              role="link"
+              tabIndex={0}
+              aria-label={`${p.ref} · ${p.name}`}
+              onClick={() => nav(`/portail/produits/${p.id}`)}
+              onKeyDown={(e) => e.key === 'Enter' && nav(`/portail/produits/${p.id}`)}
+            >
+              <div className="photo" style={{ background: p.tint }}>
+                <ProductPic product={p} />
+              </div>
+              <div className="row">
+                <BrandLogo brand={brandOf(state.brands, p.brandId)} size={10} />
+                <div className="grow" />
+                {awaitsSupplier(p) ? <Pill color="orange">{t('flow.you')}</Pill> : <PackPill product={p} />}
+              </div>
+              <div>
+                <span className="ref-tag">{p.ref}</span> <span className="bold pcard-name">{p.name}</span>
+                {p.supplierRef && (
+                  <div className="xs muted">
+                    {t('pp.yourRef')} {p.supplierRef}
+                  </div>
+                )}
+              </div>
+              <div className="mini-grid">
+                <div>
+                  <div className="l">{t('col.pa')}</div>
+                  <div className="v">
+                    <PA product={p} />
+                  </div>
+                </div>
+                <div>
+                  <div className="l">{t('col.pcb')}</div>
+                  <div className="v">{p.pcb}</div>
+                </div>
+                <div>
+                  <div className="l">{t('col.cbmCtn')}</div>
+                  <div className="v">{fmt.dec(p.cbmCarton, 3)}</div>
+                </div>
+              </div>
+              {!p.developed && <Pill color="violet">{t('pp.inDev')}</Pill>}
+            </div>
+          ))}
+        </div>
       ) : (
         <div className="card tbl-wrap">
           <table className="tbl pp-tbl">
@@ -129,7 +201,7 @@ export function PortalProductDetail() {
   const { id } = useParams();
   const { state, products, proformas } = usePortal();
   const { t, td, fmt } = useT();
-  const p = products.find((x) => x.id === id);
+  const p = products.find((x) => x.id === id) ?? products.find((x) => x.ref === id);
   if (!p)
     return (
       <div className="card empty">

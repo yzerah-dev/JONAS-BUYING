@@ -144,6 +144,8 @@ export interface Product {
   ref: string;
   /** Code-barres EAN-13 JONAS */
   ean: string;
+  /** Produit créé depuis le portail fournisseur : réf. et EAN JONAS attribués par JONAS à la signature (codes lus sur le document, à vérifier) */
+  codesPending?: { ref?: string; ean?: string };
   /** Référence de l'article chez le fournisseur (lue sur sa proforma) */
   supplierRef?: string;
   name: string;

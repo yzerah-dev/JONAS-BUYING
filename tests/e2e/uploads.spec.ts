@@ -32,12 +32,7 @@ function png(size: number, rgb: [number, number, number]) {
   ihdr[9] = 2; // RGB
   const row = Buffer.concat([Buffer.from([0]), Buffer.from(Array.from({ length: size }, () => rgb).flat())]);
   const raw = Buffer.concat(Array.from({ length: size }, () => row));
-  return Buffer.concat([
-    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-    chunk('IHDR', ihdr),
-    chunk('IDAT', deflateSync(raw)),
-    chunk('IEND', Buffer.alloc(0)),
-  ]);
+  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
 }
 
 function makeFixtures(root: string) {
@@ -88,10 +83,7 @@ test('upload du pack (versions) et du dossier créa, téléchargements et persis
   await expect(page.locator('.pk-row', { hasText: ref }).locator('.pk-c-st')).toContainText('À valider');
 
   // Téléchargement de la version courante
-  const [single] = await Promise.all([
-    page.waitForEvent('download'),
-    page.locator('.pf-current .icon-btn[title=Télécharger]').click(),
-  ]);
+  const [single] = await Promise.all([page.waitForEvent('download'), page.locator('.pf-current .icon-btn[title=Télécharger]').click()]);
   expect(single.suggestedFilename()).toBe('pack_v2.ai');
   expect(statSync(await single.path()).size).toBe(statSync(files.v2).size);
 

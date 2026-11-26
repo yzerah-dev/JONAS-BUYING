@@ -87,7 +87,9 @@ test.describe('Assistant commandes', () => {
           products: { ref: string; stock: number; source: string; openOrders: { order: string }[] }[];
         };
         (window as unknown as { __low: unknown }).__low = low;
-        const text = `${low.supplier} : ${low.products.length} produit(s) sous 1 000 pcs\n` + low.products.map((p) => `- ${p.ref} : ${p.stock} pcs (${p.source}) · ${p.openOrders.length ? p.openOrders.map((o) => o.order).join(', ') : 'aucune commande en cours'}`).join('\n');
+        const text =
+          `${low.supplier} : ${low.products.length} produit(s) sous 1 000 pcs\n` +
+          low.products.map((p) => `- ${p.ref} : ${p.stock} pcs (${p.source}) · ${p.openOrders.length ? p.openOrders.map((o) => o.order).join(', ') : 'aucune commande en cours'}`).join('\n');
         return { text };
       };
       (window as unknown as { claude: unknown }).claude = { use: async (n: string) => (n === 'sample' ? sample : null) };

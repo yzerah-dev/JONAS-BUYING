@@ -82,7 +82,10 @@ export const toast = (page: Page) => page.locator('.toast');
 /** Texte de la barre latérale, une entrée par ligne non vide. */
 export async function sidebarItems(page: Page) {
   const txt = await page.locator('.sidebar').innerText();
-  return txt.split('\n').map((s) => s.trim()).filter(Boolean);
+  return txt
+    .split('\n')
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 /** Dernier entier d'un texte (« Validés\n78 » -> 78, « 3 120 » non géré volontairement). */
@@ -149,3 +152,12 @@ export const test = base.extend<{ pageErrors: string[] }>({
 });
 
 export { expect };
+
+/** JONAS (Direction) signe la proforma : réf. et EAN JONAS attribués aux produits créés depuis le portail */
+export async function signAsDirection(page: Page, pfId: string) {
+  await loginAs(page, 'Rudy Zerah');
+  await go(page, `proformas/${pfId}`);
+  await page.locator('.page-head').getByRole('button', { name: 'Signer' }).click();
+  await page.getByRole('button', { name: 'Signer et tamponner' }).click();
+  await expect(toast(page)).toContainText(`${pfId} signée et tamponnée`);
+}

@@ -79,7 +79,10 @@ test.describe('Booking', () => {
 
     // Le transitaire retrouve les conteneurs prêts au départ
     await loginAs(page, 'Julien Morel');
-    await page.locator('nav.sidebar').getByRole('link', { name: /Prêts au départ/ }).click();
+    await page
+      .locator('nav.sidebar')
+      .getByRole('link', { name: /Prêts au départ/ })
+      .click();
     await expect(page.locator('.bk-row', { hasText: 'MSC-55821' }).first()).toContainText('MSC ARINA');
   });
 
@@ -123,7 +126,10 @@ test.describe('Booking', () => {
     await expect(row).toContainText('Saisi par le fournisseur pour Logfret');
 
     await loginAs(page, 'Julien Morel');
-    await page.locator('nav.sidebar').getByRole('link', { name: /Prêts au départ/ }).click();
+    await page
+      .locator('nav.sidebar')
+      .getByRole('link', { name: /Prêts au départ/ })
+      .click();
     await expect(page.locator('main')).toContainText('COS-778120');
   });
 

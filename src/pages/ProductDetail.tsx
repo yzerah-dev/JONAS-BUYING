@@ -20,17 +20,7 @@ import {
   Truck,
   Warehouse,
 } from 'lucide-react';
-import {
-  byId,
-  containerEta,
-  containerEtd,
-  packDone,
-  productQuantities,
-  useStore,
-  type State,
-  brandOf,
-  purchasePrice,
-} from '../data/store';
+import { byId, containerEta, containerEtd, packDone, productQuantities, useStore, type State, brandOf, purchasePrice } from '../data/store';
 import { DEV_STAGES, type Product } from '../data/types';
 import { SITES } from '../data/seed';
 import PackFlow from '../components/PackFlow';
@@ -48,7 +38,9 @@ export default function ProductDetail() {
   const { state } = useStore();
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>('info');
-  const idx = state.products.findIndex((p) => p.id === id);
+  // Par identifiant, ou par réf. JONAS (produit créé depuis le portail : identifiant provisoire, réf. attribuée à la signature)
+  const byIdIdx = state.products.findIndex((p) => p.id === id);
+  const idx = byIdIdx >= 0 ? byIdIdx : state.products.findIndex((p) => p.ref === id);
   const p = state.products[idx];
   if (!p) return <div className="card empty">Produit introuvable.</div>;
   const q = productQuantities(state, p.id);
@@ -84,8 +76,18 @@ export default function ProductDetail() {
             {p.supplierRef ? ` · Réf. fournisseur : ${p.supplierRef}` : ''}
           </div>
           <div className="row wrap">
-            {p.developed ? <Pill color="green" icon={<Check size={13} />}>Développé</Pill> : <Pill color="violet">En développement</Pill>}
-            {q.open > 0 && <Pill color="blue" icon={<ShoppingCart size={13} />}>En commande</Pill>}
+            {p.developed ? (
+              <Pill color="green" icon={<Check size={13} />}>
+                Développé
+              </Pill>
+            ) : (
+              <Pill color="violet">En développement</Pill>
+            )}
+            {q.open > 0 && (
+              <Pill color="blue" icon={<ShoppingCart size={13} />}>
+                En commande
+              </Pill>
+            )}
             {q.nextArrival && (
               <Pill color="grey" icon={<Calendar size={13} />}>
                 Prochain arrivage : {weekLabel(q.nextArrival)}
@@ -228,7 +230,9 @@ function PriceCard({ p, q }: { p: Product; q: number }) {
     <Card title="Prix & conditionnement" icon={<Boxes size={18} className="green" />} action={<ProductEdit product={p} />}>
       <dl className="kv">
         <dt>PA unitaire</dt>
-        <dd><PA product={p} /></dd>
+        <dd>
+          <PA product={p} />
+        </dd>
         <dt>PCB</dt>
         <dd>{p.pcb}</dd>
         <dt>Poids unitaire</dt>
@@ -489,44 +493,43 @@ function ArrivalsCard({ p, state }: { p: Product; state: State }) {
 
 function StockCard({ p, state }: { p: Product; state: State }) {
   const incoming: Record<string, number> = {};
-  for (const c of state.containers)
-    if (c.status !== 'arrive') for (const a of c.allocations) if (a.productId === p.id) incoming[c.warehouse] = (incoming[c.warehouse] ?? 0) + a.qty;
+  for (const c of state.containers) if (c.status !== 'arrive') for (const a of c.allocations) if (a.productId === p.id) incoming[c.warehouse] = (incoming[c.warehouse] ?? 0) + a.qty;
   const tot = { s: 0, i: 0 };
   return (
     <Card title="Stocks & prévisions" icon={<Warehouse size={18} className="green" />}>
       <div className="tbl-wrap">
-      <table className="tbl">
-        <thead>
-          <tr>
-            <th>Lieu</th>
-            <th className="num">Stock actuel</th>
-            <th className="num">Arrivages à venir</th>
-            <th className="num">Stock projeté</th>
-          </tr>
-        </thead>
-        <tbody>
-          {SITES.map((site) => {
-            const s = p.stock[site] ?? 0;
-            const i = incoming[site] ?? 0;
-            tot.s += s;
-            tot.i += i;
-            return (
-              <tr key={site}>
-                <td>{site}</td>
-                <td className="num">{num(s)}</td>
-                <td className="num">{num(i)}</td>
-                <td className="num">{num(s + i)}</td>
-              </tr>
-            );
-          })}
-          <tr style={{ background: 'var(--green-soft)' }}>
-            <td className="bold">Total</td>
-            <td className="num bold">{num(tot.s)}</td>
-            <td className="num bold">{num(tot.i)}</td>
-            <td className="num bold">{num(tot.s + tot.i)}</td>
-          </tr>
-        </tbody>
-      </table>
+        <table className="tbl">
+          <thead>
+            <tr>
+              <th>Lieu</th>
+              <th className="num">Stock actuel</th>
+              <th className="num">Arrivages à venir</th>
+              <th className="num">Stock projeté</th>
+            </tr>
+          </thead>
+          <tbody>
+            {SITES.map((site) => {
+              const s = p.stock[site] ?? 0;
+              const i = incoming[site] ?? 0;
+              tot.s += s;
+              tot.i += i;
+              return (
+                <tr key={site}>
+                  <td>{site}</td>
+                  <td className="num">{num(s)}</td>
+                  <td className="num">{num(i)}</td>
+                  <td className="num">{num(s + i)}</td>
+                </tr>
+              );
+            })}
+            <tr style={{ background: 'var(--green-soft)' }}>
+              <td className="bold">Total</td>
+              <td className="num bold">{num(tot.s)}</td>
+              <td className="num bold">{num(tot.i)}</td>
+              <td className="num bold">{num(tot.s + tot.i)}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
       <div className="xs muted mt">Stock à connecter à l’ERP TCI. Valeurs actuelles : démonstration.</div>
     </Card>
@@ -549,9 +552,7 @@ function IndicatorsCard({ p, state }: { p: Product; state: State }) {
 
 function DocsCard({ p, state }: { p: Product; state: State }) {
   const events = [
-    ...state.proformas
-      .filter((pf) => pf.lines.some((l) => l.productId === p.id))
-      .flatMap((pf) => pf.history.map((h) => ({ ...h, text: `${pf.id} · ${h.text}` }))),
+    ...state.proformas.filter((pf) => pf.lines.some((l) => l.productId === p.id)).flatMap((pf) => pf.history.map((h) => ({ ...h, text: `${pf.id} · ${h.text}` }))),
     ...Object.entries(p.pack.validations)
       .filter(([, v]) => v.state === 'done')
       .map(([k, v]) => ({ date: v.date!, user: k, text: `Pack validé (${k})` })),

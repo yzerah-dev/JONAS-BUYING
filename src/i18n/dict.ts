@@ -698,6 +698,9 @@ export const fr = {
   'cp.max': 'Maximum {n} pcs pour {ref} (reste de la proforma)',
   'cp.partial': 'Carton entamé : {n} pcs ne font pas un carton complet',
   'cp.qtySet': '{ref} : {n} pcs dans le conteneur',
+  'ex.jonasCodesLater': 'Réf. et EAN JONAS : attribués par JONAS à la signature',
+  'pp.view.list': 'Liste',
+  'pp.view.gallery': 'Galerie',
 };
 
 export type Key = keyof typeof fr;
@@ -1377,6 +1380,9 @@ export const en: Record<Key, string> = {
   'cp.max': 'Maximum {n} pcs for {ref} (remaining on the proforma)',
   'cp.partial': 'Partial carton: {n} pcs do not make a full carton',
   'cp.qtySet': '{ref}: {n} pcs in the container',
+  'ex.jonasCodesLater': 'JONAS ref. and EAN: assigned by JONAS when signing',
+  'pp.view.list': 'List',
+  'pp.view.gallery': 'Gallery',
 };
 
 /**

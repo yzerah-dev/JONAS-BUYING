@@ -51,7 +51,20 @@ test('fiche produit : tous les champs modifiables par l’acheteur, contrôles, 
   await expect(toast(page)).toContainText('Fiche CP-T001B enregistrée');
 
   const { p, brands } = await product(page, 'CP-T001');
-  expect(p).toMatchObject({ ref: 'CP-T001B', ean: '3700000000013', supplierRef: 'TX-501', name: 'Tong femme paillettes or', rayon: 'Plage', collection: 'Été 2027', gender: 'Femme', material: 'EVA', pcb: 48, weight: 0.18, cbmCarton: 0.075, paSupplier: { price: 2.15, currency: 'USD' } });
+  expect(p).toMatchObject({
+    ref: 'CP-T001B',
+    ean: '3700000000013',
+    supplierRef: 'TX-501',
+    name: 'Tong femme paillettes or',
+    rayon: 'Plage',
+    collection: 'Été 2027',
+    gender: 'Femme',
+    material: 'EVA',
+    pcb: 48,
+    weight: 0.18,
+    cbmCarton: 0.075,
+    paSupplier: { price: 2.15, currency: 'USD' },
+  });
   expect(p).toMatchObject({ devStage: 2, devDeadline: '2027-01-15', nextAction: 'Recevoir l’échantillon', targetQty: 12000 });
   expect(p.pack).toMatchObject({ type: 'Polybag', designer: 'ROLAND', artworkDeadline: '2026-12-20' });
   expect(brands.find((b) => b.id === p.brandId)?.name).toBe('LITTLE MARCEL');
@@ -142,7 +155,10 @@ test('fiches en Excel : export, modification dans Excel, import avec aperçu pui
   const bad = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(bad, XLSX.utils.aoa_to_sheet([head, row]), 'Fiches');
   await page.getByRole('button', { name: 'Importer les fiches' }).click();
-  await page.getByRole('dialog').getByLabel('Fichier des fiches produit').setInputFiles({ name: 'fiches2.xlsx', mimeType: '', buffer: Buffer.from(XLSX.write(bad, { type: 'buffer', bookType: 'xlsx' })) });
+  await page
+    .getByRole('dialog')
+    .getByLabel('Fichier des fiches produit')
+    .setInputFiles({ name: 'fiches2.xlsx', mimeType: '', buffer: Buffer.from(XLSX.write(bad, { type: 'buffer', bookType: 'xlsx' })) });
   await expect(page.getByRole('dialog')).toContainText('devise « GBP » inconnue');
 });
 

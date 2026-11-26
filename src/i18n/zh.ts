@@ -665,6 +665,9 @@ export const zh: Record<Key, string> = {
   'cp.max': '{ref} 最多 {n} 件（形式发票剩余数量）',
   'cp.partial': '零头箱：{n} 件不足整箱',
   'cp.qtySet': '{ref}：柜内 {n} 件',
+  'ex.jonasCodesLater': 'JONAS 货号和条码：JONAS 签署时分配',
+  'pp.view.list': '列表',
+  'pp.view.gallery': '图库',
 };
 
 /** Valeurs issues des données (français) traduites en chinois */

@@ -418,7 +418,12 @@ export function isAllowed(s: State, a: Action): boolean {
       return !!pf?.order && !pf.versions?.length && pf.status === 'a_signer' && (can(u, 'proforma.edit') || can(u, 'proforma.sign'));
     }
     case 'updateSupplier':
-      return canAddSupplier(u) && !!a.supplier.name.trim() && s.suppliers.some((x) => x.id === a.supplier.id) && !s.suppliers.some((x) => x.id !== a.supplier.id && x.name.trim().toLowerCase() === a.supplier.name.trim().toLowerCase());
+      return (
+        canAddSupplier(u) &&
+        !!a.supplier.name.trim() &&
+        s.suppliers.some((x) => x.id === a.supplier.id) &&
+        !s.suppliers.some((x) => x.id !== a.supplier.id && x.name.trim().toLowerCase() === a.supplier.name.trim().toLowerCase())
+      );
     case 'addSupplier':
       return canAddSupplier(u) && !!a.supplier.id && !!a.supplier.name.trim() && !s.suppliers.some((x) => x.id === a.supplier.id);
     case 'setSupplierTerms':
@@ -653,6 +658,29 @@ export function jonasCodesFor(s: State, supplierId: string, given: { ref?: strin
   });
 }
 
+/** Signature JONAS : réf. et EAN JONAS définitifs pour les produits créés depuis le portail (codes du document gardés s'ils sont libres) */
+function assignPendingCodes(s: State, pf: Proforma): State {
+  const ids = [...new Set([...pf.lines, ...(pendingVersion(pf)?.lines ?? [])].map((l) => l.productId))];
+  const pending = ids.map((id) => s.products.find((p) => p.id === id)).filter((p): p is Product => !!p?.codesPending);
+  if (!pending.length) return s;
+  const codes = jonasCodesFor(
+    s,
+    pf.supplierId,
+    pending.map((p) => p.codesPending!),
+  );
+  const byId = new Map(pending.map((p, i) => [p.id, codes[i]]));
+  return {
+    ...s,
+    products: s.products.map((p) => {
+      const c = byId.get(p.id);
+      if (!c) return p;
+      const { codesPending: _done, ...rest } = p;
+      void _done;
+      return { ...rest, ref: c.ref, ean: c.ean };
+    }),
+  };
+}
+
 /**
  * Transforme les lignes lues sur une proforma en lignes de proforma : crée les nouveaux produits
  * (rayon, marque et designer habituels du fournisseur, pack à définir, à développer).
@@ -665,6 +693,7 @@ function materializeLines(s: State, supplierId: string, lines: ImportLine[], etd
     return [...count.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? fallback;
   };
   const created: Product[] = [];
+  const provisional = isSupplier(currentUser(s));
   // Produits existants sans photo : photo lue sur la proforma
   const photos = new Map<string, ProductPhoto>();
   // PA de la fiche : celui de cette proforma (devise du fournisseur)
@@ -681,12 +710,17 @@ function materializeLines(s: State, supplierId: string, lines: ImportLine[], etd
       return { productId: l.productId, qty: l.qty, price: l.price };
     }
     const n = l.newProduct!;
-    const { ref, ean } = codes.shift()!;
+    const code = codes.shift()!;
     const deadline = addDays(etd, -35);
+    // Créé depuis le portail : le fournisseur ne voit pas le catalogue JONAS, les codes sont attribués par JONAS à la signature
+    const prov = provisional ? `PROV-${supplierCode(supplierId)}-${Date.now().toString(36).toUpperCase()}${created.length}` : '';
+    const ref = prov || code.ref;
+    const ean = prov ? '' : code.ean;
     const p: Product = {
       id: ref,
       ref,
       ean,
+      ...(prov ? { codesPending: { ref: n.ref?.trim() || undefined, ean: n.ean?.replace(/\D/g, '') || undefined } } : {}),
       supplierRef: n.supplierRef?.trim().toUpperCase() || undefined,
       name: n.name.trim(),
       // Désignation du fournisseur conservée telle quelle (description anglaise) ; la désignation peut ensuite être simplifiée en français
@@ -805,8 +839,38 @@ export function viewState(s: State): State {
   return v;
 }
 
+/** Code court d'un fournisseur dans les numéros qu'il crée (il ne voit pas ceux des autres) : « TOPUNI » */
+export const supplierCode = (supplierId: string) =>
+  supplierId
+    .replace(/[^a-z0-9]/gi, '')
+    .slice(0, 6)
+    .toUpperCase() || 'FOUR';
+
+/** Numéro d'un nouveau conteneur prévisionnel ; depuis le portail, propre au fournisseur pour ne jamais en écraser un autre */
+export function nextContainerId(s: State, supplierId: string, taken: string[] = []) {
+  const ids = new Set([...s.containers.map((c) => c.id), ...taken]);
+  if (isSupplier(currentUser(s))) {
+    const base = `PLAN-${supplierCode(supplierId)}-`;
+    let n = 1;
+    while (ids.has(base + String(n).padStart(3, '0'))) n++;
+    return base + String(n).padStart(3, '0');
+  }
+  let n = [...ids].reduce((m, id) => Math.max(m, Number(id.match(/^PLAN-(\d+)$/)?.[1] ?? 0)), 30) + 1;
+  while (ids.has(`PLAN-${String(n).padStart(3, '0')}`)) n++;
+  return `PLAN-${String(n).padStart(3, '0')}`;
+}
+
 export function nextProformaId(s: State) {
   const year = TODAY.slice(0, 4);
+  const me0 = currentUser(s);
+  if (isSupplier(me0) && me0.supplierId) {
+    // Le fournisseur ne voit que ses proformas : numéro à son nom, jamais en conflit avec celles des autres
+    const base = `PF-${year}-${supplierCode(me0.supplierId)}-`;
+    const ids = new Set(allPfs(s).map((p) => p.id));
+    let n = 1;
+    while (ids.has(base + String(n).padStart(2, '0'))) n++;
+    return base + String(n).padStart(2, '0');
+  }
   const max = allPfs(s).reduce((m, p) => {
     const x = p.id.match(/^PF-(\d{4})-(\d{4})$/);
     return x && x[1] === year ? Math.max(m, +x[2]) : m;
@@ -1112,6 +1176,7 @@ function applyAction(s: State, a: Action): State {
           ),
         };
       }
+      if (pf1) s = assignPendingCodes(s, pf1);
       return mapPF(s, a.id, (pf) => {
         const doc = pendingVersion(pf)!;
         const prev = signedVersion(pf);
@@ -1224,7 +1289,6 @@ function applyAction(s: State, a: Action): State {
       if (!pf) return s;
       const supplier = s.suppliers.find((x) => x.id === pf.supplierId)!;
       let containers = s.containers.map((c) => ({ ...c, allocations: [...c.allocations] }));
-      let seq = s.containers.length + 31;
       const touched = new Set<string>();
       const used = (c: Container) => c.allocations.reduce((t, x) => t + lineCbm(byId(s.products, x.productId), x.qty), 0);
       for (const line of pf.lines) {
@@ -1236,7 +1300,11 @@ function applyAction(s: State, a: Action): State {
           );
           if (!c) {
             c = {
-              id: `PLAN-${String(seq++).padStart(3, '0')}`,
+              id: nextContainerId(
+                s,
+                pf.supplierId,
+                containers.map((x) => x.id),
+              ),
               type: '40HC',
               status: bookingOpen(pf) ? 'booking_demande' : 'a_booker',
               supplierId: pf.supplierId,
@@ -1437,9 +1505,8 @@ function applyAction(s: State, a: Action): State {
     }
     case 'createContainer': {
       const supplier = s.suppliers.find((x) => x.id === a.supplierId)!;
-      const n = s.containers.length + 31;
       const c: Container = {
-        id: `PLAN-${String(n).padStart(3, '0')}`,
+        id: nextContainerId(s, a.supplierId),
         type: '40HC',
         status: 'a_booker',
         supplierId: a.supplierId,
@@ -2295,7 +2362,9 @@ export function proformaTotals(s: State, pf: Proforma) {
 export function maxAllocQty(s: State, containerId: string, proformaId: string, productId: string) {
   const line = s.proformas.find((p) => p.id === proformaId)?.lines.find((l) => l.productId === productId);
   if (!line) return 0;
-  const elsewhere = s.containers.filter((c) => c.id !== containerId).reduce((t, c) => t + c.allocations.filter((x) => x.proformaId === proformaId && x.productId === productId).reduce((u, x) => u + x.qty, 0), 0);
+  const elsewhere = s.containers
+    .filter((c) => c.id !== containerId)
+    .reduce((t, c) => t + c.allocations.filter((x) => x.proformaId === proformaId && x.productId === productId).reduce((u, x) => u + x.qty, 0), 0);
   return Math.max(0, line.qty - elsewhere);
 }
 

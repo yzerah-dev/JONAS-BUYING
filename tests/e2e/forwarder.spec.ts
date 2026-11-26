@@ -61,7 +61,10 @@ test.describe('Portail transitaire', () => {
     await expect(row.getByRole('button', { name: 'Lancer la douane' })).toBeDisabled();
     for (let n = 3; n > 0; n--) {
       await expect(row.locator('.fw-doc.missing')).toHaveCount(n);
-      await row.locator('input[type=file]').first().setInputFiles({ name: `doc-${n}.pdf`, mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4') });
+      await row
+        .locator('input[type=file]')
+        .first()
+        .setInputFiles({ name: `doc-${n}.pdf`, mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4') });
     }
     await expect(row.locator('.fw-doc.missing')).toHaveCount(0);
     await row.getByRole('button', { name: 'Lancer la douane' }).click();

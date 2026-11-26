@@ -83,3 +83,30 @@ test('portail fournisseur : pack en trois ronds, die cut demandé mis en avant, 
   await pack.getByRole('button', { name: 'Déposer', exact: true }).click();
   await expect(pack.getByRole('button', { name: 'Documents : envoyé' })).toContainText('1 fichier(s)');
 });
+
+test('portail fournisseur : Mes produits en liste ou en galerie (choix mémorisé)', async ({ page }) => {
+  await resetApp(page);
+  await loginAs(page, 'Mr. Chen');
+  await go(page, 'portail/produits');
+  await page.getByRole('button', { name: 'Galerie' }).click();
+  await expect(page.locator('.pp-gallery .pcard').first()).toBeVisible();
+  await page.getByLabel('Rechercher : réf., EAN, nom…').fill('ORA-N452');
+  await expect(page.locator('.pp-gallery .pcard')).toHaveCount(1);
+  await page.locator('.pp-gallery .pcard').click();
+  await expect(page).toHaveURL(/portail\/produits\/ORA-N452$/);
+  await go(page, 'portail/produits');
+  await expect(page.locator('.pp-gallery')).toBeVisible();
+});
+
+test('conteneur créé par un fournisseur : numéro à son nom (jamais celui d’un autre fournisseur)', async ({ page }) => {
+  await resetApp(page);
+  await loginAs(page, 'Ms. Park');
+  await go(page, 'portail/chargement');
+  await page.locator('.ccard', { hasText: 'Nouveau conteneur' }).first().click();
+  const ids = await page.evaluate(() => {
+    const k = Object.keys(localStorage).find((x) => x.startsWith('jonas-buying-state'))!;
+    return JSON.parse(localStorage.getItem(k)!).containers.map((c: { id: string }) => c.id) as string[];
+  });
+  expect(ids.filter((id) => /^PLAN-[A-Z]+-\d{3}$/.test(id))).toHaveLength(1);
+  expect(new Set(ids).size).toBe(ids.length);
+});

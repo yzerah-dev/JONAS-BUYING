@@ -115,7 +115,10 @@ test.describe('Suivi des reliquats', () => {
     await expect(row).toContainText('Problème de séchage');
 
     await go(page, 'proformas');
-    await page.locator('.pf-chips').getByRole('button', { name: /Reliquats/ }).click();
+    await page
+      .locator('.pf-chips')
+      .getByRole('button', { name: /Reliquats/ })
+      .click();
     await expect(page).toHaveURL(/reliquats=1/);
     await page.getByRole('button', { name: 'Vue liste' }).click();
     const main = page.locator('main');
