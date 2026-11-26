@@ -1,5 +1,5 @@
 import { PDFDocument, StandardFonts } from 'pdf-lib';
-import { expect, go, loginAs, resetApp, test, toast } from './fixtures';
+import { expect, go, loginAs, resetApp, signAsDirection, test, toast } from './fixtures';
 
 async function pdf() {
   const d = await PDFDocument.create();
@@ -126,4 +126,30 @@ test('produit créé par une proforma : pack « À faire », puis « En cours »
   }, p.id);
   await page.reload();
   await expect(page.locator('main')).toContainText('État pack : En cours');
+});
+
+test('proforma signée par JONAS : les die cuts manquants passent en « Die cuts demandés » chez le fournisseur', async ({ page }) => {
+  await resetApp(page);
+  // PF-2026-0146 (Nova, à signer) : on retire le die cut de son produit puis le fournisseur dépose sa proforma
+  const pid = await page.evaluate(() => {
+    const k = Object.keys(localStorage).find((x) => x.startsWith('jonas-buying-state'))!;
+    const st = JSON.parse(localStorage.getItem(k)!);
+    const pf = st.proformas.find((x: { id: string }) => x.id === 'PF-2026-0146');
+    const p = st.products.find((x: { id: string }) => x.id === pf.lines[0].productId);
+    p.pack.dieCut = 'none';
+    p.pack.files = (p.pack.files ?? []).filter((f: { kind: string }) => f.kind !== 'diecut');
+    pf.versions = [{ version: 1, fileId: 'demo', name: 'PI-NOVA.pdf', size: 1000, type: 'application/pdf', uploadedAt: '2026-11-20T10:00', uploadedBy: 'Ms. Lin Yu', status: 'a_signer' }];
+    localStorage.setItem(k, JSON.stringify(st));
+    return p.id as string;
+  });
+  await page.reload();
+  await signAsDirection(page, 'PF-2026-0146');
+  const dieCut = await page.evaluate((id) => {
+    const k = Object.keys(localStorage).find((x) => x.startsWith('jonas-buying-state'))!;
+    return JSON.parse(localStorage.getItem(k)!).products.find((x: { id: string }) => x.id === id).pack.dieCut;
+  }, pid);
+  expect(dieCut).toBe('requested');
+  await loginAs(page, 'Ms. Lin Yu');
+  await go(page, 'portail/packs?vue=diecut');
+  await expect(page.locator('.gallery')).toContainText(pid);
 });

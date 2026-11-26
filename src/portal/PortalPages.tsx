@@ -288,7 +288,16 @@ export function PortalProformas() {
       <div className="page-head">
         <h1>{tr('proformas.title', { n: proformas.length })}</h1>
         <div className="grow" />
-        <NewProformaButton className="btn primary" onCreated={(id) => setParams({ pf: id })} />
+        <NewProformaButton
+          className="btn primary"
+          onCreated={(id) =>
+            setParams((prev) => {
+              const next = new URLSearchParams(prev);
+              next.set('pf', id);
+              return next;
+            })
+          }
+        />
       </div>
       <div className="row wrap mb pfl-bar">
         <Seg

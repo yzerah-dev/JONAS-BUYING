@@ -681,6 +681,18 @@ export function jonasCodesFor(s: State, supplierId: string, given: { ref?: strin
   });
 }
 
+/** Die cut manquant (ni reçu, ni fichier déposé) sur les produits de la proforma : passe à « demandé » */
+function requestMissingDieCuts(s: State, pf: Proforma): State {
+  const ids = new Set([...pf.lines, ...(pendingVersion(pf)?.lines ?? [])].map((l) => l.productId));
+  let changed = false;
+  const products = s.products.map((p) => {
+    if (!ids.has(p.id) || p.pack.dieCut !== 'none' || (p.pack.files ?? []).some((f) => f.kind === 'diecut')) return p;
+    changed = true;
+    return { ...p, pack: { ...p.pack, dieCut: 'requested' as const } };
+  });
+  return changed ? { ...s, products } : s;
+}
+
 /** Signature JONAS : réf. et EAN JONAS définitifs pour les produits créés depuis le portail (codes du document gardés s'ils sont libres) */
 function assignPendingCodes(s: State, pf: Proforma): State {
   const ids = [...new Set([...pf.lines, ...(pendingVersion(pf)?.lines ?? [])].map((l) => l.productId))];
@@ -1201,6 +1213,8 @@ function applyAction(s: State, a: Action): State {
         };
       }
       if (pf1) s = assignPendingCodes(s, pf1);
+      // Proforma validée : les die cuts manquants de ses produits sont demandés au fournisseur
+      if (pf1) s = requestMissingDieCuts(s, pf1);
       return mapPF(s, a.id, (pf) => {
         const doc = pendingVersion(pf)!;
         const prev = signedVersion(pf);

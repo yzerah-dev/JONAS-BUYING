@@ -199,6 +199,7 @@ test('proforma déposée par le fournisseur : « En attente : JONAS doit signer 
   await expect(toast(page)).toContainText('envoyée à JONAS');
   await page.getByRole('button', { name: /^En attente de signature \(1\)/ }).click();
   await expect(page).toHaveURL(/etat=wait/);
+  await expect(page.locator('.pfl-stage')).toHaveCount(1);
   await expect(page.locator('.pfl-stage')).toHaveText('En attente : JONAS doit signer');
   await expect(page.locator('.pfl-loading')).toContainText('Chargement souhaité');
 });
