@@ -691,6 +691,14 @@ export const zh: Record<Key, string> = {
   'pfl.week': '{week} · {from} 至 {to}',
   'pfl.count': '{n} 份形式发票',
   'pfl.none': '此筛选下暂无形式发票。',
+  'pay.title': 'JONAS 付款',
+  'pay.deposit': '定金 {pct}%',
+  'pay.balance': '尾款',
+  'pay.due': '到期 {date}',
+  'pay.proof': '汇款凭证',
+  'pay.noProof': '汇款凭证尚未上传',
+  'pay.chip': '定金 {pct}%：{state}',
+  'pay.notFound': '未找到文件',
 };
 
 /** Valeurs issues des données (français) traduites en chinois */

@@ -2024,3 +2024,9 @@ select.pi-input { cursor: pointer; }
 .pfl-week { display: flex; align-items: center; gap: 10px; margin: 18px 0 8px; font-size: 17px; }
 .pfl-group:first-of-type .pfl-week { margin-top: 4px; }
 .pfl-bar { gap: 10px; }
+
+/* Paiements (acompte, solde) et copie du virement */
+.pay-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pay-card .pay-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 0; border-top: 1px solid var(--line); }
+.pay-card .pay-label { min-width: 110px; }
+.pay-card .pay-amount { font-size: 18px; font-weight: 900; }

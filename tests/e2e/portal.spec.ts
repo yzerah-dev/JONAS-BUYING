@@ -190,17 +190,34 @@ test('proforma déposée par le fournisseur : « En attente : JONAS doit signer 
   await page.getByRole('option').nth(1).click();
   await dlg.getByLabel('Quantité 1').fill('100');
   await dlg.getByLabel('Prix unitaire 1').fill('2');
-  await dlg
-    .getByLabel(/Proforma du fournisseur/)
-    .setInputFiles({
-      name: 'PI.png',
-      mimeType: 'image/png',
-      buffer: Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d4944415478da63f8cfc0f01f0005000201a5f1d9f30000000049454e44ae426082', 'hex'),
-    });
+  await dlg.getByLabel(/Proforma du fournisseur/).setInputFiles({
+    name: 'PI.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d4944415478da63f8cfc0f01f0005000201a5f1d9f30000000049454e44ae426082', 'hex'),
+  });
   await dlg.getByRole('button', { name: 'Envoyer à JONAS' }).click();
   await expect(toast(page)).toContainText('envoyée à JONAS');
   await page.getByRole('button', { name: /^En attente de signature \(1\)/ }).click();
   await expect(page).toHaveURL(/etat=wait/);
   await expect(page.locator('.pfl-stage')).toHaveText('En attente : JONAS doit signer');
   await expect(page.locator('.pfl-loading')).toContainText('Chargement souhaité');
+});
+
+test('acompte : JONAS dépose la copie du virement, le fournisseur la voit et la télécharge', async ({ page }) => {
+  await resetApp(page);
+  await loginAs(page, 'Rudy Zerah');
+  await go(page, 'proformas/PF-2026-0152');
+  await page.getByRole('button', { name: /Détails/ }).click();
+  await page.getByLabel('Copie du virement d’acompte (PF-2026-0152)').setInputFiles({ name: 'swift-acompte.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 swift') });
+  await expect(toast(page)).toContainText('Copie du virement d’acompte déposée : swift-acompte.pdf');
+  await expect(page.locator('main')).toContainText('swift-acompte.pdf');
+  // Fournisseur : vue sur l'acompte, copie téléchargeable
+  await loginAs(page, 'Mr. Chen');
+  await go(page, 'portail/proformas?pf=PF-2026-0152');
+  const pay = page.getByRole('region', { name: 'Paiements de JONAS' });
+  await expect(pay).toContainText('Acompte');
+  await expect(pay).toContainText('Payé');
+  const [dl] = await Promise.all([page.waitForEvent('download'), pay.getByRole('button', { name: /swift-acompte\.pdf/ }).click()]);
+  expect(dl.suggestedFilename()).toBe('swift-acompte.pdf');
+  await expect(page.locator('.week-head', { hasText: 'PF-2026-0152' })).toContainText('Acompte');
 });

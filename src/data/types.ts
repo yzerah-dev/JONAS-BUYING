@@ -241,6 +241,9 @@ export interface Proforma {
   /** Demande d'expédition partielle, à accepter par l'autre partie (fournisseur ou JONAS) */
   splitRequest?: SplitRequest;
   history: HistoryEntry[];
+  /** Copies des virements (acompte, solde) déposées par JONAS : visibles et téléchargeables par le fournisseur */
+  depositProof?: StoredFile;
+  balanceProof?: StoredFile;
   /** Proforma annulée : gardée (onglet « Annulées »), sortie de toutes les listes, rétablissable */
   cancelled?: { at: string; by: string; reason: string };
   /** Demande de booking envoyée au fournisseur, et sa réponse (plan + dates réelles) */

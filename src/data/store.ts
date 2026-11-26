@@ -160,6 +160,7 @@ export type Action =
   | { type: 'allocate'; containerId: string; proformaId: string; productId: string; qty: number }
   | { type: 'deallocate'; containerId: string; proformaId: string; productId: string }
   | { type: 'deleteContainer'; containerId: string }
+  | { type: 'setPaymentProof'; id: string; kind: 'deposit' | 'balance'; file: { fileId: string; name: string; size: number; type: string } }
   | { type: 'setAllocationQty'; containerId: string; proformaId: string; productId: string; qty: number }
   | { type: 'createContainer'; supplierId: string; etd: ISODate; eta: ISODate }
   | { type: 'autoLoad'; proformaId: string }
@@ -366,6 +367,8 @@ export function isAllowed(s: State, a: Action): boolean {
       if (isSupplier(u)) return !!p && p.supplierId === u.supplierId;
       return can(u, 'pack.design');
     }
+    case 'setPaymentProof':
+      return !isSupplier(u) && (can(u, 'finance.pay') || can(u, 'proforma.sign')) && s.proformas.some((p) => p.id === a.id);
     case 'deleteContainer': {
       // Supprimer un conteneur prévisionnel : tant qu'il n'est pas booké (ses quantités redeviennent « à affecter »)
       const c = s.containers.find((x) => x.id === a.containerId);
@@ -1275,6 +1278,14 @@ function applyAction(s: State, a: Action): State {
       });
       return syncProformaStatuses(next);
     }
+    case 'setPaymentProof': {
+      const proof = { ...a.file, at: nowStamp(), by: me };
+      return mapPF(s, a.id, (pf) =>
+        a.kind === 'deposit'
+          ? { ...pf, depositProof: proof, depositPaid: true, history: [...pf.history, hist(me, `Copie du virement d’acompte déposée (${a.file.name})${pf.depositPaid ? '' : ' · acompte payé'}`)] }
+          : { ...pf, balanceProof: proof, balancePaid: true, history: [...pf.history, hist(me, `Copie du virement de solde déposée (${a.file.name})${pf.balancePaid ? '' : ' · solde payé'}`)] },
+      );
+    }
     case 'deleteContainer':
       return syncProformaStatuses({ ...s, containers: s.containers.filter((c) => c.id !== a.containerId) });
     case 'setAllocationQty':
@@ -1929,6 +1940,8 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
       return { target: ctn(a.containerId), text: `${a.qty} pcs ${ref(a.productId)} affectées (${a.proformaId})` };
     case 'deallocate':
       return { target: ctn(a.containerId), text: `${ref(a.productId)} retiré du conteneur` };
+    case 'setPaymentProof':
+      return { target: a.id, text: `Copie du virement ${a.kind === 'deposit' ? 'd’acompte' : 'de solde'} déposée : ${a.file.name}` };
     case 'deleteContainer': {
       const c = s.containers.find((x) => x.id === a.containerId);
       const n = c?.allocations.reduce((t, x) => t + x.qty, 0) ?? 0;

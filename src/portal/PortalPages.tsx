@@ -34,6 +34,7 @@ import { TODAY, addDays, weekStart } from '../lib/format';
 import { useT } from '../i18n';
 import { usePortal } from './usePortal';
 import { productSize } from '../lib/productSize';
+import { downloadPaymentProof } from '../lib/paymentProof';
 import { ContainerDocLink, ContainerDocUpload } from '../components/ContainerDoc';
 import { proformaDocPdf } from '../lib/proformaPdf';
 import { saveBlob } from '../lib/files';
@@ -138,6 +139,52 @@ export function PortalHome() {
       </div>
       <PortalFlow />
     </>
+  );
+}
+
+/** Paiements de JONAS sur la proforma (vue fournisseur) : acompte et solde, échéance, état, copie du virement */
+function PortalPayments({ pf }: { pf: Proforma }) {
+  const { state } = usePortal();
+  const { t, fmt } = useT();
+  const tot = proformaTotals(state, pf);
+  const cur = (eur: number) => (tot.amount ? (eur / tot.amount) * tot.amountCur : 0);
+  const rows: { kind: 'deposit' | 'balance'; label: string; amount: number; due: string; paid: boolean; proof?: Proforma['depositProof'] }[] = [
+    { kind: 'deposit', label: t('pay.deposit', { pct: pf.depositPct }), amount: cur(tot.deposit), due: addDays(pf.date, 7), paid: pf.depositPaid, proof: pf.depositProof },
+    { kind: 'balance', label: t('pay.balance'), amount: cur(tot.balance), due: pf.balanceDue, paid: pf.balancePaid, proof: pf.balanceProof },
+  ];
+  return (
+    <section className="card pad mb pay-card" aria-label={t('pay.title')}>
+      <div className="card-title">
+        <Euro size={18} className="green" /> {t('pay.title')}
+      </div>
+      {rows.map((r) => (
+        <div key={r.kind} className={`pay-row ${r.paid ? 'paid' : ''}`}>
+          <b className="pay-label">{r.label}</b>
+          <span className="pay-amount">{money(r.amount, tot.currency)}</span>
+          {r.paid ? (
+            <Pill color="green" icon={<Check size={12} />}>
+              {t('finance.paid')}
+            </Pill>
+          ) : (
+            <Pill color="orange">{t('pay.due', { date: fmt.fdate(r.due) })}</Pill>
+          )}
+          <span className="grow" />
+          {r.proof ? (
+            <button
+              type="button"
+              className="btn sm"
+              onClick={async () => {
+                if (!(await downloadPaymentProof(pf, r.kind))) toast(t('pay.notFound'));
+              }}
+            >
+              <Download size={13} /> {t('pay.proof')} · {r.proof.name}
+            </button>
+          ) : (
+            <span className="xs muted">{t('pay.noProof')}</span>
+          )}
+        </div>
+      ))}
+    </section>
   );
 }
 
@@ -275,6 +322,9 @@ export function PortalProformas() {
                     </div>
                   </div>
                   <StageBadge pf={pf} />
+                  {pf.status !== 'a_signer' && (
+                    <Pill color={pf.depositPaid ? 'green' : 'orange'}>{tr('pay.chip', { pct: pf.depositPct, state: pf.depositPaid ? tr('finance.paid') : tr('finance.upcoming') })}</Pill>
+                  )}
                   {shipmentsOf(state, pf).length > 1 && <Pill color="violet">{tr('sp.part', { n: pf.split?.part ?? 1, total: shipmentsOf(state, pf).length })}</Pill>}
                   {pf.splitRequest && <Pill color="orange">{tr('sp.split')}</Pill>}
                   <div className="grow" />
@@ -308,6 +358,7 @@ export function PortalProformas() {
                     <div className="mb">
                       <ProformaVersions pf={pf} />
                     </div>
+                    <PortalPayments pf={pf} />
                     <div className="mb">
                       <ShipmentsPanel pf={pf} />
                     </div>
@@ -664,6 +715,7 @@ export function PortalFinance() {
               <th className="num">{t('col.amount')}</th>
               <th>{t('col.due')}</th>
               <th>{t('col.status')}</th>
+              <th>{t('pay.proof')}</th>
             </tr>
           </thead>
           <tbody>
@@ -674,6 +726,26 @@ export function PortalFinance() {
                 <td className="num">{payMoney(p)}</td>
                 <td>{fdate(p.due)}</td>
                 <td>{p.paid ? <Pill color="green">{t('finance.paid')}</Pill> : <Pill color="orange">{t('finance.upcoming')}</Pill>}</td>
+                <td>
+                  {(() => {
+                    const pf = state.proformas.find((x) => x.id === p.proformaId);
+                    const kind = p.kind === 'Acompte' ? 'deposit' : 'balance';
+                    const proof = pf && (kind === 'deposit' ? pf.depositProof : pf.balanceProof);
+                    return proof ? (
+                      <button
+                        type="button"
+                        className="btn sm"
+                        onClick={async () => {
+                          if (!(await downloadPaymentProof(pf!, kind))) toast(t('pay.notFound'));
+                        }}
+                      >
+                        <Download size={13} /> {proof.name}
+                      </button>
+                    ) : (
+                      <span className="xs muted">—</span>
+                    );
+                  })()}
+                </td>
               </tr>
             ))}
           </tbody>

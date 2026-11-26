@@ -3,7 +3,7 @@
 -- (c'est nécessaire au portail : dépôt de proforma, die cut, validation du pack, plan de chargement, documents).
 -- Ce déclencheur empêche en plus, même en passant hors de l'application :
 --   · toute suppression par un fournisseur (sauf ses conteneurs prévisionnels pas encore bookés) ;
---   · de marquer un acompte ou un solde comme payé, d'annuler une proforma, de la rattacher à un autre fournisseur ;
+--   · de marquer un acompte ou un solde comme payé (ou d'en changer la copie du virement), d'annuler une proforma, de la rattacher à un autre fournisseur ;
 --   · de changer la référence JONAS, l'EAN, la marque ou le fournisseur d'un produit.
 -- L'équipe JONAS et les transitaires ne sont pas concernés. À exécuter une fois dans l'éditeur SQL de Supabase.
 
@@ -26,7 +26,7 @@ begin
   end if;
 
   if new.collection = 'proformas' then
-    locked := array['supplierId', 'depositPaid', 'balancePaid', 'cancelled'];
+    locked := array['supplierId', 'depositPaid', 'balancePaid', 'depositProof', 'balanceProof', 'cancelled'];
     if tg_op = 'INSERT' then
       if coalesce((new.data ->> 'depositPaid')::boolean, false) or coalesce((new.data ->> 'balancePaid')::boolean, false) or new.data ? 'cancelled' then
         raise exception 'JONAS BUYING : proforma créée par un fournisseur avec un paiement ou une annulation';

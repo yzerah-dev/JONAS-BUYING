@@ -724,6 +724,14 @@ export const fr = {
   'pfl.week': '{week} · du {from} au {to}',
   'pfl.count': '{n} proforma(s)',
   'pfl.none': 'Aucune proforma dans cette sélection.',
+  'pay.title': 'Paiements de JONAS',
+  'pay.deposit': 'Acompte {pct} %',
+  'pay.balance': 'Solde',
+  'pay.due': 'Échéance {date}',
+  'pay.proof': 'Copie du virement',
+  'pay.noProof': 'Copie du virement pas encore déposée',
+  'pay.chip': 'Acompte {pct} % : {state}',
+  'pay.notFound': 'Fichier introuvable',
 };
 
 export type Key = keyof typeof fr;
@@ -1429,6 +1437,14 @@ export const en: Record<Key, string> = {
   'pfl.week': '{week} · {from} to {to}',
   'pfl.count': '{n} proforma(s)',
   'pfl.none': 'No proforma in this selection.',
+  'pay.title': 'JONAS payments',
+  'pay.deposit': 'Deposit {pct} %',
+  'pay.balance': 'Balance',
+  'pay.due': 'Due {date}',
+  'pay.proof': 'Transfer copy',
+  'pay.noProof': 'Transfer copy not uploaded yet',
+  'pay.chip': 'Deposit {pct} %: {state}',
+  'pay.notFound': 'File not found',
 };
 
 /**

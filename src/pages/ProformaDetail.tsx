@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { CancelledProforma, ProformaCancelButtons } from '../components/ProformaCancel';
 import { proformaBestPdf, proformaDocPdf } from '../lib/proformaPdf';
+import { PaymentProofUpload } from '../components/PaymentProof';
+import { downloadPaymentProof } from '../lib/paymentProof';
 import { saveBlob } from '../lib/files';
 import {
   ArrowLeft,
@@ -28,6 +30,7 @@ import {
   Trash2,
   Truck,
   User,
+  Upload,
 } from 'lucide-react';
 import {
   allocatedQty,
@@ -53,7 +56,7 @@ import { BookingRequestButton } from '../components/BookingDialog';
 import BookingReview, { LastRejection } from '../components/BookingReview';
 import ProformaVersions, { SignDialog } from '../components/ProformaVersions';
 import ShipmentsPanel from '../components/Shipments';
-import { addDays, dec, eur, eur2, fdate, m3, num, weekLabel } from '../lib/format';
+import { addDays, dec, eur, eur2, fdate, m3, money, num, weekLabel } from '../lib/format';
 import { useT, type I18n } from '../i18n/context';
 import type { Key } from '../i18n/dict';
 
@@ -417,26 +420,87 @@ function DetailsTab({ pf, state }: { pf: Proforma; state: State }) {
             </dd>
             <dt>Acompte ({pf.depositPct} %)</dt>
             <dd>
-              {eur2(t.deposit)} {pf.depositPaid ? <Pill color="green">Payé</Pill> : <Pill color="red">À faire</Pill>}
+              <PayLine
+                pf={pf}
+                kind="deposit"
+                amountCur={t.amountCur ? (t.deposit / t.amount) * t.amountCur : 0}
+                amountEur={t.deposit}
+                currency={t.currency}
+                paid={pf.depositPaid}
+                due={addDays(pf.date, 7)}
+              />
             </dd>
             <dt>Solde</dt>
             <dd>
-              {eur2(t.balance)} {pf.balancePaid ? <Pill color="green">Payé</Pill> : <Pill color="orange">Échéance {fdate(pf.balanceDue)}</Pill>}
+              <PayLine
+                pf={pf}
+                kind="balance"
+                amountCur={t.amountCur ? (t.balance / t.amount) * t.amountCur : 0}
+                amountEur={t.balance}
+                currency={t.currency}
+                paid={pf.balancePaid}
+                due={pf.balanceDue}
+              />
             </dd>
           </dl>
-          <div className="row mt">
+          <div className="row mt wrap">
             {!pf.depositPaid && auth.can('finance.pay') && (
-              <button className="btn primary" onClick={() => dispatch({ type: 'payDeposit', id: pf.id })}>
+              <button className="btn" onClick={() => dispatch({ type: 'payDeposit', id: pf.id })}>
                 <Check size={16} /> Marquer l’acompte payé
               </button>
             )}
             {pf.depositPaid && !pf.balancePaid && auth.can('finance.pay') && (
-              <button className="btn primary" onClick={() => dispatch({ type: 'payBalance', id: pf.id })}>
+              <button className="btn" onClick={() => dispatch({ type: 'payBalance', id: pf.id })}>
                 <Check size={16} /> Marquer le solde payé
               </button>
             )}
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+/** Une échéance (acompte ou solde) : montant dans la devise du fournisseur, état, copie du virement à déposer / télécharger */
+function PayLine({
+  pf,
+  kind,
+  amountCur,
+  amountEur,
+  currency,
+  paid,
+  due,
+}: {
+  pf: Proforma;
+  kind: 'deposit' | 'balance';
+  amountCur: number;
+  amountEur: number;
+  currency: string;
+  paid: boolean;
+  due: string;
+}) {
+  const auth = useAuth();
+  const proof = kind === 'deposit' ? pf.depositProof : pf.balanceProof;
+  return (
+    <div className="pay-line">
+      <b>{money(amountCur, currency)}</b>
+      {currency !== 'EUR' && <span className="small muted">≈ {eur2(amountEur)}</span>}
+      {paid ? <Pill color="green">Payé</Pill> : <Pill color={kind === 'deposit' ? 'red' : 'orange'}>Échéance {fdate(due)}</Pill>}
+      {proof && (
+        <button
+          type="button"
+          className="btn sm"
+          onClick={async () => {
+            if (!(await downloadPaymentProof(pf, kind))) toast('Fichier introuvable');
+          }}
+        >
+          <Download size={13} /> {proof.name}
+        </button>
+      )}
+      {auth.allowed({ type: 'setPaymentProof', id: pf.id, kind, file: { fileId: '', name: '', size: 0, type: '' } }) && (
+        <PaymentProofUpload pf={pf} kind={kind} className="btn sm primary">
+          <Upload size={13} /> {proof ? 'Remplacer la copie du virement' : 'Déposer la copie du virement'}
+        </PaymentProofUpload>
       )}
     </div>
   );
