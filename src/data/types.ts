@@ -26,6 +26,8 @@ export interface Supplier {
   active: boolean;
   /** Devise et conditions de paiement du fournisseur : reprises par chaque nouvelle proforma */
   terms?: SupplierTerms;
+  /** Logo déposé par le fournisseur (portail) ou par JONAS : affiché à la place du monogramme */
+  logo?: ProductPhoto;
 }
 
 /** Photo d'un produit : fichier dans le stockage (navigateur + bucket « files ») */

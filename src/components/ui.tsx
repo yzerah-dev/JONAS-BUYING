@@ -17,7 +17,6 @@ export function Pill({ color, children, icon }: { color: string; children: React
   );
 }
 
-
 export function ProformaStatusPill({ status, big }: { status: ProformaStatus; big?: boolean }) {
   const Icon = PROFORMA_ICON[status].icon;
   const { t } = useT(); // hors portail : libellés français de PROFORMA_STATUS_LABEL
@@ -31,6 +30,7 @@ export function ProformaStatusPill({ status, big }: { status: ProformaStatus; bi
 
 /** Monogramme fournisseur façon logo (lettre en dégradé), utilisé dans les listes */
 export function SupplierMark({ supplier, size = 30 }: { supplier: Supplier; size?: number }) {
+  if (supplier.logo) return <SupplierLogoImg supplier={supplier} size={size} />;
   if (supplier.mark === 'badge')
     return (
       <span className="supplier-badge" title={supplier.name} style={{ width: size, height: size, background: supplier.color, fontSize: size * 0.62 }}>
@@ -38,11 +38,7 @@ export function SupplierMark({ supplier, size = 30 }: { supplier: Supplier; size
       </span>
     );
   return (
-    <span
-      className="supplier-mark"
-      title={supplier.name}
-      style={{ fontSize: size, backgroundImage: `linear-gradient(135deg, ${supplier.color}, ${supplier.color}88 55%, ${supplier.color})` }}
-    >
+    <span className="supplier-mark" title={supplier.name} style={{ fontSize: size, backgroundImage: `linear-gradient(135deg, ${supplier.color}, ${supplier.color}88 55%, ${supplier.color})` }}>
       {supplier.shortName[0]}
     </span>
   );
@@ -102,7 +98,18 @@ export function BrandLogo({ brand, size = 11 }: { brand: Brand; size?: number })
   );
 }
 
+/** Logo déposé par le fournisseur : image sur fond blanc, cadre carré (le monogramme s'affiche le temps du chargement) */
+function SupplierLogoImg({ supplier, size }: { supplier: Supplier; size: number }) {
+  const url = useBlobUrl(supplier.logo?.fileId);
+  return (
+    <span className="supplier-img" title={supplier.name} style={{ width: size, height: size, borderRadius: Math.max(6, size * 0.22) }}>
+      {url ? <img src={url} alt={`Logo ${supplier.name}`} /> : <b style={{ color: supplier.color, fontSize: size * 0.45 }}>{supplier.shortName[0]}</b>}
+    </span>
+  );
+}
+
 export function SupplierLogo({ supplier, size = 44 }: { supplier: Supplier; size?: number }) {
+  if (supplier.logo) return <SupplierLogoImg supplier={supplier} size={size} />;
   return (
     <div className="supplier-logo" style={{ width: size, height: size, background: supplier.color, fontSize: size * 0.36 }}>
       {initials(supplier.shortName)}
@@ -111,11 +118,7 @@ export function SupplierLogo({ supplier, size = 44 }: { supplier: Supplier; size
 }
 
 export function ValidationDot({ state }: { state: 'done' | 'pending' | 'todo' }) {
-  return (
-    <span className={`vdot ${state}`}>
-      {state === 'done' ? <Check size={20} strokeWidth={3} /> : state === 'pending' ? <Clock size={20} /> : <Circle size={20} />}
-    </span>
-  );
+  return <span className={`vdot ${state}`}>{state === 'done' ? <Check size={20} strokeWidth={3} /> : state === 'pending' ? <Clock size={20} /> : <Circle size={20} />}</span>;
 }
 
 export function ValidationCircuit({ product, compact }: { product: Product; compact?: boolean }) {
@@ -139,9 +142,7 @@ export function ValidationCircuit({ product, compact }: { product: Product; comp
           <div key={s} className={`step ${st === 'done' ? 'done' : st === 'pending' ? 'pending' : ''}`}>
             <div className="bullet">{st === 'done' ? <Check size={16} strokeWidth={3} /> : st === 'pending' ? <Clock size={15} /> : null}</div>
             <div className="lbl">{t(`vs.${s}`)}</div>
-            <div className={st === 'pending' ? 'orange xs' : 'muted xs'}>
-              {st === 'done' ? fmt.fshort(v[s].date) : st === 'pending' ? t('vstate.pending') : t('vstate.todo')}
-            </div>
+            <div className={st === 'pending' ? 'orange xs' : 'muted xs'}>{st === 'done' ? fmt.fshort(v[s].date) : st === 'pending' ? t('vstate.pending') : t('vstate.todo')}</div>
           </div>
         );
       })}
@@ -239,10 +240,20 @@ export function Toaster() {
 /** Pictogramme conteneur de la maquette (rectangle à barres verticales) */
 export function ContainerGlyph({ size = 18, strokeWidth = 1.8, className }: { size?: number; strokeWidth?: number; className?: string }) {
   return (
-    <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg
+      className={className}
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
       <rect x="2.5" y="5.5" width="19" height="13" rx="2.5" fill="none" />
       <path d="M7 9v6M10.3 9v6M13.7 9v6M17 9v6" />
     </svg>
   );
 }
-

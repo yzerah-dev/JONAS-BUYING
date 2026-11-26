@@ -137,6 +137,7 @@ export type Action =
       file?: { fileId: string; name: string; size: number; mime: string };
     }
   | { type: 'setSupplierTerms'; supplierId: string; terms: SupplierTerms }
+  | { type: 'setSupplierLogo'; supplierId: string; logo: ProductPhoto | null }
   | { type: 'addSupplier'; supplier: Supplier }
   | { type: 'updateSupplier'; supplier: Supplier }
   | { type: 'cancelOrder'; id: string }
@@ -450,6 +451,9 @@ export function isAllowed(s: State, a: Action): boolean {
       );
     case 'addSupplier':
       return canAddSupplier(u) && !!a.supplier.id && !!a.supplier.name.trim() && !s.suppliers.some((x) => x.id === a.supplier.id);
+    case 'setSupplierLogo':
+      // Le fournisseur pour sa propre fiche (portail), ou l'équipe achats
+      return s.suppliers.some((x) => x.id === a.supplierId) && ((isSupplier(u) && u.supplierId === a.supplierId) || canAddSupplier(u));
     case 'setSupplierTerms':
       return !!s.suppliers.find((x) => x.id === a.supplierId) && (can(u, 'finance.pay') || can(u, 'proforma.sign')) && a.terms.depositPct >= 0 && a.terms.depositPct <= 100 && a.terms.balanceDays >= 0;
     case 'createProforma': {
@@ -1161,6 +1165,16 @@ function applyAction(s: State, a: Action): State {
       const next = withoutAllocations(s, a.id);
       return { ...next, proformas: next.proformas.filter((p) => p.id !== a.id) };
     }
+    case 'setSupplierLogo':
+      return {
+        ...s,
+        suppliers: s.suppliers.map((x) => {
+          if (x.id !== a.supplierId) return x;
+          const { logo: _old, ...rest } = x;
+          void _old;
+          return a.logo ? { ...rest, logo: a.logo } : rest;
+        }),
+      };
     case 'setSupplierTerms':
       return { ...s, suppliers: s.suppliers.map((x) => (x.id === a.supplierId ? { ...x, terms: a.terms } : x)) };
     case 'addSupplier':
@@ -1976,6 +1990,8 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
       return { target: a.supplier.id, text: `Fournisseur modifié : ${a.supplier.name}` };
     case 'addSupplier':
       return { target: a.supplier.id, text: `Nouveau fournisseur : ${a.supplier.name} (${a.supplier.city}, ${a.supplier.country})` };
+    case 'setSupplierLogo':
+      return { target: a.supplierId, text: `${s.suppliers.find((x) => x.id === a.supplierId)?.shortName} : logo ${a.logo ? 'mis à jour' : 'retiré'}` };
     case 'setSupplierTerms':
       return { text: `${s.suppliers.find((x) => x.id === a.supplierId)?.shortName} : devise ${a.terms.currency}, acompte ${a.terms.depositPct} %, solde J+${a.terms.balanceDays}` };
     case 'requestSplit':

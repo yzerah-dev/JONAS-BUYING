@@ -24,7 +24,8 @@ import {
   realDeparture,
 } from '../data/store';
 import SupplierPackRounds from './SupplierPackRounds';
-import { BrandLogo, ContainerStatusPill, Kpi, PackPill, Pill, ProductPic, ProductThumb, Seg, ValidationCircuit } from '../components/ui';
+import { BrandLogo, ContainerStatusPill, Kpi, PackPill, Pill, ProductPic, ProductThumb, Seg, SupplierLogo, ValidationCircuit } from '../components/ui';
+import { SupplierLogoEdit } from '../components/SupplierLogoEdit';
 import { toast } from '../components/ui-shared';
 import type { Proforma } from '../data/types';
 import BookingEntry from '../components/BookingEntry';
@@ -104,11 +105,17 @@ export function PortalHome() {
   return (
     <>
       <div className="page-head">
+        <SupplierLogo supplier={supplier!} size={56} />
         <div>
           <h1>{tr('home.welcome', { name: user.name })}</h1>
           <div className="page-sub">{tr('home.sub', { supplier: supplier!.name, date: fdate(TODAY), week: weekLabel(TODAY) })}</div>
         </div>
       </div>
+      {!supplier!.logo && (
+        <div className="card pad mb">
+          <SupplierLogoEdit supplier={supplier!} />
+        </div>
+      )}
       <div className="kpis mb">
         <Kpi icon={<Boxes size={18} />} value={products.length} label={tr('home.kpi.products')} />
         <Kpi icon={<FileText size={18} />} value={proformas.length} label={tr('home.kpi.proformas')} />
@@ -141,6 +148,11 @@ export function PortalHome() {
         )}
       </div>
       <PortalFlow />
+      {supplier!.logo && (
+        <div className="card pad mt">
+          <SupplierLogoEdit supplier={supplier!} size={64} />
+        </div>
+      )}
     </>
   );
 }

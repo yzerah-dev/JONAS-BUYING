@@ -1,9 +1,26 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { BarChart3, Boxes, Calendar, Check, ChevronLeft, Container as Ctn, Euro, FileText, Home, Hourglass, Mail, MessageCircle, Phone, ShoppingCart, Truck, User } from 'lucide-react';
-import { byId, containerCbm, containerEta, containerEtd, containerProformas, containerQty, payments, proformaTotals, supplierStats, supplierTerms, termsLabel, useAuth, useStore } from '../data/store';
+import {
+  byId,
+  canAddSupplier,
+  currentUser,
+  containerCbm,
+  containerEta,
+  containerEtd,
+  containerProformas,
+  containerQty,
+  payments,
+  proformaTotals,
+  supplierStats,
+  supplierTerms,
+  termsLabel,
+  useAuth,
+  useStore,
+} from '../data/store';
 import { toast } from '../components/ui-shared';
 import { EditSupplierButton } from '../components/NewSupplier';
+import { SupplierLogoEdit } from '../components/SupplierLogoEdit';
 import { CONTAINER_STATUSES, type Currency, type SupplierTerms } from '../data/types';
 import { ContainerStatusPill, Kpi, Pill, ProductThumb, ProformaStatusPill, Ring, Seg, SupplierLogo, Tabs } from '../components/ui';
 import { TODAY, dec, eur, fdate, fshort, num, weekLabel } from '../lib/format';
@@ -41,7 +58,7 @@ export default function SupplierDetail() {
         <EditSupplierButton supplier={sup} />
       </div>
       <div className="card pad row wrap gap-lg mb">
-        <SupplierLogo supplier={sup} size={76} />
+        {canAddSupplier(currentUser(state)) ? <SupplierLogoEdit supplier={sup} size={76} showHint={false} /> : <SupplierLogo supplier={sup} size={76} />}
         <div>
           <h1 style={{ fontSize: 26 }}>{sup.name}</h1>
           <div className="row mt">
