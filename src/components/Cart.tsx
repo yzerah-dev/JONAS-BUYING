@@ -8,7 +8,7 @@ import { TODAY, addDays, dec, fdate, money, num } from '../lib/format';
 import { ProductThumb } from './ui';
 import { toast } from './ui-shared';
 
-/** − [cartons] + : commande directe en cartons (comme un site marchand), avec les pièces et le volume */
+/** Commande directe en cartons : gros bouton « + 1 carton », puis − [cartons] + ; pièces et volume affichés */
 export function CartQty({ p }: { p: Product }) {
   const { state } = useStore();
   const me = currentUser(state);
@@ -18,30 +18,34 @@ export function CartQty({ p }: { p: Product }) {
   const ctn = Math.ceil(pcs / pcb);
   const setCtn = (n: number) => setCartQty(me.id, p.id, Math.max(0, n) * pcb);
   const stop = (e: React.SyntheticEvent) => e.stopPropagation();
-  return (
-    <div className={`cart-qty ${ctn ? 'on' : ''}`} onClick={stop} onKeyDown={stop}>
-      <div className="cq-row">
-        <button type="button" className="cq-btn" aria-label={`Retirer un carton ${p.ref}`} disabled={!ctn} onClick={() => setCtn(ctn - 1)}>
-          <Minus size={14} />
+  if (!ctn)
+    return (
+      <div className="cart-qty" onClick={stop} onKeyDown={stop}>
+        <button type="button" className="cq-add" aria-label={`Ajouter un carton ${p.ref}`} onClick={() => setCtn(1)}>
+          <Plus size={18} strokeWidth={3} /> 1 carton
         </button>
-        <input
-          className="cq-input"
-          inputMode="numeric"
-          aria-label={`Cartons au panier ${p.ref}`}
-          value={ctn || ''}
-          placeholder="0"
-          onChange={(e) => setCtn(Number(e.target.value.replace(/\D/g, '')) || 0)}
-        />
-        <button type="button" className="cq-btn plus" aria-label={`Ajouter un carton ${p.ref}`} title={`+ 1 carton (${pcb} pcs)`} onClick={() => setCtn(ctn + 1)}>
-          <Plus size={15} />
-        </button>
-        <span className="cq-unit">ctn</span>
-      </div>
-      {ctn > 0 && (
-        <div className="cq-info">
-          {num(ctn * pcb)} pcs · <b>{dec(ctn * p.cbmCarton, 2)} m³</b>
+        <div className="cq-info muted">
+          {num(pcb)} pcs · {dec(p.cbmCarton, 3)} m³ / ctn
         </div>
-      )}
+      </div>
+    );
+  return (
+    <div className="cart-qty on" onClick={stop} onKeyDown={stop}>
+      <div className="cq-row">
+        <button type="button" className="cq-btn" aria-label={`Retirer un carton ${p.ref}`} onClick={() => setCtn(ctn - 1)}>
+          <Minus size={18} strokeWidth={3} />
+        </button>
+        <label className="cq-field">
+          <input className="cq-input" inputMode="numeric" aria-label={`Cartons au panier ${p.ref}`} value={ctn} onChange={(e) => setCtn(Number(e.target.value.replace(/\D/g, '')) || 0)} />
+          <span>ctn</span>
+        </label>
+        <button type="button" className="cq-btn plus" aria-label={`Ajouter un carton ${p.ref}`} onClick={() => setCtn(ctn + 1)}>
+          <Plus size={18} strokeWidth={3} />
+        </button>
+      </div>
+      <div className="cq-info">
+        {num(ctn * pcb)} pcs · <b>{dec(ctn * p.cbmCarton, 2)} m³</b>
+      </div>
     </div>
   );
 }
