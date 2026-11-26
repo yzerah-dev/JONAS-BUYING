@@ -2104,3 +2104,36 @@ tr.pf-moving td, .pf-line.pf-moving { background: #fff6e8 !important; outline: 2
 .pfp-pack.late { background: #d92d20; color: #fff; }
 .pfp-pack.todo { background: #f1f3f2; color: var(--ink); }
 .pfp-figs b { font-size: 16px; }
+
+/* Liste des proformas : 5 colonnes, lignes hautes, gros caractères */
+.pf-table thead th { font-size: 15px; padding: 12px 14px; }
+.pf-table tbody td { padding: 20px 14px; font-size: 16px; }
+.pf-table .pf-ref { gap: 12px; align-items: center; }
+.pf-ident { display: grid; gap: 2px; min-width: 0; }
+.pf-ident .pf-id { font-size: 20px; font-weight: 900; letter-spacing: -0.01em; }
+.pf-ident .pf-title { font-size: 16px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 420px; }
+.pf-ident .pf-supname { font-size: 13.5px; color: var(--muted); }
+.pf-when { display: grid; gap: 2px; justify-items: center; }
+.pf-when b { font-size: 26px; font-weight: 900; }
+.pf-when small { font-size: 13px; color: var(--muted); white-space: nowrap; }
+.pf-table .pf-amount b { font-size: 20px; }
+.pf-table .pf-ok, .pf-table .pf-pack-n { font-size: 18px; }
+.pf-table .pf-big { font-size: 22px; font-weight: 900; } .pf-table .pf-ok { font-size: 16px; padding: 6px 14px; }
+/* Grands écrans (l'appli se réduit) : liste des proformas encore plus lisible */
+.pf-table tbody td { padding: 24px 16px; }
+.pf-ident .pf-id { font-size: 24px; }
+.pf-ident .pf-title { font-size: 19px; }
+.pf-ident .pf-supname { font-size: 15px; }
+.pf-table .pf-ref .pf-grip { width: 34px; height: 34px; }
+.pf-when b { font-size: 32px; }
+.pf-when small { font-size: 15px; }
+.pf-table .pf-amount b { font-size: 24px; }
+.pf-table .pf-amount small { font-size: 14px; }
+.pf-table .pf-amount .todo, .pf-table .pf-amount .ok { font-size: 15px; padding: 3px 14px; }
+.pf-table .pf-big { font-size: 28px; }
+.pf-table .pf-ok { font-size: 19px; padding: 8px 18px; border-radius: 10px; }
+.pf-table td.c .pill { font-size: 16px; padding: 6px 14px; }
+.pf-table td.c .pill svg { width: 16px; height: 16px; }
+.pf-table .pf-bk-btn, .pf-table .pf-bk-wait, .pf-table .pf-sign small { font-size: 13px; }
+.pf-table thead th { font-size: 16px; padding: 14px 16px; }
+.pf-table .pf-bkcell .pill, .pf-table td.c .pill { font-size: 17px !important; padding: 7px 16px !important; } .pf-table .pf-sign span { font-size: 18px; } .pf-table .pf-sign button { font-size: 13px; padding: 4px 12px; }

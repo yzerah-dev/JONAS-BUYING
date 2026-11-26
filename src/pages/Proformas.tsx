@@ -377,15 +377,10 @@ function Group({
           <table className="pf-table">
             <thead>
               <tr>
-                <th>Référence</th>
-                <th>Produit</th>
-                <th>Fournisseur</th>
-                <th className="c">Pack</th>
-                <th className="c">Validation</th>
-                <th className="c">CBM</th>
+                <th>Proforma</th>
+                <th className="c">Packs</th>
                 <th className="c">Statut</th>
                 <th className="c">Chargement</th>
-                <th className="c">Arrivée</th>
                 {showMoney && <th className="c">Montant</th>}
                 <th />
               </tr>
@@ -558,33 +553,28 @@ function Row({ p, state, showMoney, onSign, onOpen, move }: RowProps) {
               <ArrowUpDown size={15} />
             </button>
           )}
-          <SupplierMark supplier={sup} size={30} />
-          <b>{p.id}</b>
+          <SupplierMark supplier={sup} size={40} />
+          <div className="pf-ident">
+            <b className="pf-id">{p.id}</b>
+            <span className="pf-title">{title}</span>
+            <small className="pf-supname">{sup.name}</small>
+          </div>
         </div>
       </td>
-      <td className="pf-prod">
-        <b>{title}</b>
-      </td>
-      <td className="pf-sup">{sup.name}</td>
       <td className="c">
         <PackCell ok={t.packsOk} total={t.packsTotal} done={packsDone} />
       </td>
       <td className="c">
-        <CheckCircle2 className="pf-check" size={28} strokeWidth={1.8} />
+        <StatusCell p={p} onSign={onSign} />
       </td>
       <td className="c">
-        <div className="pf-cbm">
-          <b>{dec(t.cbm)}</b>
+        <div className="pf-when">
+          <b>{weekLabel(p.etd)}</b>
           <small>
-            {dec(t.eq40)} <ContainerGlyph size={18} />
+            arrivée {weekLabel(p.eta)} · {dec(t.cbm)} m³
           </small>
         </div>
       </td>
-      <td className="c">
-        <StatusCell p={p} onSign={onSign} />
-      </td>
-      <td className="c pf-week-no">{weekLabel(p.etd)}</td>
-      <td className="c pf-week-no">{weekLabel(p.eta)}</td>
       {showMoney && (
         <td className="c">
           <AmountCell p={p} amount={t.amount} deposit={t.deposit} amountCur={t.amountCur} currency={t.currency} />
