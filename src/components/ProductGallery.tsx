@@ -7,6 +7,7 @@ import { useAddPhotos } from '../lib/useAddPhotos';
 import { useBlobUrl } from '../lib/blobUrl';
 import { toast } from './ui-shared';
 import { useT } from '../i18n/context';
+import PhotoLightbox from './PhotoLightbox';
 
 function Thumb({ photo, alt, active, onClick }: { photo: ProductPhoto; alt: string; active: boolean; onClick: () => void }) {
   const url = useBlobUrl(photo.fileId);
@@ -28,6 +29,7 @@ export default function ProductGallery({ product }: { product: Product }) {
   const photos = allPhotos(product);
   const [sel, setSel] = useState(0);
   const [over, setOver] = useState(false);
+  const [zoom, setZoom] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const cur = photos[Math.min(sel, photos.length - 1)];
   const url = useBlobUrl(cur?.fileId);
@@ -40,7 +42,6 @@ export default function ProductGallery({ product }: { product: Product }) {
     <div className="gallery-box">
       <div
         className={`thumb gal-main ${over ? 'over' : ''}`}
-        style={{ background: product.tint }}
         onDragOver={(e) => {
           if (!canEdit) return;
           e.preventDefault();
@@ -54,6 +55,9 @@ export default function ProductGallery({ product }: { product: Product }) {
           add([...e.dataTransfer.files]);
         }}
         aria-label={t('ph.dropOn', { ref: product.ref })}
+        onClick={() => url && setZoom(true)}
+        title={url ? t('ph.zoom') : undefined}
+        style={{ background: product.tint, cursor: url ? 'zoom-in' : undefined }}
       >
         {url ? <img className="product-pic" src={url} alt={product.name} /> : <span className="gal-emoji">{product.emoji}</span>}
         {over && <div className="gal-over">{t('ph.dropHere')}</div>}
@@ -113,6 +117,7 @@ export default function ProductGallery({ product }: { product: Product }) {
         </div>
       )}
       {canEdit && !photos.length && <small className="muted">{t('ph.dropHint')}</small>}
+      {zoom && photos.length > 0 && <PhotoLightbox photos={photos} index={idx} alt={`${product.ref} · ${product.name}`} onIndex={setSel} onClose={() => setZoom(false)} />}
     </div>
   );
 }

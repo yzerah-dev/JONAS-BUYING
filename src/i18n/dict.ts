@@ -736,6 +736,10 @@ export const fr = {
   'pay.balanceRule': 'Échéance : départ {kind} du {date} + {n} j',
   'pay.real': 'réel',
   'pay.planned': 'prévu',
+  'ph.zoom': 'Agrandir la photo',
+  'ph.close': 'Fermer',
+  'ph.prev': 'Photo précédente',
+  'ph.next': 'Photo suivante',
 };
 
 export type Key = keyof typeof fr;
@@ -1453,6 +1457,10 @@ export const en: Record<Key, string> = {
   'pay.balanceRule': 'Due: {kind} departure {date} + {n} days',
   'pay.real': 'actual',
   'pay.planned': 'planned',
+  'ph.zoom': 'Enlarge photo',
+  'ph.close': 'Close',
+  'ph.prev': 'Previous photo',
+  'ph.next': 'Next photo',
 };
 
 /**

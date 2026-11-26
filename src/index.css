@@ -2030,3 +2030,13 @@ select.pi-input { cursor: pointer; }
 .pay-card .pay-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 0; border-top: 1px solid var(--line); }
 .pay-card .pay-label { min-width: 110px; }
 .pay-card .pay-amount { font-size: 18px; font-weight: 900; }
+
+/* Photo en grand */
+.lightbox { position: fixed; inset: 0; z-index: 200; background: rgba(8, 14, 12, 0.88); display: grid; place-items: center; padding: 32px; cursor: zoom-out; }
+.lightbox img { max-width: min(92vw, 1400px); max-height: 86vh; object-fit: contain; border-radius: 10px; background: #fff; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); cursor: default; }
+.lb-close { position: absolute; top: 16px; right: 16px; background: rgba(255, 255, 255, 0.12); color: #fff; border: 0; border-radius: 50%; width: 44px; height: 44px; display: grid; place-items: center; cursor: pointer; }
+.lb-nav { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(255, 255, 255, 0.14); color: #fff; border: 0; border-radius: 50%; width: 56px; height: 56px; display: grid; place-items: center; cursor: pointer; }
+.lb-nav.prev { left: 16px; }
+.lb-nav.next { right: 16px; }
+.lb-nav:hover, .lb-close:hover { background: rgba(255, 255, 255, 0.28); }
+.lb-count { position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); color: #fff; font-weight: 700; background: rgba(0, 0, 0, 0.35); padding: 4px 12px; border-radius: 999px; }

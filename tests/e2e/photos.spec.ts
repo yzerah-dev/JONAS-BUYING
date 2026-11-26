@@ -315,3 +315,21 @@ test('import de photos en lot : JONAS (tout le catalogue) et fournisseur (ses pr
   await expect(page.locator('main tr', { hasText: 'CP-C042' }).locator('img.product-pic')).toBeVisible();
   expect((await photoCount(page, 'AB-M026')).total).toBe(1);
 });
+
+test('fiche produit : clic sur la photo = photo en grand (flèches, Échap pour fermer)', async ({ page }) => {
+  await resetApp(page);
+  await loginAs(page, 'Tide');
+  await go(page, 'portail/produits/CP-T001');
+  await page.getByLabel('Ajouter des photos CP-T001').setInputFiles([
+    { name: 'a.png', mimeType: 'image/png', buffer: PINK },
+    { name: 'b.png', mimeType: 'image/png', buffer: GREY },
+  ]);
+  await page.locator('.gal-main img').click();
+  const box = page.locator('.lightbox');
+  await expect(box.locator('img')).toBeVisible();
+  await expect(box).toContainText('1 / 2');
+  await page.keyboard.press('ArrowRight');
+  await expect(box).toContainText('2 / 2');
+  await page.keyboard.press('Escape');
+  await expect(box).toHaveCount(0);
+});

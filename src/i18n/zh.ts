@@ -703,6 +703,10 @@ export const zh: Record<Key, string> = {
   'pay.balanceRule': '到期：{kind}出运 {date} + {n} 天',
   'pay.real': '实际',
   'pay.planned': '计划',
+  'ph.zoom': '放大照片',
+  'ph.close': '关闭',
+  'ph.prev': '上一张',
+  'ph.next': '下一张',
 };
 
 /** Valeurs issues des données (français) traduites en chinois */
