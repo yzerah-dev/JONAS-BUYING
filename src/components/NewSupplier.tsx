@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Plus, X } from 'lucide-react';
+import { Pencil, Plus, X } from 'lucide-react';
 import { DEFAULT_TERMS, canAddSupplier, currentUser, newSupplierId, useStore } from '../data/store';
 import type { Currency, Supplier } from '../data/types';
 import { toast } from './ui-shared';
@@ -39,53 +39,76 @@ export function NewSupplierButton({ onCreated, className = 'btn primary', label 
   );
 }
 
-function NewSupplierDialog({ onClose, onCreated }: { onClose: () => void; onCreated?: (id: string) => void }) {
+/** Bouton « Modifier » de la fiche fournisseur : même formulaire, prérempli */
+export function EditSupplierButton({ supplier }: { supplier: Supplier }) {
+  const { state } = useStore();
+  const [open, setOpen] = useState(false);
+  if (!canAddSupplier(currentUser(state))) return null;
+  return (
+    <>
+      <button type="button" className="btn" onClick={() => setOpen(true)}>
+        <Pencil size={16} /> Modifier
+      </button>
+      {open && <NewSupplierDialog edit={supplier} onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
+function NewSupplierDialog({ onClose, onCreated, edit }: { onClose: () => void; onCreated?: (id: string) => void; edit?: Supplier }) {
   const { state, dispatch } = useStore();
-  const [name, setName] = useState('');
-  const [shortName, setShortName] = useState('');
-  const [country, setCountry] = useState('Chine');
-  const [otherCountry, setOtherCountry] = useState('');
-  const [city, setCity] = useState('');
-  const [port, setPort] = useState('');
-  const [contact, setContact] = useState({ name: '', role: '', email: '', phone: '', wechat: '' });
-  const [currency, setCurrency] = useState<Currency>('USD');
-  const [depositPct, setDepositPct] = useState(DEFAULT_TERMS.depositPct);
-  const [balanceDays, setBalanceDays] = useState(DEFAULT_TERMS.balanceDays);
-  const dup = state.suppliers.find((s) => name.trim() && s.name.trim().toLowerCase() === name.trim().toLowerCase());
+  const known0 = !edit || COUNTRIES.some((x) => x.name === edit.country);
+  const [name, setName] = useState(edit?.name ?? '');
+  const [shortName, setShortName] = useState(edit?.shortName ?? '');
+  const [country, setCountry] = useState(edit ? (known0 ? edit.country : 'autre') : 'Chine');
+  const [otherCountry, setOtherCountry] = useState(edit && !known0 ? edit.country : '');
+  const [city, setCity] = useState(edit?.city ?? '');
+  const [port, setPort] = useState(edit?.port ?? '');
+  const [contact, setContact] = useState({
+    name: edit?.contact.name ?? '',
+    role: edit?.contact.role ?? '',
+    email: edit?.contact.email ?? '',
+    phone: edit?.contact.phone ?? '',
+    wechat: edit?.contact.wechat ?? '',
+  });
+  const [currency, setCurrency] = useState<Currency>(edit?.terms?.currency ?? 'USD');
+  const [depositPct, setDepositPct] = useState(edit?.terms?.depositPct ?? DEFAULT_TERMS.depositPct);
+  const [balanceDays, setBalanceDays] = useState(edit?.terms?.balanceDays ?? DEFAULT_TERMS.balanceDays);
+  const dup = state.suppliers.find((s) => s.id !== edit?.id && name.trim() && s.name.trim().toLowerCase() === name.trim().toLowerCase());
   const c = (k: keyof typeof contact) => (e: React.ChangeEvent<HTMLInputElement>) => setContact({ ...contact, [k]: e.target.value });
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     e.stopPropagation(); // le formulaire peut être ouvert depuis « Nouvelle commande »
     if (!name.trim() || dup) return;
-    const id = newSupplierId(state, shortName || name);
+    const id = edit?.id ?? newSupplierId(state, shortName || name);
     const known = COUNTRIES.find((x) => x.name === country);
     const supplier: Supplier = {
+      ...(edit ?? {}),
       id,
       name: name.trim(),
       shortName: shortName.trim() || name.trim(),
       country: country === 'autre' ? otherCountry.trim() || 'Autre' : country,
-      flag: known?.flag ?? '🏳️',
+      flag: known?.flag ?? (edit && country === 'autre' ? edit.flag : '🏳️'),
       city: city.trim(),
       port: port.trim() || city.trim(),
       contact: { name: contact.name.trim(), role: contact.role.trim(), email: contact.email.trim(), phone: contact.phone.trim(), ...(contact.wechat.trim() ? { wechat: contact.wechat.trim() } : {}) },
-      color: COLORS[state.suppliers.length % COLORS.length],
-      active: true,
+      color: edit?.color ?? COLORS[state.suppliers.length % COLORS.length],
+      active: edit?.active ?? true,
       terms: { currency, depositPct, balanceDays },
     };
-    dispatch({ type: 'addSupplier', supplier });
-    toast(`Fournisseur créé : ${supplier.name}`);
+    dispatch(edit ? { type: 'updateSupplier', supplier } : { type: 'addSupplier', supplier });
+    toast(edit ? `Fournisseur modifié : ${supplier.name}` : `Fournisseur créé : ${supplier.name}`);
     onClose();
     onCreated?.(id);
   };
 
   return createPortal(
     <div className="palette-back" onMouseDown={onClose}>
-      <form className="card rc-dialog bk-dialog np-dialog" role="dialog" aria-label="Nouveau fournisseur" onMouseDown={(e) => e.stopPropagation()} onSubmit={submit}>
+      <form className="card rc-dialog bk-dialog np-dialog" role="dialog" aria-label={edit ? `Modifier ${edit.name}` : 'Nouveau fournisseur'} onMouseDown={(e) => e.stopPropagation()} onSubmit={submit}>
         <header className="rc-head">
           <div>
-            <h2>Nouveau fournisseur</h2>
-            <span className="muted small">Il apparaît tout de suite dans Fournisseurs et dans Nouvelle commande.</span>
+            <h2>{edit ? `Modifier ${edit.name}` : 'Nouveau fournisseur'}</h2>
+            <span className="muted small">{edit ? 'Les conditions s’appliquent aux prochaines proformas.' : 'Il apparaît tout de suite dans Fournisseurs et dans Nouvelle commande.'}</span>
           </div>
           <button type="button" className="icon-btn" onClick={onClose} aria-label="Fermer">
             <X size={20} />
@@ -172,7 +195,7 @@ function NewSupplierDialog({ onClose, onCreated }: { onClose: () => void; onCrea
             Annuler
           </button>
           <button type="submit" className="btn primary" disabled={!name.trim() || !!dup}>
-            <Plus size={16} /> Créer le fournisseur
+            {edit ? <Pencil size={16} /> : <Plus size={16} />} {edit ? 'Enregistrer' : 'Créer le fournisseur'}
           </button>
         </div>
       </form>

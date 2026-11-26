@@ -52,3 +52,26 @@ test('un fournisseur ou un designer ne peut pas créer de fournisseur', async ({
   await go(page, 'fournisseurs');
   await expect(page.getByRole('button', { name: 'Nouveau fournisseur' })).toHaveCount(0);
 });
+
+test('modifier un fournisseur : nom, contact et conditions', async ({ page }) => {
+  await resetApp(page);
+  await loginAs(page, 'David');
+  await go(page, 'fournisseurs/tide');
+  await page.getByRole('button', { name: 'Modifier' }).first().click();
+  const dlg = page.getByRole('dialog', { name: /Modifier Xiamen Tide Living/ });
+  await expect(dlg.getByLabel('Raison sociale *')).toHaveValue('Xiamen Tide Living');
+  // Nom d'un autre fournisseur refusé
+  await dlg.getByLabel('Raison sociale *').fill('Shenzhen Nova Beauty');
+  await expect(dlg).toContainText('Ce fournisseur existe déjà.');
+  await dlg.getByLabel('Raison sociale *').fill('XIAMEN TIDE LIVING CO., LTD');
+  await dlg.getByLabel('Nom', { exact: true }).fill('Mr. Chen Wei');
+  await dlg.getByLabel('Acompte (%)').fill('20');
+  await dlg.getByRole('button', { name: 'Enregistrer' }).click();
+  await expect(toast(page)).toContainText('Fournisseur modifié : XIAMEN TIDE LIVING CO., LTD');
+  await expect(page.locator('.page-head')).toContainText('XIAMEN TIDE LIVING CO., LTD');
+  const sup = await page.evaluate(() => {
+    const k = Object.keys(localStorage).find((x) => x.startsWith('jonas-buying-state'))!;
+    return JSON.parse(localStorage.getItem(k)!).suppliers.find((s: { id: string }) => s.id === 'tide');
+  });
+  expect(sup).toMatchObject({ id: 'tide', name: 'XIAMEN TIDE LIVING CO., LTD', contact: { name: 'Mr. Chen Wei' }, terms: { depositPct: 20 } });
+});

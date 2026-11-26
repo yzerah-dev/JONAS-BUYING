@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { CancelledProforma, ProformaCancelButtons } from '../components/ProformaCancel';
+import { proformaBestPdf, proformaDocPdf } from '../lib/proformaPdf';
+import { saveBlob } from '../lib/files';
 import {
   ArrowLeft,
   Boxes,
@@ -81,10 +83,26 @@ export default function ProformaDetail() {
         {shipmentLabel(state, pf) && <span className="pill violet">{shipmentLabel(state, pf)}</span>}
         <ProformaStatusPill status={pf.status} />
         <div className="grow" />
-        <button className="btn" onClick={() => toast('Export PDF généré (démo)')}>
+        <button
+          className="btn"
+          onClick={async () => {
+            const r = await proformaBestPdf(pf, { supplier: sup, products: state.products, company: state.settings.company });
+            await saveBlob(r.blob, r.name);
+          }}
+        >
           <Download size={16} /> PDF
         </button>
-        <button className="btn" onClick={() => toast('Lien de partage copié (démo)')}>
+        <button
+          className="btn"
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(location.href);
+              toast('Lien de la proforma copié (accessible aux personnes connectées)');
+            } catch {
+              toast(`Lien : ${location.href}`);
+            }
+          }}
+        >
           <Share2 size={16} /> Partager
         </button>
         <BookingRequestButton pf={pf} />
@@ -449,6 +467,12 @@ function SignButton({ pf }: { pf: Proforma }) {
 }
 
 function DocumentsTab({ pf }: { pf: Proforma }) {
+  const { state } = useStore();
+  const download = async (d: string) => {
+    const r = await proformaDocPdf(pf, d, { supplier: byId(state.suppliers, pf.supplierId), products: state.products, company: state.settings.company });
+    if (!r) return toast(`${d} : pas de fichier joint`);
+    await saveBlob(r.blob, r.name);
+  };
   return (
     <>
       <ProformaVersions pf={pf} />
@@ -458,7 +482,7 @@ function DocumentsTab({ pf }: { pf: Proforma }) {
             <FileText size={16} className="green" />
             <span className="bold">{d}</span>
             <span className="grow" />
-            <button className="btn sm" onClick={() => toast(`Téléchargement de ${d} (démo)`)}>
+            <button className="btn sm" onClick={() => download(d)}>
               <Download size={13} /> Télécharger
             </button>
           </div>

@@ -121,7 +121,7 @@ export type Action =
   | { type: 'toggleUser'; userId: string }
   | { type: 'requestPlan'; containerId: string }
   | { type: 'proposePlan'; containerId: string }
-  | { type: 'addContainerDoc'; containerId: string; doc: string }
+  | { type: 'addContainerDoc'; containerId: string; doc: string; file?: { fileId: string; name: string; size: number; type: string } }
   | { type: 'signProforma'; id: string; etdWanted: ISODate }
   | {
       type: 'createProforma';
@@ -138,6 +138,7 @@ export type Action =
     }
   | { type: 'setSupplierTerms'; supplierId: string; terms: SupplierTerms }
   | { type: 'addSupplier'; supplier: Supplier }
+  | { type: 'updateSupplier'; supplier: Supplier }
   | { type: 'cancelOrder'; id: string }
   | { type: 'cancelProforma'; id: string; reason: string }
   | { type: 'restoreProforma'; id: string }
@@ -411,6 +412,8 @@ export function isAllowed(s: State, a: Action): boolean {
       const pf = s.proformas.find((x) => x.id === a.id);
       return !!pf?.order && !pf.versions?.length && pf.status === 'a_signer' && (can(u, 'proforma.edit') || can(u, 'proforma.sign'));
     }
+    case 'updateSupplier':
+      return canAddSupplier(u) && !!a.supplier.name.trim() && s.suppliers.some((x) => x.id === a.supplier.id) && !s.suppliers.some((x) => x.id !== a.supplier.id && x.name.trim().toLowerCase() === a.supplier.name.trim().toLowerCase());
     case 'addSupplier':
       return canAddSupplier(u) && !!a.supplier.id && !!a.supplier.name.trim() && !s.suppliers.some((x) => x.id === a.supplier.id);
     case 'setSupplierTerms':
@@ -977,7 +980,8 @@ function applyAction(s: State, a: Action): State {
       return mapC(s, a.containerId, (c) => ({
         ...c,
         documents: c.documents.includes(a.doc) ? c.documents : [...c.documents, a.doc],
-        dateHistory: [...c.dateHistory, hist(me, `Document déposé : ${a.doc}`)],
+        docFiles: a.file ? { ...(c.docFiles ?? {}), [a.doc]: { ...a.file, at: nowStamp(), by: me } } : c.docFiles,
+        dateHistory: [...c.dateHistory, hist(me, `Document déposé : ${a.doc}${a.file ? ` (${a.file.name})` : ''}`)],
       }));
     case 'createProforma': {
       const u = currentUser(s);
@@ -1033,6 +1037,8 @@ function applyAction(s: State, a: Action): State {
       return { ...s, suppliers: s.suppliers.map((x) => (x.id === a.supplierId ? { ...x, terms: a.terms } : x)) };
     case 'addSupplier':
       return { ...s, suppliers: [...s.suppliers, a.supplier] };
+    case 'updateSupplier':
+      return { ...s, suppliers: s.suppliers.map((x) => (x.id === a.supplier.id ? { ...a.supplier, id: x.id } : x)) };
     case 'requestSplit': {
       const u = currentUser(s);
       return mapPF(s, a.id, (pf) => ({
@@ -1495,7 +1501,7 @@ function applyAction(s: State, a: Action): State {
           ...c,
           status: 'en_transit',
           etdReal: TODAY,
-          documents: [...new Set([...c.documents, 'BL.pdf', 'Invoice.pdf', 'Packing List.xlsx'])],
+          // BL, Invoice et Packing List ne sont plus notés d'office : ils doivent être déposés (fournisseur ou transitaire)
           dateHistory: [...c.dateHistory, hist(me, `Départ réel ${TODAY}`)],
         })),
       );
@@ -1791,6 +1797,8 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
       const n = a.items.reduce((t, i) => t + i.photos.length, 0);
       return { target: a.items.length === 1 ? a.items[0].productId : undefined, text: `${n} photo(s) importée(s) pour ${a.items.length} produit(s)` };
     }
+    case 'updateSupplier':
+      return { target: a.supplier.id, text: `Fournisseur modifié : ${a.supplier.name}` };
     case 'addSupplier':
       return { target: a.supplier.id, text: `Nouveau fournisseur : ${a.supplier.name} (${a.supplier.city}, ${a.supplier.country})` };
     case 'setSupplierTerms':

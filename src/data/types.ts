@@ -390,6 +390,16 @@ export interface Allocation {
   qty: number;
 }
 
+/** Fichier déposé dans le stockage (navigateur + base partagée) */
+export interface StoredFile {
+  fileId: string;
+  name: string;
+  size: number;
+  type: string;
+  at: string;
+  by: string;
+}
+
 export interface Container {
   id: string; // référence interne PLAN-031
   number?: string; // MSCU7845216
@@ -433,6 +443,8 @@ export interface Container {
   planEdited?: boolean;
   allocations: Allocation[];
   documents: string[];
+  /** Fichiers réellement déposés (BL, Invoice, Packing List…), par nom de document */
+  docFiles?: Record<string, StoredFile>;
   dateHistory: HistoryEntry[];
 }
 

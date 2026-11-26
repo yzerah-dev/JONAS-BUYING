@@ -33,6 +33,9 @@ import { LogisticsTab } from '../pages/ProformaDetail';
 import { TODAY } from '../lib/format';
 import { useT } from '../i18n';
 import { usePortal } from './usePortal';
+import { ContainerDocLink, ContainerDocUpload } from '../components/ContainerDoc';
+import { proformaDocPdf } from '../lib/proformaPdf';
+import { saveBlob } from '../lib/files';
 import PortalFlow from './PortalFlow';
 export { PortalProducts, PortalProductDetail } from './PortalProduct';
 import PackDecision, { LastPackRejection } from './PackDecision';
@@ -252,7 +255,15 @@ export function PortalProformas() {
                   </div>
                   <div className="row wrap mt">
                     {pf.documents.map((d) => (
-                      <button key={d} className="btn sm" onClick={() => toast(tr('proformas.download', { file: d }))}>
+                      <button
+                        key={d}
+                        className="btn sm"
+                        onClick={async () => {
+                          const r = await proformaDocPdf(pf, d, { supplier: byId(state.suppliers, pf.supplierId), products: state.products, company: state.settings.company });
+                          if (r) await saveBlob(r.blob, r.name);
+                          else toast(tr('proformas.download', { file: d }));
+                        }}
+                      >
                         <Download size={13} /> {d}
                       </button>
                     ))}
@@ -375,7 +386,7 @@ export function PortalLoading() {
 
 // ---------------------------------------------------------------------------
 export function PortalContainers() {
-  const { state, dispatch, containers, REQUIRED_DOCS } = usePortal();
+  const { state, containers, REQUIRED_DOCS } = usePortal();
   const { t, fmt } = useT();
   const { fshort, m3, num, weekLabel } = fmt;
   return (
@@ -423,21 +434,21 @@ export function PortalContainers() {
                     <td>
                       <div className="row wrap" style={{ gap: 4 }}>
                         {REQUIRED_DOCS.map((d) =>
-                          c.documents.includes(d) ? (
+                          c.docFiles?.[d] ? (
+                            <span key={d} className="row" style={{ gap: 2 }}>
+                              <Pill color="green" icon={<Check size={11} />}>
+                                {d.split('.')[0]}
+                              </Pill>
+                              <ContainerDocLink c={c} doc={d} />
+                            </span>
+                          ) : docsOpen ? (
+                            <ContainerDocUpload key={d} c={c} doc={d} className="btn sm" done={t('containers.uploaded', { doc: d })}>
+                              <Upload size={12} /> {d.split('.')[0]}
+                            </ContainerDocUpload>
+                          ) : c.documents.includes(d) ? (
                             <Pill key={d} color="green" icon={<Check size={11} />}>
                               {d.split('.')[0]}
                             </Pill>
-                          ) : docsOpen ? (
-                            <button
-                              key={d}
-                              className="btn sm"
-                              onClick={() => {
-                                dispatch({ type: 'addContainerDoc', containerId: c.id, doc: d });
-                                toast(t('containers.uploaded', { doc: d }));
-                              }}
-                            >
-                              <Upload size={12} /> {d.split('.')[0]}
-                            </button>
                           ) : null,
                         )}
                         {!docsOpen && !REQUIRED_DOCS.some((d) => c.documents.includes(d)) && <span className="xs muted">{t('containers.afterBooking')}</span>}

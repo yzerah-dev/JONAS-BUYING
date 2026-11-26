@@ -64,7 +64,7 @@ export const zh: Record<Key, string> = {
   'col.remaining': '剩余',
   'col.cartons': '箱数',
   'proformas.title': '我的形式发票（{n}）',
-  'proformas.download': '正在下载 {file}（演示）',
+  'proformas.download': '{file}：无附件',
   'proformas.loadingPlan': '装柜计划',
   'packs.title': '包装与刀模',
   'packs.sub': '确认流程：管理层 → Moinard → 供应商。您确认后包装即定稿。',
@@ -80,7 +80,7 @@ export const zh: Record<Key, string> = {
   'packs.pack': '包装：',
   'packs.received': '已收到 v{v}',
   'packs.preparing': 'JONAS 设计中',
-  'packs.downloadToast': '正在下载包装（演示）',
+  'packs.downloadToast': 'JONAS 尚未上传包装文件',
   'packs.download': '下载包装',
   'packs.dieCutToast': '刀模已发送给 JONAS',
   'packs.sendDieCut': '发送刀模',
@@ -657,7 +657,7 @@ export const zh: Record<Key, string> = {
   'sr.uploaded': '已发送',
   'sr.toUpload': '待发送',
   'sr.toDownload': '待下载',
-  'sr.notFound': '此设备上暂无该文件（演示）。',
+  'sr.notFound': '未找到文件：请联系 JONAS 重新上传。',
 };
 
 /** Valeurs issues des données (français) traduites en chinois */

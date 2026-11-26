@@ -93,7 +93,10 @@ async function sheetPdf(bytes: Uint8Array, fileName: string): Promise<PDFDocumen
   const pdf = await PDFDocument.create();
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-  const W = 842, H = 595, M = 24, SIGN = 200;
+  const W = 842,
+    H = 595,
+    M = 24,
+    SIGN = 200;
   const sheets = await sheetTables(bytes);
   let page = pdf.addPage([W, H]);
   let y = H - M;
@@ -117,7 +120,11 @@ async function sheetPdf(bytes: Uint8Array, fileName: string): Promise<PDFDocumen
       }
       let x = M;
       for (let c = 0; c < ncol; c++) {
-        let t = safe(String(r[c] ?? '').replace(/\s+/g, ' ').trim());
+        let t = safe(
+          String(r[c] ?? '')
+            .replace(/\s+/g, ' ')
+            .trim(),
+        );
         while (t && font.widthOfTextAtSize(t, size) > widths[c] - 3) t = t.slice(0, -1);
         if (t) page.drawText(t, { x: x + 1.5, y: y - size, size, font, color: INK });
         x += widths[c];
@@ -171,8 +178,7 @@ function drawSignature(page: PDFPage, doc: ProformaDoc, prev: ProformaDoc | unde
   const x0 = width - W - 24;
   const y0 = 24;
   page.drawRectangle({ x: x0 - 6, y: y0 - 6, width: W + 12, height: prev ? 182 : 166, color: rgb(1, 1, 1), opacity: 0.94 });
-  if (prev?.signature)
-    page.drawText(safe(`Annule et remplace la proforma v${prev.version} signée le ${fr(prev.signature.date)}`), { x: x0, y: y0 + 166, size: 8.5, font: bold, color: RED });
+  if (prev?.signature) page.drawText(safe(`Annule et remplace la proforma v${prev.version} signée le ${fr(prev.signature.date)}`), { x: x0, y: y0 + 166, size: 8.5, font: bold, color: RED });
 
   // Tampon : cadre double, texte centré, rotation de -4° autour du coin bas gauche
   const lines: { t: string; size: number; f: PDFFont }[] = [
@@ -292,4 +298,66 @@ export async function purchaseOrderPdf(pf: Proforma, ctx: PdfContext): Promise<B
   txt('Merci de déposer votre proforma correspondante sur le portail JONAS. / Please upload your matching proforma on the JONAS portal.', 40, y - 16, 8.5, font, GREY);
   const out = await pdf.save();
   return new Blob([out as BlobPart], { type: 'application/pdf' });
+}
+
+/** Conditions d'achat JONAS pour une proforma : société, fournisseur, devise, acompte, solde, livraison */
+export async function conditionsPdf(pf: Proforma, ctx: PdfContext): Promise<Blob> {
+  const pdf = await PDFDocument.create();
+  const page = pdf.addPage([595, 842]);
+  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const c = ctx.company;
+  const txt = (t: string, x: number, y: number, size = 10, f: PDFFont = font, color = INK) => page.drawText(safe(t), { x, y, size, font: f, color });
+  txt(c.name || 'JONAS INTERNATIONAL', 40, 790, 16, bold, BLUE);
+  txt([c.address, c.city].filter(Boolean).join(' · '), 40, 774, 9, font, GREY);
+  if (c.vat) txt(`TVA / VAT : ${c.vat}`, 40, 762, 9, font, GREY);
+  txt("CONDITIONS D'ACHAT / PURCHASE CONDITIONS", 40, 725, 14, bold);
+  txt(`${pf.id}${pf.poNumber ? `  ·  PO ${pf.poNumber}` : ''}  ·  ${pf.title}`, 40, 707, 10, bold);
+  txt(`Fournisseur / Supplier : ${ctx.supplier.name} (${ctx.supplier.city}, ${ctx.supplier.country})`, 40, 690, 10);
+  const total = pf.lines.reduce((t, l) => t + l.qty * l.price, 0);
+  const cur = pf.currency ?? 'EUR';
+  const rows: [string, string][] = [
+    ['Devise / Currency', cur],
+    ['Montant / Amount', `${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${cur}`],
+    ['Acompte / Deposit', `${pf.depositPct} % à la commande / with order`],
+    ['Solde / Balance', `le / on ${fr(pf.balanceDue)} (après départ, contre copie du BL / after departure, against B/L copy)`],
+    ['Incoterm', `FOB ${ctx.supplier.port}`],
+    ['Destination', 'Le Havre (France)'],
+    ['Expédition / Shipment', `${fr(pf.etd)} (S${d2(isoWeek(pf.etd))})`],
+    ['Arrivée prévue / ETA', `${fr(pf.eta)} (S${d2(isoWeek(pf.eta))})`],
+  ];
+  let y = 655;
+  for (const [k, v] of rows) {
+    txt(k, 40, y, 10, bold);
+    txt(v, 200, y, 10);
+    page.drawLine({ start: { x: 40, y: y - 7 }, end: { x: 555, y: y - 7 }, thickness: 0.4, color: rgb(0.85, 0.85, 0.88) });
+    y -= 24;
+  }
+  y -= 10;
+  const notes = [
+    'Packs, étiquettes et codes-barres : uniquement selon les fichiers validés par JONAS (Direction, Moinard, fournisseur).',
+    'Packs, labels and barcodes: only as per the files approved by JONAS (Direction, Moinard, supplier).',
+    'Documents à fournir au départ / Documents due at departure : BL, Invoice, Packing List (portail JONAS / JONAS portal).',
+    'Tolérance / Tolerance : +/- 5 % sur quantités et montant / on quantities and amount.',
+  ];
+  for (const n of notes) {
+    txt(n, 40, y, 8.8, font, GREY);
+    y -= 15;
+  }
+  const out = await pdf.save();
+  return new Blob([out as BlobPart], { type: 'application/pdf' });
+}
+
+/** Meilleur PDF de la proforma : dernière version signée, sinon dernière déposée, sinon le bon de commande JONAS */
+export async function proformaBestPdf(pf: Proforma, ctx: PdfContext): Promise<{ blob: Blob; name: string }> {
+  const vs = [...(pf.versions ?? [])].sort((a, b) => b.version - a.version);
+  const v = vs.find((x) => x.status === 'signee') ?? vs.find((x) => x.status === 'a_signer') ?? vs[0];
+  if (v) return { blob: await versionPdf(pf, v, ctx), name: versionFileName(pf, v) };
+  return { blob: await purchaseOrderPdf(pf, ctx), name: `${pf.id}_bon-de-commande.pdf` };
+}
+
+/** Document listé sur la proforma (ex. « Conditions d'achat.pdf ») : généré à la demande */
+export async function proformaDocPdf(pf: Proforma, doc: string, ctx: PdfContext): Promise<{ blob: Blob; name: string } | null> {
+  if (/^conditions/i.test(doc)) return { blob: await conditionsPdf(pf, ctx), name: `${pf.id}_conditions-achat.pdf` };
+  return null;
 }

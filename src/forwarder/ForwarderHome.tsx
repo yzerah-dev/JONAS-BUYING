@@ -10,6 +10,8 @@ import { toast } from '../components/ui-shared';
 import { CarrierBadge } from '../components/ContainerCard';
 import { TODAY, addDays, diffDays } from '../lib/format';
 import { useT } from '../i18n';
+import { ContainerDocUpload } from '../components/ContainerDoc';
+import { downloadContainerDoc } from '../lib/containerDocs';
 import { DOC_KEY, REQUIRED_DOCS, STAGES, fwdBookings, fwdStages, type FwdStage } from './fwd';
 
 type Dialog = { mode: 'confirm' | 'eta' | 'delivery'; c: Container } | null;
@@ -45,9 +47,7 @@ export default function ForwarderHome() {
           <h1>{t(`fw.st.${stage}.title`)}</h1>
           <span>{t(`fw.st.${stage}.sub`)}</span>
         </div>
-        <span className="pf-count">
-          {stage === 'a-booker' ? t('fw.count.requests', { n: count }) : t('fw.count.containers', { n: count })}
-        </span>
+        <span className="pf-count">{stage === 'a-booker' ? t('fw.count.requests', { n: count }) : t('fw.count.containers', { n: count })}</span>
       </div>
 
       <div className="pf-toolbar">
@@ -100,22 +100,14 @@ function ShipRow({ s, c, onDialog }: { s: State; c: Container; onDialog: (d: Dia
         <span className="fw-tags">
           {c.status !== 'booke' &&
             REQUIRED_DOCS.map((d) =>
-              c.documents.includes(d) ? (
-                <span key={d} className="fw-doc ok">
+              c.docFiles?.[d] ? (
+                <button key={d} type="button" className="fw-doc ok" title={c.docFiles[d].name} onClick={() => downloadContainerDoc(c, d)}>
                   <Check size={11} /> {doc(d)}
-                </span>
-              ) : (
-                <button
-                  key={d}
-                  className="fw-doc missing"
-                  title={t('fw.uploadDoc', { doc: doc(d) })}
-                  onClick={() => {
-                    dispatch({ type: 'addContainerDoc', containerId: c.id, doc: d });
-                    toast(t('fw.docUploaded', { doc: doc(d) }));
-                  }}
-                >
-                  <FileUp size={11} /> {doc(d)}
                 </button>
+              ) : (
+                <ContainerDocUpload key={d} c={c} doc={d} byForwarder className="fw-doc missing" title={t('fw.uploadDoc', { doc: doc(d) })} done={t('fw.docUploaded', { doc: doc(d) })}>
+                  <FileUp size={11} /> {doc(d)}
+                </ContainerDocUpload>
               ),
             )}
           {c.customs && <span className={`fw-doc ${c.customs === 'dedouane' ? 'ok' : 'wait'}`}>{c.customs === 'dedouane' ? t('fw.cleared') : t('fw.customsOn')}</span>}
@@ -212,9 +204,7 @@ function BookingRow({ s, pf, onBook }: { s: State; pf: Proforma; onBook: () => v
         <div>
           <span className="bk-num">
             <strong>{pf.id}</strong>
-            <span className="ct-type">
-              {cs.length || b.containers} × 40HC
-            </span>
+            <span className="ct-type">{cs.length || b.containers} × 40HC</span>
           </span>
           <small>
             {pf.title} · {dec(cbm, 1)} m³
@@ -225,9 +215,7 @@ function BookingRow({ s, pf, onBook }: { s: State; pf: Proforma; onBook: () => v
         <SupplierLogo supplier={sup} size={32} />
         <span>
           <b>{sup.shortName}</b>
-          <small>
-            {sup.port} → Le Havre
-          </small>
+          <small>{sup.port} → Le Havre</small>
         </span>
       </div>
       <div className="bk-who">
@@ -389,9 +377,7 @@ function FwdDialog({ mode, c, onClose }: { mode: 'confirm' | 'eta' | 'delivery';
                 {t('fw.etd')}
                 <input id="fw-etd" className="input" type="date" value={etd} onChange={(e) => setEtd(e.target.value)} />
               </label>
-              <p className="small muted">
-                {t('fw.bookingLine', { carrier: c.carrier ?? '', no: c.bookingNo ?? '', date: fshort(c.loading?.date) })}
-              </p>
+              <p className="small muted">{t('fw.bookingLine', { carrier: c.carrier ?? '', no: c.bookingNo ?? '', date: fshort(c.loading?.date) })}</p>
             </>
           ) : (
             <>
@@ -399,9 +385,7 @@ function FwdDialog({ mode, c, onClose }: { mode: 'confirm' | 'eta' | 'delivery';
                 {mode === 'eta' ? t('fw.newEtaAt', { port: c.portTo }) : t('fw.deliveryAt', { wh: c.warehouse })}
                 <input id="fw-date" className="input" type="date" autoFocus value={date} onChange={(e) => setDate(e.target.value)} />
               </label>
-              <p className="small muted">
-                {mode === 'eta' ? t('fw.etaNote', { date: fdate(containerEta(c)) }) : t('fw.deliveryNote')}
-              </p>
+              <p className="small muted">{mode === 'eta' ? t('fw.etaNote', { date: fdate(containerEta(c)) }) : t('fw.deliveryNote')}</p>
             </>
           )}
         </div>

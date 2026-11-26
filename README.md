@@ -90,6 +90,11 @@ npm run test:e2e     # Playwright (navigateur Chromium)
 
 La CI GitHub (`.github/workflows/ci.yml`) lance lint, typage, build et tests à chaque push.
 
+## Mise en ligne (Vercel + Supabase)
+
+- **Base** : migrations `supabase/migrations/0001…`, `0002…` appliquées ; **`0003_garde_fournisseur.sql`** à exécuter une fois dans l'éditeur SQL de Supabase (un fournisseur ne peut ni supprimer, ni marquer un paiement, ni annuler une proforma, ni changer réf. / EAN / marque d'un produit, même hors de l'application).
+- **Claude** (désignation et description françaises automatiques, lecture des proformas PDF scannées et photos) : variable **`ANTHROPIC_API_KEY`** dans Vercel → Settings → Environment Variables, puis redéployer. Fonctions serveur : `api/textes-fr.ts`, `api/lire-proforma.ts` (réservées aux utilisateurs connectés).
+
 ## Prochaines étapes (nécessitent vos accès / décisions)
 
 - Serveur et base partagée (ex. Supabase : Postgres + Storage) à partir du modèle de `types.ts`.

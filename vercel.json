@@ -6,6 +6,9 @@
   "functions": {
     "api/textes-fr.ts": {
       "maxDuration": 120
+    },
+    "api/lire-proforma.ts": {
+      "maxDuration": 120
     }
   }
 }

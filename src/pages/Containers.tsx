@@ -1,3 +1,4 @@
+import { ContainerDocLink } from '../components/ContainerDoc';
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Calendar, CalendarClock, Check, ChevronLeft, ChevronRight, FileText, Home, Mail, Phone, Search, Ship, SlidersHorizontal, Truck, User, X } from 'lucide-react';
@@ -124,7 +125,13 @@ export default function Containers() {
                 </div>
                 <label className="ctn-f-row" htmlFor="ctn-sup">
                   <span className="xs muted">Fournisseur</span>
-                  <Combobox id="ctn-sup" value={supplierF} onChange={setSupplierF} placeholder="Tapez un fournisseur…" options={[{ id: 'all', label: 'Tous' }, ...state.suppliers.map((s) => ({ id: s.id, label: s.shortName, sub: `${s.flag} ${s.city}`, keywords: `${s.name} ${s.shortName}` }))]} />
+                  <Combobox
+                    id="ctn-sup"
+                    value={supplierF}
+                    onChange={setSupplierF}
+                    placeholder="Tapez un fournisseur…"
+                    options={[{ id: 'all', label: 'Tous' }, ...state.suppliers.map((s) => ({ id: s.id, label: s.shortName, sub: `${s.flag} ${s.city}`, keywords: `${s.name} ${s.shortName}` }))]}
+                  />
                 </label>
                 <label className="ctn-f-row" htmlFor="ctn-fwd">
                   <span className="xs muted">Transitaire</span>
@@ -236,9 +243,7 @@ export default function Containers() {
                   <span className="small">
                     {list.length} conteneurs | {num(cbmOf(list))} m³
                   </span>
-                  {s === 'a_booker' && list.some((c) => diffDays(c.etdPlanned, TODAY) < 21) && (
-                    <Pill color="red">⚠ {list.filter((c) => diffDays(c.etdPlanned, TODAY) < 21).length} urgent(s)</Pill>
-                  )}
+                  {s === 'a_booker' && list.some((c) => diffDays(c.etdPlanned, TODAY) < 21) && <Pill color="red">⚠ {list.filter((c) => diffDays(c.etdPlanned, TODAY) < 21).length} urgent(s)</Pill>}
                 </div>
                 <div className="ct-list">
                   {list.map((c) => {
@@ -251,25 +256,27 @@ export default function Containers() {
                         onOpen={() => select(c.id)}
                         actions={
                           <>
-                              {s === 'a_booker' && canBook && (
-                                <Link className="btn sm" to="/booking" onClick={(e) => e.stopPropagation()}>
-                                  Demande de booking
-                                </Link>
-                              )}
-                              {s === 'booking_demande' && <Pill color="violet">{c.planValidated ? `Attente ${c.forwarder ?? 'transitaire'}` : 'Attente fournisseur'}</Pill>}
-                              {s === 'booke' && canBook && (
-                                <button className="btn sm" onClick={() => dispatch({ type: 'ship', containerId: c.id })}>
-                                  <Ship size={12} /> Parti
-                                </button>
-                              )}
-                              {s === 'en_transit' && (
-                                <div className="row" style={{ gap: 4 }}>
-                                  {canBook && <button className="btn sm" onClick={() => setReceiving(c.id)}>
+                            {s === 'a_booker' && canBook && (
+                              <Link className="btn sm" to="/booking" onClick={(e) => e.stopPropagation()}>
+                                Demande de booking
+                              </Link>
+                            )}
+                            {s === 'booking_demande' && <Pill color="violet">{c.planValidated ? `Attente ${c.forwarder ?? 'transitaire'}` : 'Attente fournisseur'}</Pill>}
+                            {s === 'booke' && canBook && (
+                              <button className="btn sm" onClick={() => dispatch({ type: 'ship', containerId: c.id })}>
+                                <Ship size={12} /> Parti
+                              </button>
+                            )}
+                            {s === 'en_transit' && (
+                              <div className="row" style={{ gap: 4 }}>
+                                {canBook && (
+                                  <button className="btn sm" onClick={() => setReceiving(c.id)}>
                                     Réceptionner
-                                  </button>}
-                                </div>
-                              )}
-                              {s === 'arrive' && <Pill color="green">Réceptionné {fshort(c.receivedOn)}</Pill>}
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                            {s === 'arrive' && <Pill color="green">Réceptionné {fshort(c.receivedOn)}</Pill>}
                           </>
                         }
                       />
@@ -412,6 +419,9 @@ function ContainerDetail({ c, onClose }: { c: Container; onClose: () => void }) 
             c.documents.map((d) => (
               <div key={d} className="alert-line small">
                 <FileText size={14} className="green" /> {d}
+                <span className="grow" />
+                <span className="xs muted">{c.docFiles?.[d] ? `${c.docFiles[d].name} · ${c.docFiles[d].by}` : 'sans fichier joint'}</span>
+                {c.docFiles?.[d] && <ContainerDocLink c={c} doc={d} />}
               </div>
             ))
           ) : (

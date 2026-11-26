@@ -1,3 +1,4 @@
+import { getBlob, saveBlob, zipBlobs } from '../lib/files';
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, Box, Calendar, Users, Check, ChevronDown, ChevronUp, Download, FileText, Flame, History, Layers, Paperclip, Play, Scissors, Search, Send, X } from 'lucide-react';
@@ -757,6 +758,21 @@ function PackRow({
   );
 }
 
+/** Télécharge le dernier pack (ou tous les die cuts) déposés pour le produit */
+async function downloadPackKind(p: Product, kind: 'pack' | 'diecut') {
+  const files = (p.pack.files ?? []).filter((f) => f.kind === kind).sort((a, b) => (b.version ?? 0) - (a.version ?? 0));
+  const list = kind === 'pack' ? files.slice(0, 1) : files;
+  if (!list.length) return toast(kind === 'pack' ? 'Aucun fichier de pack déposé' : 'Aucun fichier de die cut déposé');
+  const items = [];
+  for (const f of list) {
+    const blob = await getBlob(f.id);
+    if (blob) items.push({ path: f.name, blob });
+  }
+  if (!items.length) return toast('Fichier introuvable sur cet appareil');
+  if (items.length === 1) await saveBlob(items[0].blob, items[0].path);
+  else await saveBlob(await zipBlobs(items), `${p.ref}_die-cut.zip`);
+}
+
 function PackPanel({ p }: { p: Product }) {
   const { state, dispatch } = useStore();
   const auth = useAuth();
@@ -852,10 +868,10 @@ function PackPanel({ p }: { p: Product }) {
           <div className="thumb" style={{ height: 100, background: '#f5f7f6', fontSize: 34 }}>
             ✂️
           </div>
-          <button className="btn sm" onClick={() => toast('Téléchargement pack (AI/PSD) – démo')}>
+          <button className="btn sm" onClick={() => downloadPackKind(p, 'pack')}>
             <Download size={13} /> Pack (AI/PSD)
           </button>
-          <button className="btn sm" disabled={p.pack.dieCut !== 'received'} onClick={() => toast('Téléchargement die cut – démo')}>
+          <button className="btn sm" disabled={p.pack.dieCut !== 'received'} onClick={() => downloadPackKind(p, 'diecut')}>
             <Download size={13} /> Die cut (AI/PDF)
           </button>
         </div>

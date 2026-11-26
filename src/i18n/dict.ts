@@ -83,7 +83,7 @@ export const fr = {
 
   // --- Proformas
   'proformas.title': 'Mes proformas ({n})',
-  'proformas.download': 'Téléchargement {file} (démo)',
+  'proformas.download': '{file} : pas de fichier joint',
   'proformas.loadingPlan': 'Plan de chargement',
 
   // --- Packs
@@ -101,7 +101,7 @@ export const fr = {
   'packs.pack': 'Pack :',
   'packs.received': 'Reçu v{v}',
   'packs.preparing': 'En préparation chez JONAS',
-  'packs.downloadToast': 'Téléchargement du pack (démo)',
+  'packs.downloadToast': 'Le fichier du pack n’a pas encore été déposé par JONAS',
   'packs.download': 'Télécharger le pack',
   'packs.dieCutToast': 'Die cut envoyé à JONAS',
   'packs.sendDieCut': 'Envoyer le die cut',
@@ -690,7 +690,7 @@ export const fr = {
   'sr.uploaded': 'envoyé',
   'sr.toUpload': 'à envoyer',
   'sr.toDownload': 'à télécharger',
-  'sr.notFound': 'Fichier pas encore disponible sur cet appareil (démo).',
+  'sr.notFound': 'Fichier introuvable : demandez à JONAS de le redéposer.',
 };
 
 export type Key = keyof typeof fr;
@@ -762,7 +762,7 @@ export const en: Record<Key, string> = {
   'col.cartons': 'Cartons',
 
   'proformas.title': 'My proformas ({n})',
-  'proformas.download': 'Downloading {file} (demo)',
+  'proformas.download': '{file}: no file attached',
   'proformas.loadingPlan': 'Loading plan',
 
   'packs.title': 'Packs & die cuts',
@@ -779,7 +779,7 @@ export const en: Record<Key, string> = {
   'packs.pack': 'Pack:',
   'packs.received': 'Received v{v}',
   'packs.preparing': 'Being prepared by JONAS',
-  'packs.downloadToast': 'Downloading pack (demo)',
+  'packs.downloadToast': 'The pack file has not been uploaded by JONAS yet',
   'packs.download': 'Download pack',
   'packs.dieCutToast': 'Die cut sent to JONAS',
   'packs.sendDieCut': 'Send die cut',
@@ -1362,7 +1362,7 @@ export const en: Record<Key, string> = {
   'sr.uploaded': 'sent',
   'sr.toUpload': 'to send',
   'sr.toDownload': 'to download',
-  'sr.notFound': 'File not available on this device yet (demo).',
+  'sr.notFound': 'File not found: ask JONAS to upload it again.',
 };
 
 /**

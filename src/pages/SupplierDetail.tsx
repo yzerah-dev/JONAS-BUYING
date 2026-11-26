@@ -1,39 +1,9 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import {
-  BarChart3,
-  Boxes,
-  Calendar,
-  Check,
-  ChevronLeft,
-  Container as Ctn,
-  Euro,
-  FileText,
-  Home,
-  Hourglass,
-  Mail,
-  MessageCircle,
-  Phone,
-  ShoppingCart,
-  Truck,
-  User,
-} from 'lucide-react';
-import {
-  byId,
-  containerCbm,
-  containerEta,
-  containerEtd,
-  containerProformas,
-  containerQty,
-  payments,
-  proformaTotals,
-  supplierStats,
-  supplierTerms,
-  termsLabel,
-  useAuth,
-  useStore,
-} from '../data/store';
+import { BarChart3, Boxes, Calendar, Check, ChevronLeft, Container as Ctn, Euro, FileText, Home, Hourglass, Mail, MessageCircle, Phone, ShoppingCart, Truck, User } from 'lucide-react';
+import { byId, containerCbm, containerEta, containerEtd, containerProformas, containerQty, payments, proformaTotals, supplierStats, supplierTerms, termsLabel, useAuth, useStore } from '../data/store';
 import { toast } from '../components/ui-shared';
+import { EditSupplierButton } from '../components/NewSupplier';
 import { CONTAINER_STATUSES, type Currency, type SupplierTerms } from '../data/types';
 import { ContainerStatusPill, Kpi, Pill, ProductThumb, ProformaStatusPill, Ring, Seg, SupplierLogo, Tabs } from '../components/ui';
 import { TODAY, dec, eur, fdate, fshort, num, weekLabel } from '../lib/format';
@@ -67,6 +37,8 @@ export default function SupplierDetail() {
         </button>
         <span className="muted">›</span>
         <span className="bold">{sup.name}</span>
+        <div className="grow" />
+        <EditSupplierButton supplier={sup} />
       </div>
       <div className="card pad row wrap gap-lg mb">
         <SupplierLogo supplier={sup} size={76} />
@@ -132,9 +104,15 @@ export default function SupplierDetail() {
               <div className="row gap-lg">
                 <Ring value={prodRate} size={110} stroke={12} />
                 <div className="col small" style={{ gap: 8 }}>
-                  <span>● En production : <b>{inProd}</b></span>
-                  <span className="orange">● En attente : <b>{waiting}</b></span>
-                  <span className="muted">● Terminée : <b>{finished}</b></span>
+                  <span>
+                    ● En production : <b>{inProd}</b>
+                  </span>
+                  <span className="orange">
+                    ● En attente : <b>{waiting}</b>
+                  </span>
+                  <span className="muted">
+                    ● Terminée : <b>{finished}</b>
+                  </span>
                 </div>
               </div>
             </div>
@@ -181,7 +159,12 @@ export default function SupplierDetail() {
           </div>
           <div className="card pad">
             <div className="card-title">Commandes récentes</div>
-            <PfTable ids={st.pfs.slice(-5).reverse().map((p) => p.id)} />
+            <PfTable
+              ids={st.pfs
+                .slice(-5)
+                .reverse()
+                .map((p) => p.id)}
+            />
           </div>
         </>
       )}
@@ -244,7 +227,15 @@ export default function SupplierDetail() {
                       </td>
                       <td className="num">{p.pcb}</td>
                       <td className="num">{dec(p.cbmCarton, 3)}</td>
-                      <td>{p.developed ? <Pill color="green" icon={<Check size={12} />}>Référencé</Pill> : <Pill color="violet">En dév.</Pill>}</td>
+                      <td>
+                        {p.developed ? (
+                          <Pill color="green" icon={<Check size={12} />}>
+                            Référencé
+                          </Pill>
+                        ) : (
+                          <Pill color="violet">En dév.</Pill>
+                        )}
+                      </td>
                       <td>{pf?.id ?? '—'}</td>
                       <td>{pf?.poNumber ?? '—'}</td>
                     </tr>
@@ -279,7 +270,7 @@ export default function SupplierDetail() {
             <tbody>
               {(tab === 'bookings' ? bookings : [...st.cs].sort((a, b) => CONTAINER_STATUSES.indexOf(a.status) - CONTAINER_STATUSES.indexOf(b.status))).map((c) => (
                 <tr key={c.id} className="clickable" onClick={() => navigate(`/conteneurs?c=${c.id}`)}>
-                  <td className="bold">{tab === 'bookings' ? c.bookingNo : c.number ?? c.id}</td>
+                  <td className="bold">{tab === 'bookings' ? c.bookingNo : (c.number ?? c.id)}</td>
                   <td>{containerProformas(c).join(', ')}</td>
                   <td className="num">{num(containerQty(c))}</td>
                   <td className="num">{dec(containerCbm(state, c))}</td>
@@ -389,8 +380,7 @@ function TermsCard({ supplierId }: { supplierId: string }) {
     <div className="card pad mb terms-card">
       <div className="card-title">Devise et conditions de paiement</div>
       <p className="small muted" style={{ marginTop: 0 }}>
-        Reprises automatiquement par chaque nouvelle proforma de ce fournisseur (les proformas existantes gardent leurs conditions). Actuellement : {saved.currency} ·{' '}
-        {termsLabel(saved)}.
+        Reprises automatiquement par chaque nouvelle proforma de ce fournisseur (les proformas existantes gardent leurs conditions). Actuellement : {saved.currency} · {termsLabel(saved)}.
       </p>
       <div className="terms-grid">
         <label htmlFor="tm-cur">
@@ -403,11 +393,29 @@ function TermsCard({ supplierId }: { supplierId: string }) {
         </label>
         <label htmlFor="tm-dep">
           Acompte à la commande (%)
-          <input id="tm-dep" className="input" type="number" min={0} max={100} disabled={!edit} value={t.depositPct} onChange={(e) => setT({ ...t, depositPct: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })} />
+          <input
+            id="tm-dep"
+            className="input"
+            type="number"
+            min={0}
+            max={100}
+            disabled={!edit}
+            value={t.depositPct}
+            onChange={(e) => setT({ ...t, depositPct: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })}
+          />
         </label>
         <label htmlFor="tm-days">
           Solde : jours après le départ
-          <input id="tm-days" className="input" type="number" min={0} max={180} disabled={!edit} value={t.balanceDays} onChange={(e) => setT({ ...t, balanceDays: Math.max(0, Number(e.target.value) || 0) })} />
+          <input
+            id="tm-days"
+            className="input"
+            type="number"
+            min={0}
+            max={180}
+            disabled={!edit}
+            value={t.balanceDays}
+            onChange={(e) => setT({ ...t, balanceDays: Math.max(0, Number(e.target.value) || 0) })}
+          />
         </label>
         {edit && (
           <button

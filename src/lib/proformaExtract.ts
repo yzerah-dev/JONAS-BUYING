@@ -95,7 +95,10 @@ const REF = /^[A-Z0-9][A-Z0-9-]{2,15}$/i;
 export function parseTextLines(lines: string[]): ExtractedLine[] {
   const out: ExtractedLine[] = [];
   for (const raw of lines) {
-    const cells = raw.split(' | ').map((c) => c.trim()).filter(Boolean);
+    const cells = raw
+      .split(' | ')
+      .map((c) => c.trim())
+      .filter(Boolean);
     if (cells.length < 4) continue;
     const [ref, ...rest] = cells;
     if (!REF.test(ref) || !/\d/.test(ref) || /^(total|subtotal|amount|qty)/i.test(ref)) continue;
@@ -142,7 +145,9 @@ function clean(v: unknown): Extraction | null {
   if (!o || !Array.isArray(o.lines)) return null;
   const lines = o.lines
     .map((l) => ({
-      ref: String(l.ref ?? '').trim().toUpperCase(),
+      ref: String(l.ref ?? '')
+        .trim()
+        .toUpperCase(),
       name: String(l.name ?? '').trim(),
       ean: l.ean ? String(l.ean).replace(/\D/g, '') || undefined : undefined,
       qty: Math.round(Number(l.qty)),
@@ -152,6 +157,31 @@ function clean(v: unknown): Extraction | null {
     }))
     .filter((l) => (l.ref || l.name) && l.qty > 0 && l.price >= 0);
   return { lines, engine: 'claude', currency: o.currency };
+}
+
+/** Plateforme (hors claude.ai) : lecture par Claude via la fonction serveur /api/lire-proforma */
+async function serverRead(body: { text?: string; file?: Blob }): Promise<Extraction | null> {
+  const { remoteEnabled } = await import('../data/remote');
+  if (!remoteEnabled()) return null;
+  try {
+    const { supabase } = await import('../data/supabaseSync');
+    const token = (await supabase().auth.getSession()).data.session?.access_token;
+    if (!token) return null;
+    let payload: { text?: string; file?: { data: string; type: string } } = { text: body.text };
+    if (body.file) {
+      if (body.file.size > 3_000_000) return null; // limite d'envoi de la fonction serveur
+      const bytes = new Uint8Array(await body.file.arrayBuffer());
+      let bin = '';
+      for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      payload = { file: { data: btoa(bin), type: body.file.type } };
+    }
+    const r = await fetch('/api/lire-proforma', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(payload) });
+    if (!r.ok) return null;
+    const out = clean(await r.json());
+    return out?.lines.length ? out : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Lit les lignes d'une proforma (PDF, photo, Excel ou CSV) */
@@ -169,6 +199,10 @@ export async function extractProforma(file: Blob, type: string, name = ''): Prom
       } catch {
         /* Claude indisponible : rien lu */
       }
+    } else {
+      const text = await sheetText(file).catch(() => '');
+      const r = text ? await serverRead({ text }) : null;
+      if (r) return r;
     }
     return { lines: [], engine: 'aucun' };
   }
@@ -194,6 +228,10 @@ export async function extractProforma(file: Blob, type: string, name = ''): Prom
     } catch {
       /* Claude indisponible ou refusé : lecture du texte */
     }
+  } else {
+    // Plateforme : Claude côté serveur (texte du PDF, sinon le fichier lui-même : PDF scanné ou photo)
+    const r = await serverRead(isPdf && text.length ? { text: text.join('\n') } : { file: file.type ? file : new Blob([file], { type: type }) });
+    if (r) return r;
   }
   const lines = parseTextLines(text);
   return { lines, engine: lines.length ? 'texte' : 'aucun' };
