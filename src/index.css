@@ -2138,7 +2138,7 @@ tr.pf-moving td, .pf-line.pf-moving { background: #fff6e8 !important; outline: 2
 .pfx-cmd { display: flex; align-items: center; gap: 14px; min-width: 0; }
 .pfx-cmd > div { display: grid; gap: 2px; min-width: 0; }
 .pfx-cmd b { font-size: 21px; font-weight: 800; letter-spacing: -0.01em; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 380px; }
-.pfx-logo { width: 96px; display: flex; justify-content: center; align-items: center; flex-shrink: 0; }
+.pfx-logo { width: 136px; display: flex; justify-content: center; align-items: center; flex-shrink: 0; }
 .pfx-line1 { display: flex; align-items: baseline; gap: 14px; min-width: 0; }
 .pfx-sup { font-size: 20px; font-weight: 900; color: var(--green-dark); text-transform: uppercase; letter-spacing: 0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 340px; padding-left: 14px; border-left: 2px solid #c9d6d1; line-height: 1.2; }
 .pfx-cmd small { font-size: 15px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
