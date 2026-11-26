@@ -155,8 +155,8 @@ for (const kind of ['xls', 'xlsx'] as const) {
     const buffer = kind === 'xls' ? xlsWithImages([PINK, GREY], [5, 6]) : xlsxWithImages(PINK, GREY);
     await dlg.getByLabel(/Proforma du fournisseur/).setInputFiles({ name: `PRIX99002.${kind}`, mimeType: '', buffer });
     await expect(toast(page)).toContainText('2 ligne(s) lue(s)');
-    await expect(dlg.locator('.np-line-wrap').nth(0).locator('.np-photo img')).toBeVisible();
-    await expect(dlg.locator('.np-line-wrap').nth(1).locator('.np-photo img')).toBeVisible();
+    await expect(dlg.locator('.np-line-wrap').nth(0).locator('.np-pic img')).toBeVisible();
+    await expect(dlg.locator('.np-line-wrap').nth(1).locator('.np-pic img')).toBeVisible();
     await dlg.getByRole('button', { name: 'Envoyer à JONAS' }).click();
     await expect(toast(page)).toContainText('envoyée à JONAS');
 

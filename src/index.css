@@ -1973,3 +1973,31 @@ select.pi-input { cursor: pointer; }
 .sr-hero .product-pic { width: 100%; height: 100%; object-fit: contain; }
 @media (max-width: 560px) { .sr-hero { height: 180px; font-size: 90px; } }
 .np-newsup { justify-self: start; width: fit-content; margin-top: 4px; color: var(--green-dark); }
+
+/* Lignes de commande : photo à gauche, en-têtes, nouveau produit en champs titrés */
+.np-dialog { width: min(1040px, 100%); }
+.np-lines.with-pic .np-line { grid-template-columns: 48px minmax(0, 2.4fr) minmax(0, 1fr) minmax(0, 1fr) 90px auto; }
+.np-head { padding: 0 8px; font-weight: 700; }
+.np-head span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.np-line-wrap { padding: 8px; border-radius: 12px; border: 1px solid var(--line); background: #fff; }
+.np-line-wrap.is-new { background: #f7f4ff; border-color: #ddd3fb; }
+.np-pic { position: relative; width: 48px; height: 48px; border-radius: 8px; border: 1px solid var(--line); background: #fff; overflow: hidden; display: grid; place-items: center; }
+.np-pic .product-pic { width: 100%; height: 100%; object-fit: contain; }
+.np-prod { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.np-prod > :first-child { flex: 1; min-width: 0; }
+.np-prod .pill { flex: none; white-space: nowrap; }
+.np-new { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2.4fr) minmax(0, 0.7fr) minmax(0, 0.7fr); gap: 6px 8px; padding-left: 0; }
+.np-lines.with-pic .np-new { padding-left: 56px; }
+.np-new label { display: grid; gap: 2px; min-width: 0; }
+.np-new label small { font-size: 11px; color: var(--muted); font-weight: 600; }
+.np-new .np-codes { grid-column: 1 / -1; }
+@media (max-width: 760px) {
+  .np-head { display: none; }
+  .np-lines.with-pic .np-line { grid-template-columns: 48px minmax(0, 1fr) minmax(0, 1fr); }
+  .np-lines.with-pic .np-line .np-prod { grid-column: 2 / -1; }
+  .np-lines.with-pic .np-new { padding-left: 0; }
+  .np-new { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .np-new label:nth-of-type(2) { grid-column: 1 / -1; }
+}
+@media (max-width: 640px) { .np-line > .np-prod { grid-column: 1 / -1; } }
+.np-new .input, .np-line .input { width: 100%; min-width: 0; box-sizing: border-box; }
