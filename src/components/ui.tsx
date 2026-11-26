@@ -29,8 +29,8 @@ export function ProformaStatusPill({ status, big }: { status: ProformaStatus; bi
 }
 
 /** Monogramme fournisseur façon logo (lettre en dégradé), utilisé dans les listes */
-export function SupplierMark({ supplier, size = 30 }: { supplier: Supplier; size?: number }) {
-  if (supplier.logo) return <SupplierLogoImg supplier={supplier} size={size} />;
+export function SupplierMark({ supplier, size = 30, wide }: { supplier: Supplier; size?: number; wide?: boolean }) {
+  if (supplier.logo) return <SupplierLogoImg supplier={supplier} size={size} wide={wide} />;
   if (supplier.mark === 'badge')
     return (
       <span className="supplier-badge" title={supplier.name} style={{ width: size, height: size, background: supplier.color, fontSize: size * 0.62 }}>
@@ -99,10 +99,11 @@ export function BrandLogo({ brand, size = 11 }: { brand: Brand; size?: number })
 }
 
 /** Logo déposé par le fournisseur : image sur fond blanc, cadre carré (le monogramme s'affiche le temps du chargement) */
-function SupplierLogoImg({ supplier, size }: { supplier: Supplier; size: number }) {
+function SupplierLogoImg({ supplier, size, wide }: { supplier: Supplier; size: number; wide?: boolean }) {
   const url = useBlobUrl(supplier.logo?.fileId);
+  // « wide » : cadre en largeur (logos horizontaux), pour les listes
   return (
-    <span className="supplier-img" title={supplier.name} style={{ width: size, height: size, borderRadius: Math.max(6, size * 0.22) }}>
+    <span className="supplier-img" title={supplier.name} style={{ width: wide ? Math.round(size * 1.7) : size, height: size, borderRadius: Math.max(6, size * 0.2) }}>
       {url ? <img src={url} alt={`Logo ${supplier.name}`} /> : <b style={{ color: supplier.color, fontSize: size * 0.45 }}>{supplier.shortName[0]}</b>}
     </span>
   );

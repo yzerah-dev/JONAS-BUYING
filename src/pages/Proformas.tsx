@@ -486,12 +486,15 @@ function Row({ p, state, showMoney, onSign, onOpen, move }: RowProps) {
     >
       <td>
         <div className="pfx-cmd">
-          <SupplierMark supplier={sup} size={34} />
+          <span className="pfx-logo">
+            <SupplierMark supplier={sup} size={56} wide />
+          </span>
           <div>
-            <b>{title}</b>
-            <small>
-              {sup.name} · {p.id}
-            </small>
+            <div className="pfx-line1">
+              <b>{title}</b>
+              <strong className="pfx-sup">{sup.name}</strong>
+            </div>
+            <small>{p.id}</small>
           </div>
         </div>
       </td>
