@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowUpDown, Calendar, Check, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, PenLine, Search } from 'lucide-react';
+import { ArrowUpDown, Calendar, Check, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, LayoutGrid, List, PenLine, Search } from 'lucide-react';
 import { byId, isReliquat, openReliquats, shipmentLabel, pendingRevision, pendingVersion, proformaTotals, useAuth, useStore, PROFORMA_STATUS_LABEL, type State, hasDeposit } from '../data/store';
 import { PROFORMA_STATUSES, type Proforma, type ProformaStatus } from '../data/types';
-import { ProformaStatusPill, SupplierMark } from '../components/ui';
+import { ProductPic, ProformaStatusPill, SupplierMark } from '../components/ui';
 import { toast } from '../components/ui-shared';
 import { TODAY, addDays, dec, diffDays, fdate, weekKey, weekLabel, weekRange, weekStart } from '../lib/format';
 import { pressable } from '../lib/a11y';
@@ -43,6 +43,22 @@ export default function Proformas() {
   const showCancelled = params.get('annulees') === '1';
   const cancelled = state.archived ?? [];
   const [view, setView] = useState<View>('semaine');
+  // Liste ou galerie : choix gardé dans ce navigateur
+  const [gallery, setGalleryState] = useState(() => {
+    try {
+      return localStorage.getItem('jonas-buying-pf-layout') === 'galerie';
+    } catch {
+      return false;
+    }
+  });
+  const setGallery = (g: boolean) => {
+    setGalleryState(g);
+    try {
+      localStorage.setItem('jonas-buying-pf-layout', g ? 'galerie' : 'liste');
+    } catch {
+      /* choix gardé le temps de la session */
+    }
+  };
   const [q, setQ] = useState('');
   const [showPast, setShowPast] = useState(false);
 
@@ -153,6 +169,16 @@ export default function Proformas() {
           </select>
           <ChevronDown size={20} />
         </label>
+        {!showCancelled && (
+          <span className="pk-layout pfx-layout" role="group" aria-label="Présentation">
+            <button type="button" aria-pressed={!gallery} className={!gallery ? 'on' : ''} onClick={() => setGallery(false)} title="Liste">
+              <List size={18} /> <span>Liste</span>
+            </button>
+            <button type="button" aria-pressed={gallery} className={gallery ? 'on' : ''} onClick={() => setGallery(true)} title="Galerie">
+              <LayoutGrid size={18} /> <span>Galerie</span>
+            </button>
+          </span>
+        )}
       </div>
 
       {showCancelled ? (
@@ -225,6 +251,7 @@ export default function Proformas() {
               onSign={canSign ? sign : undefined}
               weekDate={g.kind === 'semaine' ? g.items[0].etd : undefined}
               move={move}
+              gallery={gallery}
             />
           ))}
           {pastWeeks > 0 && (
@@ -249,6 +276,7 @@ function Group({
   showMoney,
   weekDate,
   move,
+  gallery,
 }: {
   title: string;
   sub: string;
@@ -259,6 +287,7 @@ function Group({
   showMoney: boolean;
   weekDate?: string;
   move: MoveCtx;
+  gallery: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const [over, setOver] = useState(false);
@@ -307,7 +336,14 @@ function Group({
         <span className="pf-chevron">{open ? <ChevronUp size={24} /> : <ChevronDown size={24} />}</span>
       </header>
 
-      {open && (
+      {open && gallery && (
+        <div className="pf-body pfg">
+          {items.map((p) => (
+            <PfCard key={p.id} p={p} state={state} showMoney={showMoney} onSign={onSign} onOpen={() => navigate(`/proformas/${p.id}`)} move={move} />
+          ))}
+        </div>
+      )}
+      {open && !gallery && (
         <div className="pf-body">
           <table className="pfx">
             <thead>
@@ -459,6 +495,84 @@ function StatusDot({ status }: { status: ProformaStatus }) {
     <span className={`pfx-st ${status}`}>
       <i /> {STATUS_TEXT[status]}
     </span>
+  );
+}
+
+/** Galerie : photos des produits, logo et nom du fournisseur, packs, statut, montant ; clic = ouvrir */
+function PfCard({ p, state, showMoney, onSign, onOpen, move }: RowProps) {
+  const { t, sup, title, packsDone } = useRowData(p, state);
+  const movable = !!move?.canMove(p);
+  const revision = pendingRevision(p);
+  const signable = !!onSign && (revision || (p.status === 'a_signer' && pendingVersion(p)));
+  const prods = [...new Set(p.lines.map((l) => l.productId))].slice(0, 4).map((id) => byId(state.products, id));
+  return (
+    <article
+      className={`pfg-card ${move?.moving === p.id ? 'pf-moving' : ''}`}
+      {...pressable(onOpen, `Ouvrir ${p.id}`)}
+      draggable={movable}
+      title={movable ? 'Glissez la carte sur une autre semaine pour changer la date d’expédition' : undefined}
+      onDragStart={(e) => {
+        e.dataTransfer.setData('text/plain', p.id);
+        e.dataTransfer.effectAllowed = 'move';
+        move?.setDragging(p.id);
+      }}
+      onDragEnd={() => move?.setDragging(null)}
+    >
+      <div className={`pfg-pics n${prods.length}`}>
+        {prods.map((pr) => (
+          <div key={pr.id} className="pfg-pic" style={{ background: pr.tint }}>
+            <ProductPic product={pr} />
+          </div>
+        ))}
+        <span className="pfg-logo">
+          <SupplierMark supplier={sup} size={52} wide />
+        </span>
+        {p.lines.length > 4 && <span className="pfg-more">+{p.lines.length - 4}</span>}
+      </div>
+      <div className="pfg-body">
+        <b className="pfg-title">{title}</b>
+        <strong className="pfg-sup">{sup.name}</strong>
+        <small className="muted">
+          {p.id} · {weekLabel(p.etd)}
+        </small>
+        <div className="pfg-row">
+          <StatusDot status={p.status} />
+          <span className={packsDone ? 'pfx-ok' : 'pfx-packs'} title="Packs validés">
+            {packsDone ? (
+              <>
+                <Check size={18} strokeWidth={3} /> OK
+              </>
+            ) : (
+              `${t.packsOk}/${t.packsTotal}`
+            )}
+          </span>
+        </div>
+        <div className="pfg-row">
+          {showMoney ? (
+            <span className="pfx-amount pfg-amount">
+              <b>{cur0(t.amountCur, t.currency)}</b>
+              {hasDeposit(p) && !p.depositPaid && <small>Acompte à faire</small>}
+            </span>
+          ) : (
+            <span />
+          )}
+          {signable ? (
+            <button
+              type="button"
+              className="pfx-sign"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSign!(p.id);
+              }}
+            >
+              Signer
+            </button>
+          ) : (
+            <BookingRequestButton pf={p} variant="row" />
+          )}
+        </div>
+      </div>
+    </article>
   );
 }
 
