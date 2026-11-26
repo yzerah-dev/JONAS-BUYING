@@ -93,6 +93,22 @@ function CartDialog({ onClose }: { onClose: () => void }) {
   for (const it of items) bySupplier.set(it.p.supplierId, [...(bySupplier.get(it.p.supplierId) ?? []), it]);
   const [etd, setEtd] = useState<Record<string, string>>({});
   const [title, setTitle] = useState<Record<string, string>>({});
+  // Vider : 1er clic arme le bouton, 2e clic confirme (panier entier « all », ou un fournisseur)
+  const [armed, setArmed] = useState<string | null>(null);
+  const clear = (supplierId?: string) => {
+    const key = supplierId ?? 'all';
+    if (armed !== key) return setArmed(key);
+    setArmed(null);
+    if (!supplierId) {
+      setCart(me.id, {});
+      toast('Panier vidé');
+      return;
+    }
+    const rest = { ...cart };
+    for (const { p } of bySupplier.get(supplierId) ?? []) delete rest[p.id];
+    setCart(me.id, rest);
+    toast(`${byId(state.suppliers, supplierId).shortName} retiré du panier`);
+  };
 
   const order = (supplierId: string) => {
     const list = bySupplier.get(supplierId)!;
@@ -127,9 +143,16 @@ function CartDialog({ onClose }: { onClose: () => void }) {
             <h2>Panier</h2>
             <span className="muted small">Une commande par fournisseur : il reçoit la demande de proforma dans son portail.</span>
           </div>
-          <button type="button" className="icon-btn" onClick={onClose} aria-label="Fermer">
-            <X size={20} />
-          </button>
+          <div className="row" style={{ gap: 8 }}>
+            {items.length > 0 && (
+              <button type="button" className={`btn ${armed === 'all' ? 'danger' : 'ghost'}`} onClick={() => clear()} onBlur={() => armed === 'all' && setArmed(null)}>
+                <Trash2 size={16} /> {armed === 'all' ? 'Confirmer : tout vider' : 'Vider le panier'}
+              </button>
+            )}
+            <button type="button" className="icon-btn" onClick={onClose} aria-label="Fermer">
+              <X size={20} />
+            </button>
+          </div>
         </header>
         <div className="bk-form" style={{ display: 'grid', gap: 14 }}>
           {!items.length && <p className="muted">Panier vide : utilisez « + Commander » sur les produits.</p>}
@@ -150,6 +173,15 @@ function CartDialog({ onClose }: { onClose: () => void }) {
                   <span className="small">
                     {dec(cbm, 1)} m³ · <b>{money(total, cur)}</b>
                   </span>
+                  <button
+                    type="button"
+                    className={`btn sm ${armed === sid ? 'danger' : 'ghost'}`}
+                    aria-label={`Vider ${sup.shortName}`}
+                    onClick={() => clear(sid)}
+                    onBlur={() => armed === sid && setArmed(null)}
+                  >
+                    <Trash2 size={14} /> {armed === sid ? 'Confirmer' : 'Vider'}
+                  </button>
                 </div>
                 <table className="tbl mt">
                   <thead>
