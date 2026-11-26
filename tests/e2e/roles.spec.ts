@@ -1,4 +1,4 @@
-import { expect, go, loginAs, planCell, resetApp, sidebarItems, test, toast } from './fixtures';
+import { expect, go, loginAs, resetApp, sidebarItems, test, toast } from './fixtures';
 
 test.describe('Rôles et visibilité des modules', () => {
   test.beforeEach(async ({ page }) => {
@@ -83,7 +83,7 @@ test.describe('Rôles et visibilité des modules', () => {
   });
 });
 
-test('fournisseur : validation du pack forwardé dans le portail', async ({ page }) => {
+test('fournisseur : le pack validé par Moinard arrive tout seul dans le portail', async ({ page }) => {
   await resetApp(page);
   // Circuit interne complet sur CP-C042
   for (const who of ['Direction', 'Moinard']) {
@@ -92,14 +92,7 @@ test('fournisseur : validation du pack forwardé dans le portail', async ({ page
     await page.getByRole('button', { name: 'Design & Pack' }).click();
     await page.getByRole('region', { name: 'Prochaine action' }).getByRole('button', { name: 'Valider le pack' }).click();
   }
-  // Forward par la designer (ABIR) depuis l'Espace Designer, semaine S01
-  await loginAs(page, 'ABIR');
-  await go(page, 'design');
-  await (await planCell(page, 'ABIR', 'S01')).click();
-  await page.locator('.pk-row', { hasText: 'CP-C042' }).click();
-  await page.getByRole('button', { name: 'Forwarder le pack' }).click();
-  await expect(page.getByRole('button', { name: /^Valider \(/ })).toHaveCount(0);
-
+  // Validé par Moinard : le pack part tout seul chez le fournisseur (plus de « Forwarder » à faire)
   // Le fournisseur Tide valide le pack
   await loginAs(page, 'Mr. Chen');
   await expect(page).toHaveURL(/#\/portail$/);

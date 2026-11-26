@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, Boxes, Calendar, Check, Container as Ctn, Download, Euro, FileText, Package, Pencil, Scissors, Send, Ship, Truck, Upload, X } from 'lucide-react';
+import { AlertTriangle, Boxes, Calendar, Check, Container as Ctn, Download, Euro, FileText, Package, Pencil, Scissors, Send, Ship, Truck, Upload } from 'lucide-react';
 import {
   allocatedQty,
   byId,
@@ -10,7 +10,6 @@ import {
   containerProformas,
   containerQty,
   lineCbm,
-  packDone,
   pfContainers,
   pendingVersion,
   shipmentsOf,
@@ -21,10 +20,8 @@ import {
   proformaTotals,
   brandOf,
 } from '../data/store';
-import ProductPhotoEdit from '../components/ProductPhotoEdit';
-import PhotoImport from '../components/PhotoImport';
 import SupplierPackFiles from './SupplierPackFiles';
-import { BrandLogo, ContainerStatusPill, Kpi, PackPill, Pill, ProductThumb, ProformaStatusPill, Ring, Seg, ValidationCircuit, PA } from '../components/ui';
+import { BrandLogo, ContainerStatusPill, Kpi, PackPill, Pill, ProductThumb, ProformaStatusPill, Seg, ValidationCircuit } from '../components/ui';
 import { toast } from '../components/ui-shared';
 import type { Proforma } from '../data/types';
 import BookingEntry from '../components/BookingEntry';
@@ -36,20 +33,60 @@ import { LogisticsTab } from '../pages/ProformaDetail';
 import { TODAY } from '../lib/format';
 import { useT } from '../i18n';
 import { usePortal } from './usePortal';
+import PortalFlow from './PortalFlow';
+export { PortalProducts, PortalProductDetail } from './PortalProduct';
+import PackDecision, { LastPackRejection } from './PackDecision';
+import { money } from '../lib/format';
+import { fxOf } from '../data/store';
+
+/** Montants par devise (jamais convertis) : « 12 000,00 USD + 3 000,00 € » */
+function sumByCurrency(items: { cur: string; v: number }[]) {
+  const by = new Map<string, number>();
+  for (const x of items) by.set(x.cur, (by.get(x.cur) ?? 0) + x.v);
+  if (!by.size) return money(0, 'EUR');
+  return [...by].map(([c, v]) => money(Math.round(v), c).replace(/,00(?=\s|$)/, '')).join(' + ');
+}
+
+/** Échéance JONAS exprimée dans la devise de la proforma */
+function usePayCurrency() {
+  const { state } = usePortal();
+  return (p: { proformaId: string; amount: number }) => {
+    const pf = state.proformas.find((x) => x.id === p.proformaId);
+    const fx = pf ? fxOf(state, pf) : 1;
+    return { cur: pf?.currency ?? 'EUR', v: p.amount / fx };
+  };
+}
+function usePayMoney() {
+  const cur = usePayCurrency();
+  return (p: { proformaId: string; amount: number }) => {
+    const c = cur(p);
+    return money(c.v, c.cur);
+  };
+}
 
 // ---------------------------------------------------------------------------
 export function PortalHome() {
   const { state, supplier, user, products, proformas, containers, packsToValidate, dieCutsRequested, bookingsToDo, bookingsToAccept, proformasToUpload, splitsToAccept, docsMissing } = usePortal();
   const pays = payments(state).filter((p) => p.supplierId === supplier!.id);
   const nextPay = pays.find((p) => !p.paid);
-  const amount = proformas.reduce((s, p) => s + proformaTotals(state, p).amount, 0);
-  const ok = products.filter(packDone).length;
+  const payMoney = usePayMoney();
+  const amount = sumByCurrency(proformas.map((p) => ({ cur: p.currency ?? 'EUR', v: proformaTotals(state, p).amountCur })));
   const { t: tr, td, fmt } = useT();
-  const { eur, fdate, fshort, weekLabel } = fmt;
+  const { fdate, weekLabel } = fmt;
 
   const todo: { to: string; icon: React.ReactNode; text: string; n: number }[] = [
-    { to: proformasToUpload[0] ? `/portail/proformas?pf=${proformasToUpload[0].id}` : '/portail/proformas', icon: <FileText size={16} className="orange" />, text: tr('home.todo.pfUpload'), n: proformasToUpload.length },
-    { to: splitsToAccept[0] ? `/portail/proformas?pf=${splitsToAccept[0].id}` : '/portail/proformas', icon: <Truck size={16} className="orange" />, text: tr('home.todo.split'), n: splitsToAccept.length },
+    {
+      to: proformasToUpload[0] ? `/portail/proformas?pf=${proformasToUpload[0].id}` : '/portail/proformas',
+      icon: <FileText size={16} className="orange" />,
+      text: tr('home.todo.pfUpload'),
+      n: proformasToUpload.length,
+    },
+    {
+      to: splitsToAccept[0] ? `/portail/proformas?pf=${splitsToAccept[0].id}` : '/portail/proformas',
+      icon: <Truck size={16} className="orange" />,
+      text: tr('home.todo.split'),
+      n: splitsToAccept.length,
+    },
     { to: '/portail/packs', icon: <Package size={16} className="orange" />, text: tr('home.todo.packs'), n: packsToValidate.length },
     { to: '/portail/packs?vue=diecut', icon: <Scissors size={16} className="orange" />, text: tr('home.todo.diecuts'), n: dieCutsRequested.length },
     { to: '/portail/booking', icon: <Calendar size={16} className="orange" />, text: tr('home.todo.booking'), n: bookingsToDo.length + bookingsToAccept.length },
@@ -61,25 +98,25 @@ export function PortalHome() {
       <div className="page-head">
         <div>
           <h1>{tr('home.welcome', { name: user.name })}</h1>
-          <div className="page-sub">
-            {tr('home.sub', { supplier: supplier!.name, date: fdate(TODAY), week: weekLabel(TODAY) })}
-          </div>
+          <div className="page-sub">{tr('home.sub', { supplier: supplier!.name, date: fdate(TODAY), week: weekLabel(TODAY) })}</div>
         </div>
       </div>
       <div className="kpis mb">
         <Kpi icon={<Boxes size={18} />} value={products.length} label={tr('home.kpi.products')} />
         <Kpi icon={<FileText size={18} />} value={proformas.length} label={tr('home.kpi.proformas')} />
         <Kpi icon={<Ctn size={18} />} value={containers.length} label={tr('home.kpi.containers')} />
-        <Kpi icon={<Package size={18} />} value={`${ok}/${products.length}`} label={tr('home.kpi.packs')} />
-        <Kpi icon={<Euro size={18} />} value={eur(amount)} label={tr('home.kpi.amount')} />
+        <Kpi icon={<AlertTriangle size={18} />} value={todo.reduce((n, x) => n + x.n, 0)} label={tr('home.kpi.todo')} color="orange" />
+        <Kpi icon={<Euro size={18} />} value={amount} label={tr('home.kpi.amount')} />
       </div>
-      <div className="grid2">
-        <div className="card pad">
-          <div className="card-title">
-            <AlertTriangle size={18} className="orange" /> {tr('home.todo.title')}
-          </div>
-          {todo.map((t) => (
-            <Link key={t.to} to={t.to} className="alert-line" style={{ opacity: t.n ? 1 : 0.45 }}>
+      <div className="card pad mb">
+        <div className="card-title">
+          <AlertTriangle size={18} className="orange" /> {tr('home.todo.title')}
+        </div>
+        {todo.every((t) => !t.n) && <p className="small muted">{tr('home.allDone')}</p>}
+        {todo
+          .filter((t) => t.n)
+          .map((t) => (
+            <Link key={t.to} to={t.to} className="alert-line">
               {t.icon}
               <span className="bold" style={{ minWidth: 22 }}>
                 {t.n}
@@ -88,119 +125,14 @@ export function PortalHome() {
               <span className="grow" />›
             </Link>
           ))}
-        </div>
-        <div className="card pad">
-          <div className="card-title">
-            <Calendar size={18} className="green" /> {tr('home.departures')}
+        {nextPay && (
+          <div className="pill green mt" style={{ width: '100%', justifyContent: 'space-between', padding: 10, borderRadius: 10 }}>
+            <span>{tr('home.nextPay', { kind: td(nextPay.kind), pf: nextPay.proformaId, date: fdate(nextPay.due) })}</span>
+            <span>{payMoney(nextPay)}</span>
           </div>
-          {proformas
-            .filter((p) => !['en_transit', 'arrive'].includes(p.status))
-            .sort((a, b) => a.etd.localeCompare(b.etd))
-            .map((p) => (
-              <Link key={p.id} to={`/portail/proformas?pf=${p.id}`} className="alert-line">
-                <span className="bold" style={{ width: 40 }}>
-                  {weekLabel(p.etd)}
-                </span>
-                <span className="small">{fshort(p.etd)}</span>
-                <span className="bold small">{p.id}</span>
-                <span className="grow" />
-                <ProformaStatusPill status={p.status} />
-              </Link>
-            ))}
-          {nextPay && (
-            <div className="pill green mt" style={{ width: '100%', justifyContent: 'space-between', padding: 10, borderRadius: 10 }}>
-              <span>
-                {tr('home.nextPay', { kind: td(nextPay.kind), pf: nextPay.proformaId, date: fdate(nextPay.due) })}
-              </span>
-              <span>{eur(nextPay.amount)}</span>
-            </div>
-          )}
-        </div>
+        )}
       </div>
-    </>
-  );
-}
-
-// ---------------------------------------------------------------------------
-export function PortalProducts() {
-  const { state, products } = usePortal();
-  const [tab, setTab] = useState<'dev' | 'todo'>('dev');
-  const developed = products.filter((p) => p.developed);
-  const todo = products.filter((p) => !p.developed);
-  const { t, td, fmt } = useT();
-  const { dec } = fmt;
-  return (
-    <>
-      <div className="page-head">
-        <h1>{t('products.title', { n: products.length })}</h1>
-        <div className="grow" />
-        <PhotoImport products={products} />
-      </div>
-      <div className="grid2 mb">
-        <div className="card pad row gap-lg">
-          <div className="grow">
-            <div className="bold">{t('products.developed')}</div>
-            <div style={{ fontSize: 28, fontWeight: 800 }}>{developed.length}</div>
-          </div>
-          <Ring value={products.length ? developed.length / products.length : 0} size={70} stroke={8} />
-        </div>
-        <div className="card pad row gap-lg">
-          <div className="grow">
-            <div className="bold">{t('products.todo')}</div>
-            <div style={{ fontSize: 28, fontWeight: 800 }}>{todo.length}</div>
-          </div>
-          <Ring value={products.length ? todo.length / products.length : 0} size={70} stroke={8} />
-        </div>
-      </div>
-      <div className="mb">
-        <Seg
-          value={tab}
-          onChange={setTab}
-          options={[
-            { id: 'dev', label: t('products.developedN', { n: developed.length }) },
-            { id: 'todo', label: t('products.todoN', { n: todo.length }) },
-          ]}
-        />
-      </div>
-      <div className="card tbl-wrap">
-        <table className="tbl">
-          <thead>
-            <tr>
-              <th>{t('col.ref')}</th>
-              <th>{t('col.visual')}</th>
-              <th>{t('col.designation')}</th>
-              <th>{t('col.brand')}</th>
-              <th className="num">{t('col.pa')}</th>
-              <th className="num">{t('col.pcb')}</th>
-              <th className="num">{t('col.cbmCtn')}</th>
-              <th>{t('col.ean')}</th>
-              <th>{tab === 'dev' ? t('col.packState') : t('col.nextAction')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(tab === 'dev' ? developed : todo).map((p) => (
-              <tr key={p.id}>
-                <td className="bold">{p.ref}</td>
-                <td>
-                  <div className="row" style={{ gap: 6 }}>
-                    <ProductThumb product={p} size={40} />
-                    <ProductPhotoEdit product={p} />
-                  </div>
-                </td>
-                <td>{p.name}</td>
-                <td>
-                  <BrandLogo brand={brandOf(state.brands, p.brandId)} size={9} />
-                </td>
-                <td className="num"><PA product={p} /></td>
-                <td className="num">{p.pcb}</td>
-                <td className="num">{dec(p.cbmCarton, 3)}</td>
-                <td className="small">{p.ean}</td>
-                <td>{tab === 'dev' ? <PackPill product={p} /> : <Pill color="violet">{td(p.nextAction)}</Pill>}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <PortalFlow />
     </>
   );
 }
@@ -211,7 +143,7 @@ export function PortalProformas() {
   const [params, setParams] = useSearchParams();
   const openId = params.get('pf');
   const { t: tr, fmt } = useT();
-  const { dec, eur, eur2, fdate, fshort, num, weekLabel } = fmt;
+  const { dec, fdate, fshort, num, weekLabel } = fmt;
   return (
     <>
       <div className="page-head">
@@ -263,7 +195,7 @@ export function PortalProformas() {
                 <div className="metric">
                   <div className="l">{tr('col.amount')}</div>
                   <div className="v" style={{ fontSize: 16 }}>
-                    {eur(t.amount)}
+                    {money(t.amountCur, t.currency)}
                   </div>
                 </div>
               </div>
@@ -303,10 +235,10 @@ export function PortalProformas() {
                                   </div>
                                 </div>
                               </td>
-                              <td className="num">{eur2(l.price)}</td>
+                              <td className="num">{money(l.price, t.currency)}</td>
                               <td className="num">{num(l.qty)}</td>
                               <td className="num">{dec(lineCbm(p, l.qty), 2)}</td>
-                              <td className="num">{eur(l.qty * l.price)}</td>
+                              <td className="num">{money(l.qty * l.price, t.currency)}</td>
                               <td className="num">{num(allocatedQty(state, pf.id, p.id))}</td>
                               <td>{fdate(p.pack.artworkDeadline)}</td>
                               <td>
@@ -342,12 +274,10 @@ export function PortalProformas() {
 
 // ---------------------------------------------------------------------------
 export function PortalPacks() {
-  const { state, dispatch, products, packsToValidate, dieCutsRequested } = usePortal();
+  const { state, products, packsToValidate, dieCutsRequested } = usePortal();
   const [params, setParams] = useSearchParams();
   const view = (params.get('vue') as 'valider' | 'diecut' | 'tous' | null) ?? 'valider';
-  const list = (view === 'valider' ? packsToValidate : view === 'diecut' ? dieCutsRequested : products)
-    .slice()
-    .sort((a, b) => a.pack.artworkDeadline.localeCompare(b.pack.artworkDeadline));
+  const list = (view === 'valider' ? packsToValidate : view === 'diecut' ? dieCutsRequested : products).slice().sort((a, b) => a.pack.artworkDeadline.localeCompare(b.pack.artworkDeadline));
   const [limit, setLimit] = useState(30);
   const { t, td, fmt } = useT();
   const { fdate } = fmt;
@@ -371,24 +301,30 @@ export function PortalPacks() {
       {list.length === 0 && <div className="card empty">{t('packs.empty')}</div>}
       <div className="gallery" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))' }}>
         {list.slice(0, limit).map((p) => {
-          const canValidate = p.pack.sentToSupplier && p.pack.validations.fournisseur.state === 'pending' && !packDone(p);
           return (
             <div key={p.id} className="card pad col" style={{ gap: 10 }}>
               <div className="row">
                 <ProductThumb product={p} size={56} />
                 <div className="grow">
-                  <span className="ref-tag">{p.ref}</span>
+                  <Link to={`/portail/produits/${p.id}`} className="ref-tag">
+                    {p.ref}
+                  </Link>
                   <div className="bold">{p.name}</div>
-                  <div className="xs muted">
-                    {t('packs.deadline', { type: td(p.pack.type), date: fdate(p.pack.artworkDeadline) })}
-                  </div>
+                  <div className="xs muted">{t('packs.deadline', { type: td(p.pack.type), date: fdate(p.pack.artworkDeadline) })}</div>
                 </div>
                 <BrandLogo brand={brandOf(state.brands, p.brandId)} size={10} />
               </div>
               <ValidationCircuit product={p} />
+              <LastPackRejection product={p} />
               <div className="row wrap">
                 <span className="small">{t('packs.dieCut')}</span>
-                {p.pack.dieCut === 'received' ? <Pill color="green">{t('packs.dieCut.sent')}</Pill> : p.pack.dieCut === 'requested' ? <Pill color="orange">{t('packs.dieCut.requested')}</Pill> : <Pill color="grey">{t('packs.dieCut.none')}</Pill>}
+                {p.pack.dieCut === 'received' ? (
+                  <Pill color="green">{t('packs.dieCut.sent')}</Pill>
+                ) : p.pack.dieCut === 'requested' ? (
+                  <Pill color="orange">{t('packs.dieCut.requested')}</Pill>
+                ) : (
+                  <Pill color="grey">{t('packs.dieCut.none')}</Pill>
+                )}
                 <span className="small">{t('packs.pack')}</span>
                 {p.pack.sentToSupplier ? <Pill color="blue">{t('packs.received', { v: p.pack.artworkVersions })}</Pill> : <Pill color="grey">{t('packs.preparing')}</Pill>}
               </div>
@@ -396,28 +332,7 @@ export function PortalPacks() {
                 {/* Fichiers : télécharger le pack JONAS ; déposer die cut, ancien pack, fiches qualité */}
                 <SupplierPackFiles product={p} label={p.pack.dieCut === 'requested' ? t('packs.sendDieCut') : undefined} />
                 <div className="grow" />
-                {canValidate && (
-                  <>
-                    <button
-                      className="btn sm danger"
-                      onClick={() => {
-                        dispatch({ type: 'rejectPack', productId: p.id });
-                        toast(t('packs.rejectToast'));
-                      }}
-                    >
-                      <X size={13} /> {t('packs.reject')}
-                    </button>
-                    <button
-                      className="btn sm primary"
-                      onClick={() => {
-                        dispatch({ type: 'validatePack', productId: p.id });
-                        toast(t('packs.validateToast'));
-                      }}
-                    >
-                      <Check size={13} /> {t('packs.validate')}
-                    </button>
-                  </>
-                )}
+                <PackDecision product={p} />
               </div>
             </div>
           );
@@ -552,18 +467,20 @@ export function PortalContainers() {
 export function PortalFinance() {
   const { state, supplier } = usePortal();
   const pays = payments(state).filter((p) => p.supplierId === supplier!.id);
-  const paid = pays.filter((p) => p.paid).reduce((s, p) => s + p.amount, 0);
-  const open = pays.filter((p) => !p.paid).reduce((s, p) => s + p.amount, 0);
+  const payMoney = usePayMoney();
+  const cur = usePayCurrency();
+  const paid = sumByCurrency(pays.filter((p) => p.paid).map((p) => cur(p)));
+  const open = sumByCurrency(pays.filter((p) => !p.paid).map((p) => cur(p)));
   const { t, td, fmt } = useT();
-  const { eur, fdate } = fmt;
+  const { fdate } = fmt;
   return (
     <>
       <div className="page-head">
         <h1>{t('finance.title')}</h1>
       </div>
       <div className="kpis mb">
-        <Kpi icon={<Check size={18} />} value={eur(paid)} label={t('finance.received')} />
-        <Kpi icon={<Euro size={18} />} value={eur(open)} label={t('finance.open')} color="orange" />
+        <Kpi icon={<Check size={18} />} value={paid} label={t('finance.received')} />
+        <Kpi icon={<Euro size={18} />} value={open} label={t('finance.open')} color="orange" />
       </div>
       <div className="card tbl-wrap">
         <table className="tbl">
@@ -581,7 +498,7 @@ export function PortalFinance() {
               <tr key={p.proformaId + p.kind}>
                 <td className="bold">{p.proformaId}</td>
                 <td>{td(p.kind)}</td>
-                <td className="num">{eur(p.amount)}</td>
+                <td className="num">{payMoney(p)}</td>
                 <td>{fdate(p.due)}</td>
                 <td>{p.paid ? <Pill color="green">{t('finance.paid')}</Pill> : <Pill color="orange">{t('finance.upcoming')}</Pill>}</td>
               </tr>
@@ -592,7 +509,6 @@ export function PortalFinance() {
     </>
   );
 }
-
 
 // ---------------------------------------------------------------------------
 /**

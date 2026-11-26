@@ -1091,7 +1091,9 @@ function applyAction(s: State, a: Action): State {
         if (idx < 0) return p;
         v[VALIDATION_STEPS[idx]] = { state: 'done', date: TODAY };
         if (idx + 1 < VALIDATION_STEPS.length) v[VALIDATION_STEPS[idx + 1]] = { state: 'pending' };
-        return { ...p, pack: { ...p.pack, validations: v, sentToSupplier: idx === 3 ? true : p.pack.sentToSupplier } };
+        // Validé par Moinard (avant-dernière étape) : le pack part tout seul chez le fournisseur
+        const toSupplier = VALIDATION_STEPS[idx + 1] === 'fournisseur' || idx === VALIDATION_STEPS.length - 1;
+        return { ...p, pack: { ...p.pack, validations: v, sentToSupplier: toSupplier ? true : p.pack.sentToSupplier } };
       });
     case 'rejectPack':
       return mapP(s, a.productId, (p) => {

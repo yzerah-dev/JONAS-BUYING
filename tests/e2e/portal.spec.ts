@@ -35,3 +35,32 @@ test.describe('Portail fournisseur', () => {
     await expect(page.getByRole('button', { name: 'Demande de booking' })).toHaveCount(0);
   });
 });
+
+test('portail fournisseur : commandes en cours, fiche produit, refus du pack avec motif', async ({ page }) => {
+  await resetApp(page);
+  await loginAs(page, 'Mr. Chen');
+  // Tableau de bord : chaque commande et ce que JONAS attend du fournisseur
+  const flow = page.getByRole('region', { name: 'Mes commandes en cours' });
+  await expect(flow.locator('[data-pf="PF-2026-0141"]')).toContainText('Déposer BL, Invoice et Packing List');
+  await expect(flow.locator('[data-pf="PF-2026-0141"] li[aria-current="step"]')).toContainText('Départ');
+  // Mes produits : recherche puis fiche
+  await go(page, 'portail/produits');
+  await page.getByRole('button', { name: /^Pack à valider \(\d+\)$/ }).click();
+  await page.getByLabel('Rechercher : réf., EAN, nom…').fill('ORA-N452');
+  await expect(page.locator('main tbody tr')).toHaveCount(1);
+  await page.getByRole('link', { name: 'ORA-N452' }).click();
+  await expect(page).toHaveURL(/portail\/produits\/ORA-N452$/);
+  await expect(page.getByRole('region', { name: 'Informations' })).toContainText('3701571519661');
+  // Refus : la modification demandée est obligatoire
+  const pack = page.getByRole('region', { name: 'Pack & die cut' });
+  await pack.getByRole('button', { name: 'Refuser' }).click();
+  await expect(pack.getByRole('button', { name: 'Refuser et envoyer à JONAS' })).toBeDisabled();
+  await pack.getByLabel('Modification demandée').fill('Le code-barres est trop petit.');
+  await pack.getByRole('button', { name: 'Refuser et envoyer à JONAS' }).click();
+  await expect(toast(page)).toContainText('Pack refusé');
+  const rej = await page.evaluate(() => {
+    const k = Object.keys(localStorage).find((x) => x.startsWith('jonas-buying-state'))!;
+    return JSON.parse(localStorage.getItem(k)!).products.find((p: { id: string }) => p.id === 'ORA-N452').pack.rejection.reason;
+  });
+  expect(rej).toBe('Le code-barres est trop petit.');
+});

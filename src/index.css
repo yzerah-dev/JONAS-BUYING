@@ -1886,3 +1886,45 @@ select.pi-input { cursor: pointer; }
 .pk-view { height: 38px; font-size: 14px; }
 @media (max-width: 760px) { .pk-designers { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; } .pk-dchip { flex: none; } }
 .pk-card-avatar { flex: none; width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 15px; }
+
+/* --- Portail fournisseur : commandes en cours (étapes) --- */
+.pflow-sub { margin: -4px 0 12px; }
+.pflow-row { display: grid; grid-template-columns: 190px 1fr 280px; align-items: center; gap: 16px; padding: 12px 0; border-top: 1px solid var(--line); }
+.pflow-row.you { background: linear-gradient(90deg, var(--orange-soft), transparent 70%); border-radius: 10px; padding-left: 10px; }
+.pflow-id { display: grid; gap: 3px; justify-items: start; color: inherit; }
+.pflow-steps { display: flex; list-style: none; margin: 0; padding: 0; }
+.pflow-steps li { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px; position: relative; min-width: 0; }
+.pflow-steps li::before { content: ''; position: absolute; top: 14px; right: 50%; width: 100%; height: 3px; background: var(--line); z-index: 0; }
+.pflow-steps li:first-child::before { display: none; }
+.pflow-steps li.done::before, .pflow-steps li.now::before, .pflow-steps li.you::before { background: var(--green); }
+.pflow-dot { position: relative; z-index: 1; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 13px; background: #fff; border: 3px solid var(--line); color: var(--muted); }
+.pflow-steps li.done .pflow-dot { background: var(--green); border-color: var(--green); color: #fff; }
+.pflow-steps li.now .pflow-dot { border-color: var(--green); color: var(--green-dark); }
+.pflow-steps li.you .pflow-dot { background: var(--orange); border-color: var(--orange); color: #fff; box-shadow: 0 0 0 4px var(--orange-soft); }
+.pflow-lbl { font-size: 12px; font-weight: 600; color: var(--muted); text-align: center; }
+.pflow-steps li.done .pflow-lbl, .pflow-steps li.now .pflow-lbl { color: var(--ink); }
+.pflow-steps li.you .pflow-lbl { color: #b65d05; font-weight: 800; }
+.pflow-next { justify-self: end; text-align: right; }
+.pflow-act { background: var(--orange) !important; border-color: var(--orange) !important; white-space: normal; text-align: left; }
+.pflow-you { background: #fff; color: #b65d05; border-radius: 6px; padding: 1px 6px; font-size: 11px; font-weight: 800; }
+@media (max-width: 1100px) {
+  .pflow-row { grid-template-columns: 1fr; gap: 10px; }
+  .pflow-next { justify-self: start; text-align: left; }
+}
+@media (max-width: 560px) {
+  .pflow-lbl { font-size: 10px; }
+  .pflow-dot { width: 24px; height: 24px; font-size: 11px; }
+  .pflow-steps li::before { top: 11px; }
+}
+
+/* --- Portail fournisseur : mes produits / fiche produit --- */
+.pp-search { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 220px; max-width: 420px; color: var(--muted); }
+.pp-search .input { flex: 1; }
+.pp-detail { display: grid; grid-template-columns: minmax(280px, 420px) 1fr; gap: 16px; align-items: start; }
+@media (max-width: 900px) { .pp-detail { grid-template-columns: 1fr; } }
+.pp-info { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px 20px; margin: 0; }
+.pp-info dt { font-size: 12px; color: var(--muted); }
+.pp-info dd { margin: 2px 0 0; font-weight: 600; }
+.pp-desc { white-space: pre-line; margin: 4px 0 0; }
+.pp-await { border-color: var(--orange); box-shadow: 0 0 0 3px var(--orange-soft); }
+.pk-lastrej { margin-top: 8px; background: #fdecec; color: #b42318; border-radius: 8px; padding: 6px 10px; }

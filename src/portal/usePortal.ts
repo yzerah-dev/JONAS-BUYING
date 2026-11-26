@@ -1,4 +1,8 @@
+import type { Product } from '../data/types';
 import { bookingStage, currentUser, pendingVersion, signedVersion, packDone, useStore } from '../data/store';
+
+/** Le pack attend la validation de ce fournisseur */
+export const awaitsSupplier = (p: Product) => p.pack.sentToSupplier && p.pack.validations.fournisseur.state === 'pending' && !packDone(p);
 
 /** Données visibles par le fournisseur connecté — et uniquement celles-ci. */
 export function usePortal() {
@@ -10,7 +14,7 @@ export function usePortal() {
   const proformas = state.proformas.filter((p) => p.supplierId === sid);
   const containers = state.containers.filter((c) => c.supplierId === sid);
 
-  const packsToValidate = products.filter((p) => p.pack.sentToSupplier && p.pack.validations.fournisseur.state === 'pending' && !packDone(p));
+  const packsToValidate = products.filter(awaitsSupplier);
   const dieCutsRequested = products.filter((p) => p.pack.dieCut === 'requested');
   const plansRequested = containers.filter((c) => c.planRequested && !c.planValidated && ['a_booker', 'booking_demande', 'booke'].includes(c.status));
   /** Demandes de booking de JONAS à prendre en compte (plan, marchandise prête, boîtes demandées au transitaire) */
