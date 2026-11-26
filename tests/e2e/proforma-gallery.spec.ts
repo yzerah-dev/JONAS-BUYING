@@ -7,10 +7,7 @@ test('proformas en galerie : cartes par semaine, ouverture, signature depuis la 
   await page.getByRole('button', { name: 'Galerie' }).click();
   const card = page.locator('.pf-week.open .pfg-card', { hasText: 'PF-2026-0146' });
   await expect(card).toBeVisible();
-  await expect(card).toContainText(
-    'SHENZHEN NOVA BEAUTY'.toLowerCase().replace(/\b./g, (c) => c),
-    { ignoreCase: true },
-  );
+  await expect(card).toContainText('Shenzhen Nova Beauty', { ignoreCase: true });
   await expect(card.getByRole('button', { name: 'Signer' })).toBeVisible();
   await expect(page.locator('.pfx')).toHaveCount(0);
   await page.reload();
