@@ -2049,3 +2049,14 @@ select.pi-input { cursor: pointer; }
 .tbl tr.pk-late td { background: #fdf0f0; }
 .tbl tr.clickable.pk-ok:hover td { background: #e3f5ec; }
 .tbl tr.clickable.pk-late:hover td { background: #fde8e8; }
+
+/* Panier : − quantité + sur les produits */
+.cart-qty { display: flex; align-items: center; gap: 4px; justify-content: flex-end; }
+.cq-btn { display: inline-flex; align-items: center; gap: 4px; height: 30px; min-width: 30px; justify-content: center; border-radius: 8px; border: 1px solid var(--line); background: #fff; cursor: pointer; font-weight: 700; font-size: 12px; color: var(--ink); padding: 0 8px; }
+.cq-btn.plus { background: var(--green); border-color: var(--green); color: #fff; }
+.cq-btn.plus:hover { background: var(--green-dark); }
+.cq-input { width: 70px; height: 30px; text-align: center; border: 1px solid var(--green); border-radius: 8px; font-weight: 800; font: inherit; font-weight: 800; }
+.cart-qty.on { background: var(--green-soft); border-radius: 10px; padding: 3px; }
+.cart-count { background: #fff; color: var(--green-dark); border-radius: 999px; padding: 0 7px; margin-left: 2px; }
+.cart-sup .tbl td { vertical-align: middle; }
+.cart-sup { grid-column: 1 / -1; }

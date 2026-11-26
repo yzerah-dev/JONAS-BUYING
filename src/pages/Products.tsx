@@ -1,4 +1,6 @@
 import { productSize } from '../lib/productSize';
+import { CartButton, CartQty } from '../components/Cart';
+import { useCanOrder } from '../lib/cart';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LayoutGrid, List, Search } from 'lucide-react';
@@ -11,6 +13,7 @@ import PhotoImport from '../components/PhotoImport';
 import ProductSheetImport from '../components/ProductSheetImport';
 
 export default function Products() {
+  const canOrder = useCanOrder();
   const { state } = useStore();
   const navigate = useNavigate();
   const [mode, setMode] = useState<'galerie' | 'liste'>('galerie');
@@ -48,6 +51,7 @@ export default function Products() {
         <h1>Total – Tous les produits</h1>
         <span className="pill green">{state.products.length} références</span>
         <div className="grow" />
+        {canOrder && <CartButton />}
         <ProductSheetImport products={state.products} />
         <PhotoImport products={state.products} />
         <Seg
@@ -165,6 +169,7 @@ export default function Products() {
                 <span className="small muted">Prochain chgt</span>
                 <span className="bold">{qty.nextArrival ? weekLabel(qty.nextArrival) : '—'}</span>
               </div>
+              {canOrder && <CartQty p={p} />}
             </div>
           ))}
         </div>
@@ -184,6 +189,7 @@ export default function Products() {
                 <th className="num">En transit</th>
                 <th className="num">En stock</th>
                 <th>Prochaine arrivée</th>
+                {canOrder && <th>Commander</th>}
               </tr>
             </thead>
             <tbody>
@@ -216,6 +222,11 @@ export default function Products() {
                   <td className="num">{num(qty.inTransit)}</td>
                   <td className="num">{num(qty.stock)}</td>
                   <td className="bold">{qty.nextArrival ? weekLabel(qty.nextArrival) : '—'}</td>
+                  {canOrder && (
+                    <td>
+                      <CartQty p={p} />
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

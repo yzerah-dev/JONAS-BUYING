@@ -740,6 +740,7 @@ export const fr = {
   'ph.close': 'Fermer',
   'ph.prev': 'Photo précédente',
   'ph.next': 'Photo suivante',
+  'po.srcLabel.panier': 'panier produits',
 };
 
 export type Key = keyof typeof fr;
@@ -1461,6 +1462,7 @@ export const en: Record<Key, string> = {
   'ph.close': 'Close',
   'ph.prev': 'Previous photo',
   'ph.next': 'Next photo',
+  'po.srcLabel.panier': 'product cart',
 };
 
 /**

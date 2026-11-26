@@ -707,6 +707,7 @@ export const zh: Record<Key, string> = {
   'ph.close': '关闭',
   'ph.prev': '上一张',
   'ph.next': '下一张',
+  'po.srcLabel.panier': '产品购物车',
 };
 
 /** Valeurs issues des données (français) traduites en chinois */

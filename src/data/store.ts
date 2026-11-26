@@ -132,7 +132,7 @@ export type Action =
       eta: ISODate;
       lines: ImportLine[];
       /** Commande JONAS : origine des articles et fichier importé */
-      order?: { source: 'saisie' | 'excel' | 'bc' | 'ia'; file?: { fileId: string; name: string; size: number; mime: string } };
+      order?: { source: 'saisie' | 'excel' | 'bc' | 'ia' | 'panier'; file?: { fileId: string; name: string; size: number; mime: string } };
       /** Proforma déposée par le fournisseur (obligatoire côté fournisseur) */
       file?: { fileId: string; name: string; size: number; mime: string };
     }
