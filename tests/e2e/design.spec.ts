@@ -190,29 +190,29 @@ test('Développement = une seule page : ancienne adresse redirigée, PUSH URGENT
 });
 
 
-test('vues par designer (toutes les semaines) et par semaine (tous les designers)', async ({ page }) => {
+test('vues claires : par semaine de deadline, par designer, par fournisseur', async ({ page }) => {
   await resetApp(page);
   await loginAs(page, 'David');
   await go(page, 'design');
   const views = page.getByRole('tablist', { name: 'Vue' });
-  // Par designer : ABIR, rangée semaine par semaine
-  await views.getByRole('tab', { name: 'Par designer' }).click();
-  await page.getByRole('group', { name: 'Designer' }).getByRole('button', { name: /ABIR/ }).click();
-  await expect(page.getByRole('group', { name: 'Designer' }).getByRole('button', { name: /ABIR/ })).toHaveAttribute('aria-pressed', 'true');
-  // Cartes semaine comme la page Proformas : semaine en cours ouverte, les autres se déplient
+  // Par semaine (par défaut) : cartes semaine, la semaine en cours ouverte
+  await expect(views.getByRole('tab', { name: 'Par semaine' })).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('.pk-week').first()).toContainText('Semaine');
-  expect(await page.locator('.pk-week').count()).toBeGreaterThan(1);
   await expect(page.locator('.pk-week', { hasText: 'en cours' })).toHaveClass(/open/);
   const closed = page.locator('.pk-week:not(.open)').first();
   await closed.locator('.pf-week-head').click();
-  await expect(page.locator('.pk-week:not(.open)')).toHaveCount((await page.locator('.pk-week').count()) - (await page.locator('.pk-week.open').count()));
-  // Par semaine : tous les designers, rangés designer par designer
-  await views.getByRole('tab', { name: 'Par semaine' }).click();
-  const heads = await page.locator('.pk-group-head').allInnerTexts();
-  expect(heads.some((h) => h.includes('ABIR'))).toBe(true);
-  expect(heads.some((h) => h.includes('ROLAND'))).toBe(true);
+  // Par designer : une carte par designer (dont ALEX PANDA)
+  await views.getByRole('tab', { name: 'Par designer' }).click();
+  for (const d of ['ABIR', 'ALEX PANDA', 'ROLAND']) await expect(page.locator('.pk-week .pf-week-title h2', { hasText: d })).toHaveCount(1);
+  // Filtre designer : une seule carte
+  await page.getByRole('group', { name: 'Designer' }).getByRole('button', { name: /ABIR/ }).click();
+  await expect(page.locator('.pk-week')).toHaveCount(1);
+  // Par fournisseur : une carte par fournisseur
+  await views.getByRole('tab', { name: 'Par fournisseur' }).click();
+  expect(await page.locator('.pk-week').count()).toBeGreaterThan(1);
+  await expect(page.locator('.pk-week').first().locator('.pf-week-head')).toContainText('packs');
   // Designer × semaine : en cliquant une case du planning
   await (await planCell(page, 'ABIR', 'S47')).click();
   await expect(views.getByRole('tab', { name: 'Designer × semaine' })).toHaveAttribute('aria-selected', 'true');
-  await expect(page.locator('.pk-group-head')).toHaveCount(0);
+  await expect(page.locator('.pk-week')).toHaveCount(0);
 });

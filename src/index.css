@@ -1885,3 +1885,4 @@ select.pi-input { cursor: pointer; }
 .pk-views { gap: 6px; }
 .pk-view { height: 38px; font-size: 14px; }
 @media (max-width: 760px) { .pk-designers { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; } .pk-dchip { flex: none; } }
+.pk-card-avatar { flex: none; width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 15px; }

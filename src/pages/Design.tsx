@@ -93,7 +93,8 @@ function DesignPage() {
   }, [state.products]);
 
   const [designer, setDesigner] = useState(auth.user.designerName ?? 'all');
-  const [view, setView] = useState<'case' | 'designer' | 'semaine'>('designer');
+  // Vues : par semaine de deadline, par designer, par fournisseur (+ case du planning)
+  const [view, setView] = useState<'case' | 'semaine' | 'designer' | 'fournisseur'>('semaine');
   const [showPlan, setShowPlan] = useState(false);
   // Cartes semaine repliées / dépliées (par défaut : semaine en cours et suivante ouvertes)
   const [toggled, setToggled] = useState<Set<string>>(new Set());
@@ -124,12 +125,7 @@ function DesignPage() {
 
   // Vue : un designer sur toutes les semaines, une semaine pour tous les designers, ou une case du planning
   const firstWeek = weeks[0]?.key ?? weekKey(TODAY);
-  const scope =
-    view === 'designer'
-      ? state.products.filter((p) => (designer === 'all' || p.pack.designer === designer) && weekKey(p.pack.artworkDeadline) >= firstWeek)
-      : view === 'semaine'
-        ? cell('all', week)
-        : cell(designer, week);
+  const scope = view === 'case' ? cell(designer, week) : state.products.filter((p) => (designer === 'all' || p.pack.designer === designer) && weekKey(p.pack.artworkDeadline) >= firstWeek);
   const s = q.trim().toLowerCase();
   const list = scope
     .filter((p) => matches(p, status))
@@ -138,21 +134,15 @@ function DesignPage() {
     .sort(sorters[sortBy]);
   const sel = list.find((p) => p.id === selId) ?? scope.find((p) => p.id === selId);
 
-  const shown = list.slice(0, view === 'designer' ? Math.max(limit, 1000) : limit);
+  const shown = list.slice(0, view !== 'case' ? Math.max(limit, 2000) : limit);
   const groups: [string, Product[]][] = useMemo(() => {
-    // Vue par designer : rangée semaine par semaine ; vue par semaine : designer par designer
-    if (view === 'designer') {
+    // Cartes : une par semaine de deadline, par designer ou par fournisseur
+    if (view !== 'case') {
+      const keyOf = (p: Product) => (view === 'semaine' ? weekKey(p.pack.artworkDeadline) : view === 'designer' ? p.pack.designer : p.supplierId);
       const map = new Map<string, Product[]>();
-      for (const p of shown) {
-        const k = weekKey(p.pack.artworkDeadline);
-        map.set(k, [...(map.get(k) ?? []), p]);
-      }
-      return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
-    }
-    if (view === 'semaine') {
-      const map = new Map<string, Product[]>();
-      for (const p of shown) map.set(p.pack.designer, [...(map.get(p.pack.designer) ?? []), p]);
-      return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
+      for (const p of shown) map.set(keyOf(p), [...(map.get(keyOf(p)) ?? []), p]);
+      const nameOf = (k: string) => (view === 'fournisseur' ? (byId(state.suppliers, k)?.name ?? k) : k);
+      return [...map.entries()].sort(([a], [b]) => nameOf(a).localeCompare(nameOf(b)));
     }
     if (groupBy === 'none') return [['', shown]];
     const map = new Map<string, Product[]>();
@@ -318,29 +308,22 @@ function DesignPage() {
         <div className="col" style={{ gap: 12 }}>
           {/* Vue et designers */}
           <div className="pk-views" role="tablist" aria-label="Vue">
-            {([['designer', 'Par designer'], ['semaine', 'Par semaine'], ...(view === 'case' ? ([['case', 'Designer × semaine']] as const) : [])] as const).map(([v, label]) => (
-              <button
-                key={v}
-                type="button"
-                role="tab"
-                aria-selected={view === v}
-                className={`pk-view ${view === v ? 'active' : ''}`}
-                onClick={() => (setView(v), setSelected(new Set()), setStatus('all'), setLimit(50))}
-              >
-                {label}
-              </button>
-            ))}
-            {view !== 'designer' && (
-              <select className="input pk-view-pick" aria-label="Semaine" value={week} onChange={(e) => setWeek(e.target.value)}>
-                {weeks.map((w) => (
-                  <option key={w.key} value={w.key}>
-                    Semaine {weekLabel(w.sample).slice(1)} · {weekRange(w.sample)}
-                  </option>
-                ))}
-              </select>
+            {([['semaine', 'Par semaine'], ['designer', 'Par designer'], ['fournisseur', 'Par fournisseur'], ...(view === 'case' ? ([['case', 'Designer × semaine']] as const) : [])] as const).map(
+              ([v, label]) => (
+                <button
+                  key={v}
+                  type="button"
+                  role="tab"
+                  aria-selected={view === v}
+                  className={`pk-view ${view === v ? 'active' : ''}`}
+                  onClick={() => (setView(v), setSelected(new Set()), setStatus('all'), setLimit(50))}
+                >
+                  {label}
+                </button>
+              ),
             )}
           </div>
-          {view !== 'semaine' && (
+          {view !== 'case' && (
             <div className="pk-designers" role="group" aria-label="Designer">
               {['all', ...designers].map((d) => {
                 const n = state.products.filter((p) => (d === 'all' || p.pack.designer === d) && weekKey(p.pack.artworkDeadline) >= (weeks[0]?.key ?? weekKey(TODAY))).length;
@@ -408,7 +391,7 @@ function DesignPage() {
                 ))}
               </select>
             </label>
-            {view !== 'designer' && (
+            {view === 'case' && (
               <label className="pk-group" htmlFor="pk-group">
                 <span className="xs muted">Grouper</span>
                 <select id="pk-group" className="input" value={groupBy} onChange={(e) => setGroupBy(e.target.value as GroupBy)}>
@@ -505,31 +488,38 @@ function DesignPage() {
               <span className="pk-c-sup">Fournisseur</span>
               <span className="pk-c-type">Type de pack</span>
               <span className="pk-c-val">Suivi pack</span>
-              <span className="pk-c-due">Échéance</span>
+              <span className="pk-c-due">Deadline</span>
               <span className="pk-c-st">Statut</span>
             </div>
             {list.length === 0 && <div className="empty">Aucun pack pour ce filtre.</div>}
             {groups.map(([g, items]) => {
               const nextWeek = weekKey(addDays(TODAY, 7));
-              const isWeek = view === 'designer';
-              // Semaine en cours et suivante ouvertes par défaut ; un clic inverse
-              const open = !isWeek || (g >= weekKey(TODAY) && g <= nextWeek) !== toggled.has(g);
+              const isCard = view !== 'case';
+              const tk = `${view}:${g}`;
+              // Ouvertes par défaut : semaine en cours et suivante ; designers ; fournisseurs s'ils sont peu nombreux
+              const byDefault = view === 'semaine' ? g >= weekKey(TODAY) && g <= nextWeek : view === 'designer' ? true : groups.length <= 3;
+              const open = !isCard || byDefault !== toggled.has(tk);
+              const onToggle = () =>
+                setToggled((s) => {
+                  const n = new Set(s);
+                  if (n.has(tk)) n.delete(tk);
+                  else n.add(tk);
+                  return n;
+                });
+              const sup = view === 'fournisseur' ? byId(state.suppliers, g) : undefined;
               return (
-                <div key={g || 'all'} className={isWeek ? `pf-week pk-week ${open ? 'open' : ''}` : undefined}>
-                  {isWeek ? (
+                <div key={g || 'all'} className={isCard ? `pf-week pk-week ${open ? 'open' : ''}` : undefined}>
+                  {isCard ? (
                     <WeekHead
                       items={items}
-                      current={g === weekKey(TODAY)}
+                      kind={view as 'semaine' | 'designer' | 'fournisseur'}
+                      title={view === 'designer' ? g : sup?.name}
+                      sub={view === 'designer' ? 'Designer' : sup ? `${sup.city ?? ''}${sup.country ? ` · ${sup.country}` : ''}` : undefined}
+                      color={view === 'designer' ? colorOf(g) : sup?.color}
+                      current={view === 'semaine' && g === weekKey(TODAY)}
                       open={open}
-                      capacity={designer !== 'all' ? capacityOf(state, designer) : undefined}
-                      onToggle={() =>
-                        setToggled((s) => {
-                          const n = new Set(s);
-                          if (n.has(g)) n.delete(g);
-                          else n.add(g);
-                          return n;
-                        })
-                      }
+                      capacity={view === 'semaine' && designer !== 'all' ? capacityOf(state, designer) : undefined}
+                      onToggle={onToggle}
                     />
                   ) : (
                     g && (
@@ -579,7 +569,7 @@ function DesignPage() {
                 </div>
               );
             })}
-            {list.length > limit && (
+            {view === 'case' && list.length > limit && (
               <button className="pk-more" onClick={() => setLimit(limit + 50)}>
                 Afficher plus ({list.length - limit} restants)
               </button>
@@ -593,20 +583,46 @@ function DesignPage() {
 }
 
 /** En-tête de semaine, comme la page Proformas : date, nombre de packs, retards, urgents, validés, capacité */
-function WeekHead({ items, current, open, capacity, onToggle }: { items: Product[]; current: boolean; open: boolean; capacity?: number; onToggle: () => void }) {
+function WeekHead({
+  items,
+  kind = 'semaine',
+  title: name,
+  sub: subText,
+  color,
+  current,
+  open,
+  capacity,
+  onToggle,
+}: {
+  items: Product[];
+  kind?: 'semaine' | 'designer' | 'fournisseur';
+  title?: string;
+  sub?: string;
+  color?: string;
+  current: boolean;
+  open: boolean;
+  capacity?: number;
+  onToggle: () => void;
+}) {
   const sample = items[0].pack.artworkDeadline;
   const late = items.filter(packLate).length;
   const urgent = items.filter((p) => p.urgent).length;
   const validated = items.filter(packDone).length;
-  const title = `Semaine ${weekLabel(sample).slice(1)}`;
+  const title = kind === 'semaine' ? `Semaine ${weekLabel(sample).slice(1)}` : (name ?? '');
   return (
     <header className="pf-week-head" {...pressable(onToggle, `${title} : ${open ? 'replier' : 'déplier'}`)} aria-expanded={open}>
-      <Calendar className="pf-week-cal" size={38} strokeWidth={1.8} />
+      {kind === 'semaine' ? (
+        <Calendar className="pf-week-cal" size={38} strokeWidth={1.8} />
+      ) : (
+        <span className="pk-card-avatar" style={{ background: color ?? 'var(--green)' }}>
+          {initials(title)}
+        </span>
+      )}
       <div className="pf-week-title">
         <h2>
           {title} {current && <span className="dev-now">en cours</span>}
         </h2>
-        <span>{weekRange(sample)}</span>
+        <span>{kind === 'semaine' ? weekRange(sample) : subText}</span>
       </div>
       <span className="pf-count">
         {items.length} pack{items.length > 1 ? 's' : ''}
