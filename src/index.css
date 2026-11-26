@@ -2041,3 +2041,11 @@ select.pi-input { cursor: pointer; }
 .lb-nav:hover, .lb-close:hover { background: rgba(255, 255, 255, 0.28); }
 .lb-count { position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); color: #fff; font-weight: 700; background: rgba(0, 0, 0, 0.35); padding: 4px 12px; border-radius: 999px; }
 .auth-forgot { justify-self: center; color: var(--muted); }
+
+/* Produits d'une proforma : pack validé (vert) / en retard (rouge) */
+.pcard.pk-ok { background: #e3f5ec; border-color: #9fd8bd; }
+.pcard.pk-late { background: #fde8e8; border-color: #f2a8a8; }
+.tbl tr.pk-ok td { background: #eef9f3; }
+.tbl tr.pk-late td { background: #fdf0f0; }
+.tbl tr.clickable.pk-ok:hover td { background: #e3f5ec; }
+.tbl tr.clickable.pk-late:hover td { background: #fde8e8; }

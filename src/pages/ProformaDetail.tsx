@@ -35,6 +35,8 @@ import {
 import {
   allocatedQty,
   maxAllocQty,
+  packDone,
+  packLate,
   hasDeposit,
   balanceDaysOf,
   realDeparture,
@@ -52,14 +54,14 @@ import {
   type State,
   brandOf,
 } from '../data/store';
-import type { Container, Proforma, ProformaStatus } from '../data/types';
+import type { Container, Product, Proforma, ProformaStatus } from '../data/types';
 import { BrandLogo, ProductPic, ContainerStatusPill, PackPill, Pill, ProductThumb, ProformaStatusPill, Progress, Ring, Seg, SupplierLogo, Tabs } from '../components/ui';
 import { toast } from '../components/ui-shared';
 import { BookingRequestButton } from '../components/BookingDialog';
 import BookingReview, { LastRejection } from '../components/BookingReview';
 import ProformaVersions, { SignDialog } from '../components/ProformaVersions';
 import ShipmentsPanel from '../components/Shipments';
-import { addDays, dec, eur, eur2, fdate, m3, money, num, weekLabel } from '../lib/format';
+import { addDays, dec, eur2, fdate, m3, money, num, weekLabel } from '../lib/format';
 import { useT, type I18n } from '../i18n/context';
 import type { Key } from '../i18n/dict';
 
@@ -252,107 +254,144 @@ function Metric({ l, v }: { l: string; v: string }) {
   );
 }
 
+type PackFilter = 'all' | 'missing' | 'late' | 'ok';
+/** Couleur d'une carte / ligne produit : pack validé (vert) ou en retard (rouge) */
+const packTone = (p: Product) => (packDone(p) ? 'pk-ok' : packLate(p) ? 'pk-late' : '');
+
 function ProductsTab({ pf, state, mode }: { pf: Proforma; state: State; mode: 'galerie' | 'liste' }) {
   const navigate = useNavigate();
+  const [filter, setFilter] = useState<PackFilter>('all');
+  const cur = pf.currency ?? 'EUR';
+  const all = pf.lines.map((l) => ({ l, p: byId(state.products, l.productId) }));
+  const match = (f: PackFilter, p: Product) => (f === 'all' ? true : f === 'missing' ? !packDone(p) : f === 'late' ? packLate(p) : packDone(p));
+  const rows = all.filter(({ p }) => match(filter, p));
+  const lines = rows.map((r) => r.l);
+  const bar = (
+    <div className="row wrap mb" style={{ gap: 8 }}>
+      <Seg
+        value={filter}
+        onChange={setFilter}
+        options={[
+          { id: 'all', label: `Tous (${all.length})` },
+          { id: 'missing', label: `Pack manquant (${all.filter(({ p }) => match('missing', p)).length})` },
+          { id: 'late', label: `En retard (${all.filter(({ p }) => match('late', p)).length})` },
+          { id: 'ok', label: `Pack OK (${all.filter(({ p }) => match('ok', p)).length})` },
+        ]}
+      />
+    </div>
+  );
+  if (!rows.length)
+    return (
+      <>
+        {bar}
+        <div className="card empty">Aucun produit dans cette sélection.</div>
+      </>
+    );
   if (mode === 'liste')
     return (
-      <div className="card tbl-wrap">
-        <table className="tbl">
-          <thead>
-            <tr>
-              <th>Produit</th>
-              <th>Marque</th>
-              <th className="num">PA</th>
-              <th className="num">PCB</th>
-              <th className="num">Qté</th>
-              <th className="num">CBM/carton</th>
-              <th className="num">CBM total</th>
-              <th className="num">Montant</th>
-              <th>Date max artwork</th>
-              <th>État pack</th>
-            </tr>
-          </thead>
-          <tbody>
-            {pf.lines.map((l) => {
-              const p = byId(state.products, l.productId);
-              return (
-                <tr key={p.id} className="clickable" onClick={() => navigate(`/produits/${p.id}`)}>
-                  <td>
-                    <div className="row">
-                      <ProductThumb product={p} size={40} />
-                      <div>
-                        <span className="ref-tag">{p.ref}</span>
-                        <div className="small">{p.name}</div>
+      <>
+        {bar}
+        <div className="card tbl-wrap">
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th>Produit</th>
+                <th>Marque</th>
+                <th className="num">PA</th>
+                <th className="num">PCB</th>
+                <th className="num">Qté</th>
+                <th className="num">CBM/carton</th>
+                <th className="num">CBM total</th>
+                <th className="num">Montant</th>
+                <th>Date max artwork</th>
+                <th>État pack</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lines.map((l) => {
+                const p = byId(state.products, l.productId);
+                return (
+                  <tr key={p.id} className={`clickable ${packTone(p)}`} onClick={() => navigate(`/produits/${p.id}`)}>
+                    <td>
+                      <div className="row">
+                        <ProductThumb product={p} size={40} />
+                        <div>
+                          <span className="ref-tag">{p.ref}</span>
+                          <div className="small">{p.name}</div>
+                        </div>
                       </div>
-                    </div>
-                  </td>
-                  <td>
-                    <BrandLogo brand={brandOf(state.brands, p.brandId)} size={10} />
-                  </td>
-                  <td className="num">{eur2(l.price)}</td>
-                  <td className="num">{p.pcb}</td>
-                  <td className="num">{num(l.qty)}</td>
-                  <td className="num">{dec(p.cbmCarton, 3)}</td>
-                  <td className="num bold">{dec(lineCbm(p, l.qty), 2)} m³</td>
-                  <td className="num">{eur(l.qty * l.price)}</td>
-                  <td>{fdate(p.pack.artworkDeadline)}</td>
-                  <td>
-                    <PackPill product={p} />
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+                    </td>
+                    <td>
+                      <BrandLogo brand={brandOf(state.brands, p.brandId)} size={10} />
+                    </td>
+                    <td className="num">{money(l.price, cur)}</td>
+                    <td className="num">{p.pcb}</td>
+                    <td className="num">{num(l.qty)}</td>
+                    <td className="num">{dec(p.cbmCarton, 3)}</td>
+                    <td className="num bold">{dec(lineCbm(p, l.qty), 2)} m³</td>
+                    <td className="num">{money(l.qty * l.price, cur)}</td>
+                    <td>{fdate(p.pack.artworkDeadline)}</td>
+                    <td>
+                      <PackPill product={p} />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </>
     );
   return (
-    <div className="gallery">
-      {pf.lines.map((l) => {
-        const p = byId(state.products, l.productId);
-        return (
-          <div key={p.id} className="pcard" onClick={() => navigate(`/produits/${p.id}`)}>
-            <div className="photo" style={{ background: p.tint }}>
-              <ProductPic product={p} />
-            </div>
-            <div className="row">
-              <span className="ref-tag">{p.ref}</span>
-              <span className="small">{p.name}</span>
-            </div>
-            <div className="mini-grid">
-              <div>
-                <div className="l">PA</div>
-                <div className="v">{eur2(l.price)}</div>
+    <>
+      {bar}
+      <div className="gallery">
+        {lines.map((l) => {
+          const p = byId(state.products, l.productId);
+          return (
+            <div key={p.id} className={`pcard ${packTone(p)}`} onClick={() => navigate(`/produits/${p.id}`)}>
+              <div className="photo" style={{ background: p.tint }}>
+                <ProductPic product={p} />
               </div>
-              <div>
-                <div className="l">PCB</div>
-                <div className="v">{p.pcb}</div>
+              <div className="row">
+                <span className="ref-tag">{p.ref}</span>
+                <span className="small">{p.name}</span>
               </div>
-              <div>
-                <div className="l">Qté</div>
-                <div className="v">{num(l.qty)}</div>
+              <div className="mini-grid">
+                <div>
+                  <div className="l">PA</div>
+                  <div className="v">{money(l.price, cur)}</div>
+                </div>
+                <div>
+                  <div className="l">PCB</div>
+                  <div className="v">{p.pcb}</div>
+                </div>
+                <div>
+                  <div className="l">Qté</div>
+                  <div className="v">{num(l.qty)}</div>
+                </div>
+                <div>
+                  <div className="l">CBM/ctn</div>
+                  <div className="v">{dec(p.cbmCarton, 3)}</div>
+                </div>
+                <div>
+                  <div className="l">CBM tot.</div>
+                  <div className="v">{dec(lineCbm(p, l.qty), 2)}</div>
+                </div>
               </div>
-              <div>
-                <div className="l">CBM/ctn</div>
-                <div className="v">{dec(p.cbmCarton, 3)}</div>
+              <div className="small row" style={{ gap: 6 }}>
+                <Calendar size={13} /> Date rendu max artwork : <b>{fdate(p.pack.artworkDeadline)}</b>
               </div>
-              <div>
-                <div className="l">CBM tot.</div>
-                <div className="v">{dec(lineCbm(p, l.qty), 2)}</div>
+              <div className="row">
+                <PackPill product={p} prefix />
+                <div className="grow" />
+                <BrandLogo brand={brandOf(state.brands, p.brandId)} size={10} />
               </div>
             </div>
-            <div className="small row" style={{ gap: 6 }}>
-              <Calendar size={13} /> Date rendu max artwork : <b>{fdate(p.pack.artworkDeadline)}</b>
-            </div>
-            <div className="row">
-              <PackPill product={p} prefix />
-              <div className="grow" />
-              <BrandLogo brand={brandOf(state.brands, p.brandId)} size={10} />
-            </div>
-          </div>
-        );
-      })}
-    </div>
+          );
+        })}
+      </div>
+    </>
   );
 }
 
