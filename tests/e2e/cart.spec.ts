@@ -6,10 +6,13 @@ test('panier : + par carton, validation par fournisseur, le fournisseur reçoit 
   await loginAs(page, 'David');
   await go(page, 'produits');
   await page.getByPlaceholder('Réf., désignation, EAN…').fill('CP-T001');
+  // Un clic sur + = un carton ajouté directement (pièces et volume affichés)
   await page.getByRole('button', { name: 'Ajouter un carton CP-T001' }).click();
-  await expect(toast(page)).toContainText('CP-T001 ajouté au panier (24 pcs)');
+  await expect(page.getByLabel('Cartons au panier CP-T001')).toHaveValue('1');
   await page.getByRole('button', { name: 'Ajouter un carton CP-T001' }).click();
-  await expect(page.getByLabel('Quantité au panier CP-T001')).toHaveValue('48');
+  await expect(page.getByLabel('Cartons au panier CP-T001')).toHaveValue('2');
+  await expect(page.locator('.cart-qty', { has: page.getByLabel('Cartons au panier CP-T001') })).toContainText('48 pcs');
+  await expect(page.locator('.cart-qty', { has: page.getByLabel('Cartons au panier CP-T001') })).toContainText('m³');
   await page.getByPlaceholder('Réf., désignation, EAN…').fill('JO-J205');
   await page.getByRole('button', { name: 'Ajouter un carton JO-J205' }).click();
   // Panier : une section par fournisseur
@@ -17,8 +20,8 @@ test('panier : + par carton, validation par fournisseur, le fournisseur reçoit 
   const dlg = page.getByRole('dialog', { name: 'Panier' });
   await expect(dlg.getByRole('region')).toHaveCount(2);
   const tide = dlg.getByRole('region', { name: /Commande Tide Living/ });
-  await tide.getByLabel('Quantité CP-T001').fill('500');
-  await expect(tide).toContainText('carton entamé');
+  await tide.getByLabel('Cartons CP-T001').fill('21');
+  await expect(tide).toContainText('504');
   await tide.getByRole('button', { name: 'Valider la commande · demander la proforma' }).click();
   await expect(toast(page)).toContainText('Commande PF-2026-0154 passée');
   await expect(dlg.getByRole('region')).toHaveCount(1);
@@ -26,7 +29,7 @@ test('panier : + par carton, validation par fournisseur, le fournisseur reçoit 
     const k = Object.keys(localStorage).find((x) => x.startsWith('jonas-buying-state'))!;
     return JSON.parse(localStorage.getItem(k)!).proformas.find((p: { id: string }) => p.id === 'PF-2026-0154');
   });
-  expect(pf).toMatchObject({ supplierId: 'tide', status: 'a_signer', order: { source: 'panier' }, lines: [{ productId: 'CP-T001', qty: 500 }] });
+  expect(pf).toMatchObject({ supplierId: 'tide', status: 'a_signer', order: { source: 'panier' }, lines: [{ productId: 'CP-T001', qty: 504 }] });
   // Le reste du panier (autre fournisseur) est gardé
   await dlg.getByRole('button', { name: 'Fermer' }).click();
   await expect(page.getByRole('button', { name: 'Panier (1)' })).toBeVisible();

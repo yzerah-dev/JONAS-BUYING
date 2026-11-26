@@ -8,43 +8,40 @@ import { TODAY, addDays, dec, fdate, money, num } from '../lib/format';
 import { ProductThumb } from './ui';
 import { toast } from './ui-shared';
 
-/** − [quantité] + : ajoute au panier par carton (PCB) ; on peut aussi taper la quantité */
+/** − [cartons] + : commande directe en cartons (comme un site marchand), avec les pièces et le volume */
 export function CartQty({ p }: { p: Product }) {
   const { state } = useStore();
   const me = currentUser(state);
   const cart = useCart(me.id);
-  const q = cart[p.id] ?? 0;
-  const step = Math.max(1, p.pcb || 1);
+  const pcb = Math.max(1, p.pcb || 1);
+  const pcs = cart[p.id] ?? 0;
+  const ctn = Math.ceil(pcs / pcb);
+  const setCtn = (n: number) => setCartQty(me.id, p.id, Math.max(0, n) * pcb);
   const stop = (e: React.SyntheticEvent) => e.stopPropagation();
   return (
-    <div className={`cart-qty ${q ? 'on' : ''}`} onClick={stop} onKeyDown={stop}>
-      {q > 0 && (
-        <button type="button" className="cq-btn" aria-label={`Retirer un carton ${p.ref}`} onClick={() => setCartQty(me.id, p.id, q - step)}>
+    <div className={`cart-qty ${ctn ? 'on' : ''}`} onClick={stop} onKeyDown={stop}>
+      <div className="cq-row">
+        <button type="button" className="cq-btn" aria-label={`Retirer un carton ${p.ref}`} disabled={!ctn} onClick={() => setCtn(ctn - 1)}>
           <Minus size={14} />
         </button>
-      )}
-      {q > 0 && (
         <input
           className="cq-input"
           inputMode="numeric"
-          aria-label={`Quantité au panier ${p.ref}`}
-          value={q}
-          onChange={(e) => setCartQty(me.id, p.id, Number(e.target.value.replace(/\D/g, '')) || 0)}
+          aria-label={`Cartons au panier ${p.ref}`}
+          value={ctn || ''}
+          placeholder="0"
+          onChange={(e) => setCtn(Number(e.target.value.replace(/\D/g, '')) || 0)}
         />
+        <button type="button" className="cq-btn plus" aria-label={`Ajouter un carton ${p.ref}`} title={`+ 1 carton (${pcb} pcs)`} onClick={() => setCtn(ctn + 1)}>
+          <Plus size={15} />
+        </button>
+        <span className="cq-unit">ctn</span>
+      </div>
+      {ctn > 0 && (
+        <div className="cq-info">
+          {num(ctn * pcb)} pcs · <b>{dec(ctn * p.cbmCarton, 2)} m³</b>
+        </div>
       )}
-      <button
-        type="button"
-        className="cq-btn plus"
-        aria-label={`Ajouter un carton ${p.ref}`}
-        title={`+ 1 carton (${step} pcs)`}
-        onClick={() => {
-          setCartQty(me.id, p.id, q + step);
-          if (!q) toast(`${p.ref} ajouté au panier (${step} pcs)`);
-        }}
-      >
-        <Plus size={15} />
-        {!q && <span>Commander</span>}
-      </button>
     </div>
   );
 }
@@ -56,10 +53,24 @@ export function CartButton() {
   const cart = useCart(me.id);
   const [open, setOpen] = useState(false);
   const n = Object.keys(cart).length;
+  let ctn = 0;
+  let cbm = 0;
+  for (const [id, pcs] of Object.entries(cart)) {
+    const p = state.products.find((x) => x.id === id);
+    if (!p) continue;
+    const c = Math.ceil(pcs / Math.max(1, p.pcb || 1));
+    ctn += c;
+    cbm += c * p.cbmCarton;
+  }
   return (
     <>
       <button type="button" className={`btn ${n ? 'primary' : ''} cart-btn`} onClick={() => setOpen(true)} aria-label={`Panier (${n})`}>
         <ShoppingCart size={16} /> Panier {n > 0 && <b className="cart-count">{n}</b>}
+        {n > 0 && (
+          <span className="cart-sum">
+            {num(ctn)} ctn · {dec(cbm, 1)} m³
+          </span>
+        )}
       </button>
       {open && <CartDialog onClose={() => setOpen(false)} />}
     </>
@@ -140,8 +151,9 @@ function CartDialog({ onClose }: { onClose: () => void }) {
                   <thead>
                     <tr>
                       <th>Produit</th>
-                      <th className="num">Qté (pcs)</th>
                       <th className="num">Cartons</th>
+                      <th className="num">Pièces</th>
+                      <th className="num">CBM</th>
                       <th className="num">PA</th>
                       <th className="num">Montant</th>
                       <th />
@@ -165,19 +177,16 @@ function CartDialog({ onClose }: { onClose: () => void }) {
                             <input
                               className="input alloc-input"
                               inputMode="numeric"
-                              aria-label={`Quantité ${p.ref}`}
-                              value={qty}
-                              onChange={(e) => setCartQty(me.id, p.id, Number(e.target.value.replace(/\D/g, '')) || 0)}
+                              aria-label={`Cartons ${p.ref}`}
+                              value={Math.ceil(qty / Math.max(1, p.pcb || 1))}
+                              onChange={(e) => setCartQty(me.id, p.id, (Number(e.target.value.replace(/\D/g, '')) || 0) * Math.max(1, p.pcb || 1))}
                             />
                           </td>
                           <td className="num">
-                            {p.pcb ? num(Math.ceil(qty / p.pcb)) : '—'}
-                            {p.pcb > 1 && qty % p.pcb !== 0 && (
-                              <div className="xs" style={{ color: '#b45309' }}>
-                                carton entamé
-                              </div>
-                            )}
+                            {num(qty)}
+                            <div className="xs muted">{p.pcb || 1} pcs/ctn</div>
                           </td>
+                          <td className="num">{dec(Math.ceil(qty / Math.max(1, p.pcb || 1)) * p.cbmCarton, 2)}</td>
                           <td className="num">{money(pa.price, pa.currency)}</td>
                           <td className="num">{money(qty * pa.price, pa.currency)}</td>
                           <td>

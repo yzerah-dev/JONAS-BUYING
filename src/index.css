@@ -2060,3 +2060,10 @@ select.pi-input { cursor: pointer; }
 .cart-count { background: #fff; color: var(--green-dark); border-radius: 999px; padding: 0 7px; margin-left: 2px; }
 .cart-sup .tbl td { vertical-align: middle; }
 .cart-sup { grid-column: 1 / -1; }
+.cart-qty { flex-direction: column; align-items: stretch; gap: 3px; }
+.cq-row { display: flex; align-items: center; gap: 4px; justify-content: flex-end; }
+.cq-btn:disabled { opacity: 0.4; cursor: default; }
+.cq-input { width: 56px; }
+.cq-unit { font-size: 11px; color: var(--muted); font-weight: 700; }
+.cq-info { text-align: right; font-size: 11.5px; color: var(--green-dark); }
+.cart-sum { font-size: 11.5px; opacity: 0.9; margin-left: 4px; }
