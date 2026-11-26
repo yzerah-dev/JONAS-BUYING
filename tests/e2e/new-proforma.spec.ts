@@ -116,7 +116,7 @@ test('produit créé par une proforma : pack « À faire », puis « En cours »
     });
   const p = await created();
   expect(p.pack.validations.direction.state).toBe('todo');
-  await expect(page.locator('main')).toContainText('État pack : À faire');
+  await expect(page.locator('main')).toContainText('Pack à faire');
   // Le designer du produit appuie sur « Je commence maintenant »
   await page.evaluate((id) => {
     const k = Object.keys(localStorage).find((x) => x.startsWith('jonas-buying-state'))!;
@@ -125,7 +125,7 @@ test('produit créé par une proforma : pack « À faire », puis « En cours »
     localStorage.setItem(k, JSON.stringify(st));
   }, p.id);
   await page.reload();
-  await expect(page.locator('main')).toContainText('État pack : En cours');
+  await expect(page.locator('main')).toContainText('Pack en cours');
 });
 
 test('proforma signée par JONAS : les die cuts manquants passent en « Die cuts demandés » chez le fournisseur', async ({ page }) => {

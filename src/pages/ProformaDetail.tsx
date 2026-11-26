@@ -37,6 +37,7 @@ import {
   maxAllocQty,
   packDone,
   packLate,
+  packState,
   hasDeposit,
   balanceDaysOf,
   realDeparture,
@@ -389,43 +390,42 @@ function ProductsTab({ pf, state, mode }: { pf: Proforma; state: State; mode: 'g
         {lines.map((l) => {
           const p = byId(state.products, l.productId);
           return (
-            <div key={p.id} className={`pcard ${packTone(p)}`} onClick={() => navigate(`/produits/${p.id}`)}>
+            <div key={p.id} className={`pcard pfp-card ${packTone(p)}`} onClick={() => navigate(`/produits/${p.id}`)}>
               <div className="photo" style={{ background: p.tint }}>
                 <ProductPic product={p} />
               </div>
-              <div className="row">
+              <div>
                 <span className="ref-tag">{p.ref}</span>
-                <span className="small">{p.name}</span>
+                <div className="pfp-name">{p.name}</div>
               </div>
-              <div className="mini-grid">
+              <div className="pfp-figs">
                 <div>
-                  <div className="l">PA</div>
-                  <div className="v">{money(l.price, cur)}</div>
+                  <b>{num(l.qty)}</b>
+                  <small>pcs</small>
                 </div>
                 <div>
-                  <div className="l">PCB</div>
-                  <div className="v">{p.pcb}</div>
+                  <b>{dec(lineCbm(p, l.qty), 1)}</b>
+                  <small>m³</small>
                 </div>
                 <div>
-                  <div className="l">Qté</div>
-                  <div className="v">{num(l.qty)}</div>
-                </div>
-                <div>
-                  <div className="l">CBM/ctn</div>
-                  <div className="v">{dec(p.cbmCarton, 3)}</div>
-                </div>
-                <div>
-                  <div className="l">CBM tot.</div>
-                  <div className="v">{dec(lineCbm(p, l.qty), 2)}</div>
+                  <b title={money(l.price, cur)}>
+                    {new Intl.NumberFormat('fr-FR', {
+                      style: 'currency',
+                      currency: cur,
+                      currencyDisplay: cur === 'EUR' ? 'symbol' : 'code',
+                      maximumFractionDigits: 2,
+                      minimumFractionDigits: 2,
+                    }).format(l.price)}
+                  </b>
+                  <small>PA</small>
                 </div>
               </div>
-              <div className="small row" style={{ gap: 6 }}>
-                <Calendar size={13} /> Date rendu max artwork : <b>{fdate(p.pack.artworkDeadline)}</b>
-              </div>
-              <div className="row">
-                <PackPill product={p} prefix />
-                <div className="grow" />
-                <BrandLogo brand={brandOf(state.brands, p.brandId)} size={10} />
+              <div className={`pfp-pack ${packDone(p) ? 'ok' : packLate(p) ? 'late' : 'todo'}`}>
+                {packDone(p)
+                  ? 'Pack OK'
+                  : packLate(p)
+                    ? `Pack en retard · ${fdate(p.pack.artworkDeadline)}`
+                    : `Pack ${packState(p) === 'en_cours' ? 'en cours' : 'à faire'} · avant le ${fdate(p.pack.artworkDeadline)}`}
               </div>
             </div>
           );
