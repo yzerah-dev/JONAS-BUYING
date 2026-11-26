@@ -88,3 +88,42 @@ test.describe('Nouvelle proforma', () => {
     await expect(toast(page)).toContainText('Proforma v1 déposée');
   });
 });
+
+test('produit créé par une proforma : pack « À faire », puis « En cours » quand le designer commence', async ({ page }) => {
+  await resetApp(page);
+  await loginAs(page, 'David');
+  await go(page, 'proformas');
+  await page.getByRole('button', { name: 'Nouvelle commande' }).click();
+  const dlg = page.getByRole('dialog');
+  await page.locator('#np-sup').fill('tide');
+  await page.getByRole('option', { name: /Xiamen Tide Living/ }).click();
+  await page.locator('#np-title').fill('Tasses');
+  await page.locator('#ln-prod-0').click();
+  await page.getByRole('option', { name: /Nouveau produit/ }).click();
+  await dlg.getByLabel('Désignation 1').fill('Mug léopard 350 ml');
+  await dlg.getByLabel('Pcs/carton 1').fill('24');
+  await dlg.getByLabel('m³/carton 1').fill('0.03');
+  await dlg.getByLabel('Quantité 1').fill('7200');
+  await dlg.getByLabel('Prix unitaire 1').fill('0.5');
+  await dlg.getByRole('button', { name: 'Passer la commande' }).click();
+  await expect(page).toHaveURL(/proformas\/PF-2026-0154$/);
+  const created = () =>
+    page.evaluate(() => {
+      const k = Object.keys(localStorage).find((x) => x.startsWith('jonas-buying-state'))!;
+      const st = JSON.parse(localStorage.getItem(k)!);
+      const id = st.proformas.find((p: { id: string }) => p.id === 'PF-2026-0154').lines[0].productId;
+      return st.products.find((p: { id: string }) => p.id === id);
+    });
+  const p = await created();
+  expect(p.pack.validations.direction.state).toBe('todo');
+  await expect(page.locator('main')).toContainText('État pack : À faire');
+  // Le designer du produit appuie sur « Je commence maintenant »
+  await page.evaluate((id) => {
+    const k = Object.keys(localStorage).find((x) => x.startsWith('jonas-buying-state'))!;
+    const st = JSON.parse(localStorage.getItem(k)!);
+    st.products.find((x: { id: string }) => x.id === id).pack.startedAt = '2026-11-26T10:00';
+    localStorage.setItem(k, JSON.stringify(st));
+  }, p.id);
+  await page.reload();
+  await expect(page.locator('main')).toContainText('État pack : En cours');
+});

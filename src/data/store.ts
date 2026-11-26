@@ -688,7 +688,8 @@ function materializeLines(s: State, supplierId: string, lines: ImportLine[], etd
         type: 'À définir',
         designer: most('pack', mine[0]?.pack ?? ({ designer: 'ABIR' } as Product['pack'])).designer,
         artworkDeadline: deadline,
-        validations: { direction: { state: 'pending' }, moinard: { state: 'todo' }, fournisseur: { state: 'todo' } },
+        // Rien à valider tant que le designer n'a pas déposé de pack : « À faire »
+        validations: { direction: { state: 'todo' }, moinard: { state: 'todo' }, fournisseur: { state: 'todo' } },
         dieCut: 'none',
         artworkVersions: 0,
         sentToSupplier: false,
@@ -2140,8 +2141,9 @@ export function newSupplierId(s: State, name: string) {
 export function packState(p: Product): PackState {
   const done = VALIDATION_STEPS.filter((s) => p.pack.validations[s].state === 'done').length;
   if (done === VALIDATION_STEPS.length) return 'ok';
-  if (done === 0 && p.pack.artworkVersions <= 1 && p.pack.validations.direction.state === 'todo') return 'a_faire';
-  return done > 0 || p.pack.validations.direction.state === 'pending' ? 'en_cours' : 'a_faire';
+  // « En cours » seulement quand le designer a commencé (bouton Commencer) ou déposé un pack
+  const started = !!p.pack.startedAt || p.pack.artworkVersions > 0 || (p.pack.files ?? []).some((f) => f.kind === 'pack' || f.kind === 'crea');
+  return done > 0 || started ? 'en_cours' : 'a_faire';
 }
 export function packDone(p: Product) {
   return packState(p) === 'ok';
