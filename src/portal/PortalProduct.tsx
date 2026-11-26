@@ -7,6 +7,7 @@ import ProductPhotoEdit from '../components/ProductPhotoEdit';
 import ProductGallery from '../components/ProductGallery';
 import PhotoImport from '../components/PhotoImport';
 import { money } from '../lib/format';
+import { productSize } from '../lib/productSize';
 import { useT } from '../i18n';
 import { awaitsSupplier, usePortal } from './usePortal';
 import SupplierPackRounds from './SupplierPackRounds';
@@ -106,6 +107,11 @@ export function PortalProducts() {
                     {t('pp.yourRef')} {p.supplierRef}
                   </div>
                 )}
+                {productSize(p) && (
+                  <div className="xs">
+                    {t('pp.size')} : <b>{productSize(p)!.text}</b>
+                  </div>
+                )}
               </div>
               <div className="mini-grid">
                 <div>
@@ -135,6 +141,7 @@ export function PortalProducts() {
                 <th>{t('col.visual')}</th>
                 <th>{t('col.ref')}</th>
                 <th>{t('col.designation')}</th>
+                <th>{t('pp.size')}</th>
                 <th>{t('col.brand')}</th>
                 <th className="num">{t('col.pa')}</th>
                 <th className="num">{t('col.pcb')}</th>
@@ -175,6 +182,12 @@ export function PortalProducts() {
                         <Pill color="violet">{t('pp.inDev')}</Pill>
                       </div>
                     )}
+                  </td>
+                  <td className="small pp-size">
+                    {(() => {
+                      const z = productSize(p);
+                      return z ? <span title={z.fromSupplier ? t('pp.sizeFromSupplier') : undefined}>{z.text}</span> : <span className="muted">—</span>;
+                    })()}
                   </td>
                   <td>
                     <BrandLogo brand={brandOf(state.brands, p.brandId)} size={9} />
@@ -222,7 +235,7 @@ export function PortalProductDetail() {
     [t('pp.cbm'), fmt.dec(p.cbmCarton, 3)],
     [t('pp.weight'), p.weight ? `${fmt.dec(p.weight, 2)} kg` : '—'],
     [t('pp.material'), td(p.material)],
-    ...(p.sizes ? ([[t('pp.sizes'), p.sizes]] as [string, React.ReactNode][]) : []),
+    ...(productSize(p) ? ([[t('pp.size'), productSize(p)!.text]] as [string, React.ReactNode][]) : []),
   ];
   return (
     <>

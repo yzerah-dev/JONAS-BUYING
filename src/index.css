@@ -2007,3 +2007,6 @@ select.pi-input { cursor: pointer; }
 .bk-dialog > .rc-head { position: sticky; top: 0; z-index: 3; background: var(--card, #fff); }
 .bk-dialog > .rc-foot { position: sticky; bottom: 0; z-index: 3; background: var(--card, #fff); box-shadow: 0 -6px 12px -8px rgba(10, 20, 16, 0.18); }
 .alloc-input { width: 84px; text-align: right; padding: 4px 8px; height: 30px; margin-left: auto; display: block; }
+.pp-size { white-space: nowrap; }
+.pf-lines-gallery .pcard { color: inherit; text-decoration: none; }
+.pf-lines-gallery .mini-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; row-gap: 8px; }

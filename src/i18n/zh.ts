@@ -668,6 +668,8 @@ export const zh: Record<Key, string> = {
   'ex.jonasCodesLater': 'JONAS 货号和条码：JONAS 签署时分配',
   'pp.view.list': '列表',
   'pp.view.gallery': '图库',
+  'pp.size': '尺寸',
+  'pp.sizeFromSupplier': '取自供应商描述',
 };
 
 /** Valeurs issues des données (français) traduites en chinois */

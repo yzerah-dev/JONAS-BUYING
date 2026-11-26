@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, Boxes, Calendar, Check, Container as Ctn, Download, Euro, FileText, Package, Pencil, Scissors, Send, Ship, Truck, Upload } from 'lucide-react';
+import { AlertTriangle, Boxes, Calendar, Check, Container as Ctn, Download, Euro, FileText, LayoutGrid, List, Package, Pencil, Scissors, Send, Ship, Truck, Upload } from 'lucide-react';
 import {
   allocatedQty,
   byId,
@@ -33,6 +33,7 @@ import { LogisticsTab } from '../pages/ProformaDetail';
 import { TODAY } from '../lib/format';
 import { useT } from '../i18n';
 import { usePortal } from './usePortal';
+import { productSize } from '../lib/productSize';
 import { ContainerDocLink, ContainerDocUpload } from '../components/ContainerDoc';
 import { proformaDocPdf } from '../lib/proformaPdf';
 import { saveBlob } from '../lib/files';
@@ -147,6 +148,21 @@ export function PortalProformas() {
   const openId = params.get('pf');
   const { t: tr, fmt } = useT();
   const { dec, fdate, fshort, num, weekLabel } = fmt;
+  const [view, setView] = useState<'liste' | 'galerie'>(() => {
+    try {
+      return localStorage.getItem('jonas-portal-lines-view') === 'galerie' ? 'galerie' : 'liste';
+    } catch {
+      return 'liste';
+    }
+  });
+  const pickView = (v: 'liste' | 'galerie') => {
+    setView(v);
+    try {
+      localStorage.setItem('jonas-portal-lines-view', v);
+    } catch {
+      /* préférence non mémorisée */
+    }
+  };
   return (
     <>
       <div className="page-head">
@@ -210,49 +226,118 @@ export function PortalProformas() {
                   <div className="mb">
                     <ShipmentsPanel pf={pf} />
                   </div>
-                  <div className="tbl-wrap">
-                    <table className="tbl">
-                      <thead>
-                        <tr>
-                          <th>{tr('col.product')}</th>
-                          <th className="num">{tr('col.price')}</th>
-                          <th className="num">{tr('col.qty')}</th>
-                          <th className="num">{tr('col.cbm')}</th>
-                          <th className="num">{tr('col.amount')}</th>
-                          <th className="num">{tr('col.loaded')}</th>
-                          <th>{tr('col.artworkDeadline')}</th>
-                          <th>{tr('col.packState')}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {pf.lines.map((l) => {
-                          const p = byId(state.products, l.productId);
-                          return (
-                            <tr key={p.id}>
-                              <td>
-                                <div className="row">
-                                  <ProductThumb product={p} size={34} />
-                                  <div>
-                                    <span className="ref-tag">{p.ref}</span>
-                                    <div className="small">{p.name}</div>
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="num">{money(l.price, t.currency)}</td>
-                              <td className="num">{num(l.qty)}</td>
-                              <td className="num">{dec(lineCbm(p, l.qty), 2)}</td>
-                              <td className="num">{money(l.qty * l.price, t.currency)}</td>
-                              <td className="num">{num(allocatedQty(state, pf.id, p.id))}</td>
-                              <td>{fdate(p.pack.artworkDeadline)}</td>
-                              <td>
-                                <PackPill product={p} />
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                  <div className="row mb">
+                    <div className="grow" />
+                    <Seg
+                      value={view}
+                      onChange={pickView}
+                      options={[
+                        { id: 'liste', label: tr('pp.view.list'), icon: <List size={15} /> },
+                        { id: 'galerie', label: tr('pp.view.gallery'), icon: <LayoutGrid size={15} /> },
+                      ]}
+                    />
                   </div>
+                  {view === 'galerie' ? (
+                    <div className="gallery pp-gallery pf-lines-gallery">
+                      {pf.lines.map((l) => {
+                        const p = byId(state.products, l.productId);
+                        const size = productSize(p);
+                        return (
+                          <Link key={p.id} to={`/portail/produits/${p.id}`} className="pcard" aria-label={`${p.ref} · ${p.name}`}>
+                            <div className="photo" style={{ background: p.tint }}>
+                              <ProductPic product={p} />
+                            </div>
+                            <div className="row">
+                              <span className="ref-tag">{p.ref}</span>
+                              <div className="grow" />
+                              <PackPill product={p} />
+                            </div>
+                            <div className="small pcard-name">{p.name}</div>
+                            {size && (
+                              <div className="xs">
+                                {tr('pp.size')} : <b>{size.text}</b>
+                              </div>
+                            )}
+                            <div className="mini-grid">
+                              <div>
+                                <div className="l">{tr('col.price')}</div>
+                                <div className="v">{money(l.price, t.currency)}</div>
+                              </div>
+                              <div>
+                                <div className="l">{tr('col.qty')}</div>
+                                <div className="v">{num(l.qty)}</div>
+                              </div>
+                              <div>
+                                <div className="l">{tr('col.cbm')}</div>
+                                <div className="v">{dec(lineCbm(p, l.qty), 2)}</div>
+                              </div>
+                              <div>
+                                <div className="l">{tr('col.amount')}</div>
+                                <div className="v">{money(l.qty * l.price, t.currency)}</div>
+                              </div>
+                              <div>
+                                <div className="l">{tr('col.loaded')}</div>
+                                <div className="v">{num(allocatedQty(state, pf.id, p.id))}</div>
+                              </div>
+                              <div>
+                                <div className="l">{tr('col.artworkDeadline')}</div>
+                                <div className="v">{fshort(p.pack.artworkDeadline)}</div>
+                              </div>
+                            </div>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="tbl-wrap">
+                      <table className="tbl">
+                        <thead>
+                          <tr>
+                            <th>{tr('col.product')}</th>
+                            <th className="num">{tr('col.price')}</th>
+                            <th className="num">{tr('col.qty')}</th>
+                            <th className="num">{tr('col.cbm')}</th>
+                            <th className="num">{tr('col.amount')}</th>
+                            <th className="num">{tr('col.loaded')}</th>
+                            <th>{tr('col.artworkDeadline')}</th>
+                            <th>{tr('col.packState')}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {pf.lines.map((l) => {
+                            const p = byId(state.products, l.productId);
+                            return (
+                              <tr key={p.id}>
+                                <td>
+                                  <div className="row">
+                                    <ProductThumb product={p} size={34} />
+                                    <div>
+                                      <span className="ref-tag">{p.ref}</span>
+                                      <div className="small">{p.name}</div>
+                                      {productSize(p) && (
+                                        <div className="xs muted">
+                                          {tr('pp.size')} : {productSize(p)!.text}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="num">{money(l.price, t.currency)}</td>
+                                <td className="num">{num(l.qty)}</td>
+                                <td className="num">{dec(lineCbm(p, l.qty), 2)}</td>
+                                <td className="num">{money(l.qty * l.price, t.currency)}</td>
+                                <td className="num">{num(allocatedQty(state, pf.id, p.id))}</td>
+                                <td>{fdate(p.pack.artworkDeadline)}</td>
+                                <td>
+                                  <PackPill product={p} />
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                   <div className="row wrap mt">
                     {pf.documents.map((d) => (
                       <button

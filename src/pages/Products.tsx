@@ -1,3 +1,4 @@
+import { productSize } from '../lib/productSize';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LayoutGrid, List, Search } from 'lucide-react';
@@ -30,9 +31,7 @@ export default function Products() {
       .filter(({ p }) => f.collection === 'all' || p.collection === f.collection)
       .filter(({ p }) => matchTrack(p, f.pack as TrackFilter))
       .filter(({ p }) => f.dev === 'all' || (f.dev === 'dev' ? p.developed : !p.developed))
-      .filter(({ qty }) =>
-        f.flow === 'all' ? true : f.flow === 'commande' ? qty.open - qty.inTransit > 0 : f.flow === 'transit' ? qty.inTransit > 0 : qty.stock > 0,
-      )
+      .filter(({ qty }) => (f.flow === 'all' ? true : f.flow === 'commande' ? qty.open - qty.inTransit > 0 : f.flow === 'transit' ? qty.inTransit > 0 : qty.stock > 0))
       .sort((a, b) =>
         sortBy === 'pack'
           ? TRACK_ORDER[packTrack(a.p).status] - TRACK_ORDER[packTrack(b.p).status] || Number(packTrack(b.p).dieCutMissing) - Number(packTrack(a.p).dieCutMissing) || a.p.ref.localeCompare(b.p.ref)
@@ -139,7 +138,9 @@ export default function Products() {
               <div className="mini-grid">
                 <div>
                   <div className="l">PA</div>
-                  <div className="v"><PA product={p} /></div>
+                  <div className="v">
+                    <PA product={p} />
+                  </div>
                 </div>
                 <div>
                   <div className="l">PCB</div>
@@ -173,6 +174,7 @@ export default function Products() {
             <thead>
               <tr>
                 <th>Produit</th>
+                <th>Taille</th>
                 <th>Marque</th>
                 <th>Fournisseur</th>
                 <th className="num">PA</th>
@@ -196,11 +198,16 @@ export default function Products() {
                       </div>
                     </div>
                   </td>
+                  <td className="small pp-size" title={productSize(p)?.fromSupplier ? 'Lue dans le texte du fournisseur' : undefined}>
+                    {productSize(p)?.text ?? <span className="muted">—</span>}
+                  </td>
                   <td>
                     <BrandLogo brand={brandOf(state.brands, p.brandId)} size={10} />
                   </td>
                   <td>{byId(state.suppliers, p.supplierId).shortName}</td>
-                  <td className="num"><PA product={p} /></td>
+                  <td className="num">
+                    <PA product={p} />
+                  </td>
                   <td className="num">{p.pcb}</td>
                   <td>
                     <PackTrackDots p={p} />

@@ -110,3 +110,37 @@ test('conteneur créé par un fournisseur : numéro à son nom (jamais celui d�
   expect(ids.filter((id) => /^PLAN-[A-Z]+-\d{3}$/.test(id))).toHaveLength(1);
   expect(new Set(ids).size).toBe(ids.length);
 });
+
+test('Mes produits en liste : colonne Taille (fiche, sinon « SIZE » du texte fournisseur)', async ({ page }) => {
+  await resetApp(page);
+  await page.evaluate(() => {
+    const k = Object.keys(localStorage).find((x) => x.startsWith('jonas-buying-state'))!;
+    const st = JSON.parse(localStorage.getItem(k)!);
+    const p = st.products.find((x: { id: string }) => x.id === 'ORA-N452');
+    p.sizes = undefined;
+    p.description = { en: 'lunch box 3 design assortment MATERIAL :PP -SIZE :18*14*8cm' };
+    localStorage.setItem(k, JSON.stringify(st));
+  });
+  await page.reload();
+  await loginAs(page, 'Mr. Chen');
+  await go(page, 'portail/produits');
+  await page.getByRole('button', { name: 'Liste' }).click();
+  await expect(page.locator('main thead')).toContainText('Taille');
+  await page.getByLabel('Rechercher : réf., EAN, nom…').fill('ORA-N452');
+  await expect(page.locator('main tbody tr').first().locator('.pp-size')).toHaveText('18 × 14 × 8 cm');
+});
+
+test('Mes proformas : lignes en liste ou en galerie (choix mémorisé)', async ({ page }) => {
+  await resetApp(page);
+  await loginAs(page, 'Mr. Chen');
+  await go(page, 'portail/proformas?pf=PF-2026-0141');
+  await expect(page.locator('main table').first()).toBeVisible();
+  await page.getByRole('button', { name: 'Galerie' }).click();
+  const cards = page.locator('.pf-lines-gallery .pcard');
+  await expect(cards.first()).toBeVisible();
+  await expect(cards.first()).toContainText('Chargé');
+  await go(page, 'portail/proformas?pf=PF-2026-0141');
+  await expect(page.locator('.pf-lines-gallery')).toBeVisible();
+  await cards.first().click();
+  await expect(page).toHaveURL(/portail\/produits\//);
+});

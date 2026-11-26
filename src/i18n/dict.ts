@@ -701,6 +701,8 @@ export const fr = {
   'ex.jonasCodesLater': 'Réf. et EAN JONAS : attribués par JONAS à la signature',
   'pp.view.list': 'Liste',
   'pp.view.gallery': 'Galerie',
+  'pp.size': 'Taille',
+  'pp.sizeFromSupplier': 'Lue dans le texte du fournisseur',
 };
 
 export type Key = keyof typeof fr;
@@ -1383,6 +1385,8 @@ export const en: Record<Key, string> = {
   'ex.jonasCodesLater': 'JONAS ref. and EAN: assigned by JONAS when signing',
   'pp.view.list': 'List',
   'pp.view.gallery': 'Gallery',
+  'pp.size': 'Size',
+  'pp.sizeFromSupplier': 'Read from the supplier text',
 };
 
 /**
