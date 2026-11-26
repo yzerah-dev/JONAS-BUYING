@@ -109,15 +109,7 @@ export interface PackFile {
   uploadedBy: string;
 }
 
-export const DEV_STAGES = [
-  'Brief & idée',
-  'Design & concept',
-  'Échantillon',
-  'Validation',
-  'Prix & sourcing',
-  'Lancement',
-  'Production',
-] as const;
+export const DEV_STAGES = ['Brief & idée', 'Design & concept', 'Échantillon', 'Validation', 'Prix & sourcing', 'Lancement', 'Production'] as const;
 
 /** Modification d'une fiche produit (formulaire de la fiche ou import Excel) : seuls les champs présents changent */
 export interface ProductPatch {
@@ -247,6 +239,8 @@ export interface Proforma {
   /** Demande d'expédition partielle, à accepter par l'autre partie (fournisseur ou JONAS) */
   splitRequest?: SplitRequest;
   history: HistoryEntry[];
+  /** Proforma annulée : gardée (onglet « Annulées »), sortie de toutes les listes, rétablissable */
+  cancelled?: { at: string; by: string; reason: string };
   /** Demande de booking envoyée au fournisseur, et sa réponse (plan + dates réelles) */
   booking?: BookingRequest;
 }

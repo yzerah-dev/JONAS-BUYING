@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { CancelledProforma, ProformaCancelButtons } from '../components/ProformaCancel';
 import {
   ArrowLeft,
   Boxes,
@@ -63,7 +64,9 @@ export default function ProformaDetail() {
   const pf = state.proformas.find((p) => p.id === id);
   const [tab, setTab] = useState<Tab>('produits');
   const [mode, setMode] = useState<'galerie' | 'liste'>('galerie');
-  if (!pf) return <div className="card empty">Proforma introuvable.</div>;
+  const cancelled = state.archived?.find((p) => p.id === id);
+  if (!pf && cancelled) return <CancelledProforma pf={cancelled} />;
+  if (!pf) return <div className="card empty">Proforma introuvable (supprimée ?).</div>;
   const sup = byId(state.suppliers, pf.supplierId);
   const t = proformaTotals(state, pf);
   const showMoney = auth.can('finance.view');
@@ -87,6 +90,7 @@ export default function ProformaDetail() {
         <BookingRequestButton pf={pf} />
         {pf.booking && <BookingState pf={pf} />}
         <SignButton pf={pf} />
+        <ProformaCancelButtons pf={pf} />
       </div>
 
       <div className="row wrap gap-lg" style={{ alignItems: 'stretch' }}>
@@ -107,7 +111,11 @@ export default function ProformaDetail() {
             </span>
           </div>
           {sup.contact.wechat && (
-            <span title={`WeChat : ${sup.contact.wechat}`} className="kpi-icon" style={{ background: '#2dc100', color: '#fff', width: 36, height: 36, borderRadius: 10, display: 'grid', placeItems: 'center' }}>
+            <span
+              title={`WeChat : ${sup.contact.wechat}`}
+              className="kpi-icon"
+              style={{ background: '#2dc100', color: '#fff', width: 36, height: 36, borderRadius: 10, display: 'grid', placeItems: 'center' }}
+            >
               <MessageCircle size={20} />
             </span>
           )}
@@ -360,7 +368,12 @@ function DetailsTab({ pf, state }: { pf: Proforma; state: State }) {
         </dl>
         <div className="mt">
           <div className="muted small mb">Changer le statut</div>
-          <select className="input" disabled={!auth.can('proforma.edit')} value={pf.status} onChange={(e) => dispatch({ type: 'setProformaStatus', id: pf.id, status: e.target.value as ProformaStatus })}>
+          <select
+            className="input"
+            disabled={!auth.can('proforma.edit')}
+            value={pf.status}
+            onChange={(e) => dispatch({ type: 'setProformaStatus', id: pf.id, status: e.target.value as ProformaStatus })}
+          >
             <option value="a_signer">À signer</option>
             <option value="en_dev">En dev</option>
             <option value="en_production">En production</option>
@@ -370,40 +383,42 @@ function DetailsTab({ pf, state }: { pf: Proforma; state: State }) {
           </select>
         </div>
       </div>
-      {auth.can('finance.view') && <div className="card pad">
-        <div className="card-title">Finance</div>
-        <dl className="kv">
-          <dt>Montant total</dt>
-          <dd>
-            {eur2(t.amount)}
-            {t.currency !== 'EUR' && (
-              <div className="small violet-t">
-                {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: t.currency }).format(t.amountCur)} · 1 {t.currency} = {state.settings.fx[t.currency]} €
-              </div>
+      {auth.can('finance.view') && (
+        <div className="card pad">
+          <div className="card-title">Finance</div>
+          <dl className="kv">
+            <dt>Montant total</dt>
+            <dd>
+              {eur2(t.amount)}
+              {t.currency !== 'EUR' && (
+                <div className="small violet-t">
+                  {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: t.currency }).format(t.amountCur)} · 1 {t.currency} = {state.settings.fx[t.currency]} €
+                </div>
+              )}
+            </dd>
+            <dt>Acompte ({pf.depositPct} %)</dt>
+            <dd>
+              {eur2(t.deposit)} {pf.depositPaid ? <Pill color="green">Payé</Pill> : <Pill color="red">À faire</Pill>}
+            </dd>
+            <dt>Solde</dt>
+            <dd>
+              {eur2(t.balance)} {pf.balancePaid ? <Pill color="green">Payé</Pill> : <Pill color="orange">Échéance {fdate(pf.balanceDue)}</Pill>}
+            </dd>
+          </dl>
+          <div className="row mt">
+            {!pf.depositPaid && auth.can('finance.pay') && (
+              <button className="btn primary" onClick={() => dispatch({ type: 'payDeposit', id: pf.id })}>
+                <Check size={16} /> Marquer l’acompte payé
+              </button>
             )}
-          </dd>
-          <dt>Acompte ({pf.depositPct} %)</dt>
-          <dd>
-            {eur2(t.deposit)} {pf.depositPaid ? <Pill color="green">Payé</Pill> : <Pill color="red">À faire</Pill>}
-          </dd>
-          <dt>Solde</dt>
-          <dd>
-            {eur2(t.balance)} {pf.balancePaid ? <Pill color="green">Payé</Pill> : <Pill color="orange">Échéance {fdate(pf.balanceDue)}</Pill>}
-          </dd>
-        </dl>
-        <div className="row mt">
-          {!pf.depositPaid && auth.can('finance.pay') && (
-            <button className="btn primary" onClick={() => dispatch({ type: 'payDeposit', id: pf.id })}>
-              <Check size={16} /> Marquer l’acompte payé
-            </button>
-          )}
-          {pf.depositPaid && !pf.balancePaid && auth.can('finance.pay') && (
-            <button className="btn primary" onClick={() => dispatch({ type: 'payBalance', id: pf.id })}>
-              <Check size={16} /> Marquer le solde payé
-            </button>
-          )}
+            {pf.depositPaid && !pf.balancePaid && auth.can('finance.pay') && (
+              <button className="btn primary" onClick={() => dispatch({ type: 'payBalance', id: pf.id })}>
+                <Check size={16} /> Marquer le solde payé
+              </button>
+            )}
+          </div>
         </div>
-      </div>}
+      )}
     </div>
   );
 }
@@ -436,19 +451,19 @@ function SignButton({ pf }: { pf: Proforma }) {
 function DocumentsTab({ pf }: { pf: Proforma }) {
   return (
     <>
-    <ProformaVersions pf={pf} />
-    <div className="card pad mt">
-      {pf.documents.map((d) => (
-        <div key={d} className="alert-line">
-          <FileText size={16} className="green" />
-          <span className="bold">{d}</span>
-          <span className="grow" />
-          <button className="btn sm" onClick={() => toast(`Téléchargement de ${d} (démo)`)}>
-            <Download size={13} /> Télécharger
-          </button>
-        </div>
-      ))}
-    </div>
+      <ProformaVersions pf={pf} />
+      <div className="card pad mt">
+        {pf.documents.map((d) => (
+          <div key={d} className="alert-line">
+            <FileText size={16} className="green" />
+            <span className="bold">{d}</span>
+            <span className="grow" />
+            <button className="btn sm" onClick={() => toast(`Téléchargement de ${d} (démo)`)}>
+              <Download size={13} /> Télécharger
+            </button>
+          </div>
+        ))}
+      </div>
     </>
   );
 }
@@ -483,10 +498,7 @@ export function LogisticsTab({ pf, portal }: { pf: Proforma; portal?: boolean })
 
   // Conteneurs du fournisseur encore modifiables, ou liés à cette proforma
   const containers = useMemo(
-    () =>
-      state.containers.filter(
-        (c) => c.allocations.some((a) => a.proformaId === pf.id) || (c.supplierId === pf.supplierId && ['a_booker', 'booking_demande'].includes(c.status)),
-      ),
+    () => state.containers.filter((c) => c.allocations.some((a) => a.proformaId === pf.id) || (c.supplierId === pf.supplierId && ['a_booker', 'booking_demande'].includes(c.status))),
     [state.containers, pf],
   );
   const sel = containers.find((c) => c.id === selected) ?? containers[0];
@@ -603,9 +615,7 @@ export function LogisticsTab({ pf, portal }: { pf: Proforma; portal?: boolean })
               </tbody>
             </table>
           </div>
-          <div className="xs muted mt">
-            {t('log.help')}
-          </div>
+          <div className="xs muted mt">{t('log.help')}</div>
         </div>
 
         <div className="card pad">
@@ -666,27 +676,23 @@ export function LogisticsTab({ pf, portal }: { pf: Proforma; portal?: boolean })
                 </div>
               );
             })}
-            {auth.allowed({ type: 'createContainer', supplierId: pf.supplierId, etd: pf.etd, eta: pf.eta }) && <div
-              className="ccard center"
-              style={{ justifyContent: 'center', alignItems: 'center', borderStyle: 'dashed', minHeight: 150 }}
-              onClick={() => {
-                dispatch({ type: 'createContainer', supplierId: pf.supplierId, etd: pf.etd, eta: pf.eta });
-                toast(t('log.toast.created'));
-              }}
-            >
-              <Plus className="green" />
-              <span className="bold small">{t('log.newContainer')}</span>
-            </div>}
+            {auth.allowed({ type: 'createContainer', supplierId: pf.supplierId, etd: pf.etd, eta: pf.eta }) && (
+              <div
+                className="ccard center"
+                style={{ justifyContent: 'center', alignItems: 'center', borderStyle: 'dashed', minHeight: 150 }}
+                onClick={() => {
+                  dispatch({ type: 'createContainer', supplierId: pf.supplierId, etd: pf.etd, eta: pf.eta });
+                  toast(t('log.toast.created'));
+                }}
+              >
+                <Plus className="green" />
+                <span className="bold small">{t('log.newContainer')}</span>
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="card pad">
-          {sel ? (
-            <ContainerPanel c={sel} index={containers.indexOf(sel) + 1} portal={portal} />
-          ) : (
-            <div className="empty">{t('log.noContainer')}</div>
-          )}
-        </div>
+        <div className="card pad">{sel ? <ContainerPanel c={sel} index={containers.indexOf(sel) + 1} portal={portal} /> : <div className="empty">{t('log.noContainer')}</div>}</div>
       </div>
 
       <div className="card summary-bar">
@@ -698,9 +704,7 @@ export function LogisticsTab({ pf, portal }: { pf: Proforma; portal?: boolean })
           <span className="small">
             <Check size={13} className="green" /> {t('log.loaded', { qty: num(loadedQty), cbm: m3(loadedCbm) })}
           </span>
-          <span className="small orange">
-            {t('log.remaining', { qty: num(totalQty - loadedQty), cbm: m3(totalCbm - loadedCbm) })}
-          </span>
+          <span className="small orange">{t('log.remaining', { qty: num(totalQty - loadedQty), cbm: m3(totalCbm - loadedCbm) })}</span>
         </div>
         <div className="grow" />
         <Metric l={t('log.m.containers')} v={`${containers.length} × 40HC`} />
@@ -735,9 +739,7 @@ function ContainerPanel({ c, index, portal }: { c: Container; index: number; por
         <span className="bold">{num(containerQty(c))} pcs</span>
       </div>
       {ratio > 1 && <div className="pill red mb">{t('cp.over')}</div>}
-      <div className="row wrap mb">
-        {c.loading?.status === 'validated' && <Pill color="green">{t('cp.loadingOk', { date: fmt.fshort(c.loading.date) })}</Pill>}
-      </div>
+      <div className="row wrap mb">{c.loading?.status === 'validated' && <Pill color="green">{t('cp.loadingOk', { date: fmt.fshort(c.loading.date) })}</Pill>}</div>
       <table className="tbl">
         <thead>
           <tr>
@@ -767,7 +769,11 @@ function ContainerPanel({ c, index, portal }: { c: Container; index: number; por
                 <td className="num">{dec(lineCbm(p, a.qty), 2)}</td>
                 <td>
                   {editable && (
-                    <button className="btn ghost sm danger" title={t('cp.remove')} onClick={() => dispatch({ type: 'deallocate', containerId: c.id, proformaId: a.proformaId, productId: a.productId })}>
+                    <button
+                      className="btn ghost sm danger"
+                      title={t('cp.remove')}
+                      onClick={() => dispatch({ type: 'deallocate', containerId: c.id, proformaId: a.proformaId, productId: a.productId })}
+                    >
                       <Trash2 size={14} />
                     </button>
                   )}
@@ -801,8 +807,7 @@ function BookingState({ pf }: { pf: Proforma }) {
   if (!b.answeredAt)
     return (
       <Link to="/booking" className="pill orange pf-bk-state" title={`Demandé le ${fdate(b.requestedAt.slice(0, 10))}`}>
-        <Ship size={14} /> Booking demandé · {b.containers} × 40HC ·{' '}
-        {b.proposal ? 'proposition à valider' : b.ackAt ? `attente ${b.forwarder}` : 'attente fournisseur'}
+        <Ship size={14} /> Booking demandé · {b.containers} × 40HC · {b.proposal ? 'proposition à valider' : b.ackAt ? `attente ${b.forwarder}` : 'attente fournisseur'}
       </Link>
     );
   return (

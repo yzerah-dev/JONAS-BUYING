@@ -45,6 +45,8 @@ export interface State {
   currentUserId: string;
   settings: Settings;
   journal: JournalEntry[];
+  /** Vue seulement (jamais enregistré) : proformas annulées, sorties de « proformas » */
+  archived?: Proforma[];
 }
 
 /** Préfixe GS1 des EAN JONAS (celui des produits existants) */
@@ -137,6 +139,9 @@ export type Action =
   | { type: 'setSupplierTerms'; supplierId: string; terms: SupplierTerms }
   | { type: 'addSupplier'; supplier: Supplier }
   | { type: 'cancelOrder'; id: string }
+  | { type: 'cancelProforma'; id: string; reason: string }
+  | { type: 'restoreProforma'; id: string }
+  | { type: 'deleteProforma'; id: string }
   | { type: 'requestSplit'; id: string; lines: { productId: string; qtyNow: number }[]; etdLater: ISODate; reason: string }
   | { type: 'acceptSplit'; id: string }
   | { type: 'refuseSplit'; id: string; reason?: string }
@@ -388,6 +393,18 @@ export function isAllowed(s: State, a: Action): boolean {
       if (!pf || bookingStage(pf) !== 'fournisseur') return false;
       if (!(isSupplier(u) ? pf.supplierId === u.supplierId : u.role === 'pilote')) return false;
       return s.containers.some((c) => c.allocations.some((x) => x.proformaId === pf.id) && ['a_booker', 'booking_demande'].includes(c.status));
+    }
+    case 'cancelProforma': {
+      const pf = allPfs(s).find((x) => x.id === a.id);
+      return !!pf && !pf.cancelled && !!a.reason.trim() && canCancelProforma(s, u, pf);
+    }
+    case 'restoreProforma': {
+      const pf = allPfs(s).find((x) => x.id === a.id);
+      return !!pf?.cancelled && (can(u, 'proforma.edit') || can(u, 'proforma.sign'));
+    }
+    case 'deleteProforma': {
+      const pf = allPfs(s).find((x) => x.id === a.id);
+      return !!pf && canDeleteProforma(s, u, pf);
     }
     case 'cancelOrder': {
       // Annuler une commande JONAS tant que le fournisseur n'a rien déposé
@@ -748,9 +765,41 @@ export function lastPricePaid(s: State, productId: string, currency: Currency): 
 }
 
 /** Prochain numéro de proforma (PF-AAAA-NNNN), hors reliquats */
+/** Toutes les proformas, annulées comprises (la vue les range à part) */
+export const allPfs = (s: State): Proforma[] => (s.archived?.length ? [...s.proformas, ...s.archived] : s.proformas);
+/** Fait partie d'une expédition partielle (proforma d'origine ou reliquat) : à gérer depuis l'expédition */
+const inSplit = (s: State, pf: Proforma) => !!pf.split || allPfs(s).some((x) => x.split?.root === pf.id);
+const shipped = (pf: Proforma) => pf.status === 'en_transit' || pf.status === 'arrive';
+/** Annuler : l'équipe achats (pilote, Direction, acheteurs), tant que la marchandise n'est pas partie */
+export const canCancelProforma = (s: State, u: User, pf: Proforma) => (can(u, 'proforma.edit') || can(u, 'proforma.sign')) && !shipped(pf) && !inSplit(s, pf);
+/** Supprimer définitivement : pilote et Direction seulement, tant que la marchandise n'est pas partie */
+export const canDeleteProforma = (s: State, u: User, pf: Proforma) => can(u, 'proforma.sign') && !shipped(pf) && !inSplit(s, pf);
+/** Pourquoi on ne peut pas annuler / supprimer (message affiché) */
+export const cancelBlock = (s: State, pf: Proforma) =>
+  shipped(pf) ? 'Marchandise partie : la proforma ne peut plus être annulée.' : inSplit(s, pf) ? 'Expédition partielle en cours : gérez-la depuis l’onglet Expéditions.' : '';
+
+/** Retire les quantités de la proforma des conteneurs ; supprime les conteneurs prévisionnels restés vides */
+function withoutAllocations(s: State, pfId: string): State {
+  const containers = s.containers
+    .map((c) => (c.allocations.some((x) => x.proformaId === pfId) ? { ...c, allocations: c.allocations.filter((x) => x.proformaId !== pfId), planValidated: false } : c))
+    .filter((c) => c.allocations.length > 0 || !s.containers.find((o) => o.id === c.id)!.allocations.some((x) => x.proformaId === pfId) || !['a_booker', 'booking_demande'].includes(c.status));
+  return { ...s, containers };
+}
+
+const viewCache = new WeakMap<State, State>();
+/** Ce que voient les écrans : les proformas annulées sortent des listes et vont dans « archived » */
+export function viewState(s: State): State {
+  const hit = viewCache.get(s);
+  if (hit) return hit;
+  const off = s.proformas.filter((p) => p.cancelled);
+  const v = off.length ? { ...s, proformas: s.proformas.filter((p) => !p.cancelled), archived: off } : s;
+  viewCache.set(s, v);
+  return v;
+}
+
 export function nextProformaId(s: State) {
   const year = TODAY.slice(0, 4);
-  const max = s.proformas.reduce((m, p) => {
+  const max = allPfs(s).reduce((m, p) => {
     const x = p.id.match(/^PF-(\d{4})-(\d{4})$/);
     return x && x[1] === year ? Math.max(m, +x[2]) : m;
   }, 0);
@@ -970,6 +1019,16 @@ function applyAction(s: State, a: Action): State {
     }
     case 'cancelOrder':
       return { ...s, proformas: s.proformas.filter((p) => p.id !== a.id) };
+    case 'cancelProforma': {
+      const next = withoutAllocations(s, a.id);
+      return mapPF(next, a.id, (pf) => ({ ...pf, cancelled: { at: nowStamp(), by: me, reason: a.reason.trim() }, history: [...pf.history, hist(me, `Proforma annulée : ${a.reason.trim()}`)] }));
+    }
+    case 'restoreProforma':
+      return mapPF(s, a.id, (pf) => ({ ...pf, cancelled: undefined, history: [...pf.history, hist(me, 'Proforma rétablie')] }));
+    case 'deleteProforma': {
+      const next = withoutAllocations(s, a.id);
+      return { ...next, proformas: next.proformas.filter((p) => p.id !== a.id) };
+    }
     case 'setSupplierTerms':
       return { ...s, suppliers: s.suppliers.map((x) => (x.id === a.supplierId ? { ...x, terms: a.terms } : x)) };
     case 'addSupplier':
@@ -1701,6 +1760,12 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
       return { target: a.id, text: `Proforma signée et tamponnée (expédition demandée ${a.etdWanted})` };
     case 'createProforma':
       return { target: a.id, text: `Nouvelle proforma ${a.id} : ${a.title}${a.file ? ' (déposée par le fournisseur)' : ''}` };
+    case 'cancelProforma':
+      return { target: a.id, text: `Proforma annulée : ${a.reason.trim()}` };
+    case 'restoreProforma':
+      return { target: a.id, text: 'Proforma rétablie' };
+    case 'deleteProforma':
+      return { target: a.id, text: 'Proforma supprimée définitivement' };
     case 'cancelOrder':
       return { target: a.id, text: 'Commande JONAS annulée avant proforma' };
     case 'setProductPhoto':
@@ -1919,7 +1984,7 @@ export const StoreContext = createContext<{ state: State; dispatch: (a: Action) 
 export function useStore() {
   const ctx = useContext(StoreContext);
   if (!ctx) throw new Error('StoreProvider manquant');
-  return ctx;
+  return { state: viewState(ctx.state), dispatch: ctx.dispatch };
 }
 
 // ---------------------------------------------------------------------------

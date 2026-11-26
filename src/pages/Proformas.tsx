@@ -1,25 +1,11 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import {
-  Calendar,
-  Check,
-  CheckCircle2,
-  ChevronDown,
-  ChevronRight,
-  ChevronUp,
-  Landmark,
-  Layers,
-  List,
-  PenLine,
-  Search,
-  SlidersHorizontal,
-  Split,
-} from 'lucide-react';
+import { Ban, Calendar, Check, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, Landmark, Layers, List, PenLine, Search, SlidersHorizontal, Split } from 'lucide-react';
 import { byId, isReliquat, openReliquats, shipmentLabel, pendingRevision, pendingVersion, proformaTotals, useAuth, useStore, PROFORMA_STATUS_LABEL, type State } from '../data/store';
 import { PROFORMA_STATUSES, type Proforma, type ProformaStatus } from '../data/types';
 import { ContainerGlyph, ProformaStatusPill, SupplierMark } from '../components/ui';
 import { PROFORMA_ICON, toast } from '../components/ui-shared';
-import { TODAY, dec, eur, weekKey, weekLabel, weekRange } from '../lib/format';
+import { TODAY, dec, eur, fdate, weekKey, weekLabel, weekRange } from '../lib/format';
 import { pressable } from '../lib/a11y';
 import { BookingRequestButton } from '../components/BookingDialog';
 import { SignDialog } from '../components/ProformaVersions';
@@ -37,6 +23,8 @@ export default function Proformas() {
   const [params, setParams] = useSearchParams();
   const status = (params.get('statut') as ProformaStatus | null) ?? 'all';
   const onlyReliquats = params.get('reliquats') === '1';
+  const showCancelled = params.get('annulees') === '1';
+  const cancelled = state.archived ?? [];
   const [view, setView] = useState<View>('semaine');
   const [q, setQ] = useState('');
   const [supplier, setSupplier] = useState('all');
@@ -113,7 +101,16 @@ export default function Proformas() {
               <label className="xs muted" htmlFor="pf-sup">
                 Fournisseur
               </label>
-              <Combobox id="pf-sup" value={supplier} onChange={setSupplier} placeholder="Tapez un fournisseur…" options={[{ id: 'all', label: 'Tous les fournisseurs' }, ...state.suppliers.map((s) => ({ id: s.id, label: s.name, sub: `${s.flag} ${s.city}`, keywords: `${s.name} ${s.shortName}` }))]} />
+              <Combobox
+                id="pf-sup"
+                value={supplier}
+                onChange={setSupplier}
+                placeholder="Tapez un fournisseur…"
+                options={[
+                  { id: 'all', label: 'Tous les fournisseurs' },
+                  ...state.suppliers.map((s) => ({ id: s.id, label: s.name, sub: `${s.flag} ${s.city}`, keywords: `${s.name} ${s.shortName}` })),
+                ]}
+              />
               {pastWeeks > 0 && (
                 <label className="row small" style={{ gap: 6 }}>
                   <input type="checkbox" checked={showPast} onChange={(e) => setShowPast(e.target.checked)} /> Afficher les semaines passées ({pastWeeks})
@@ -153,35 +150,78 @@ export default function Proformas() {
         >
           <Split size={19} style={{ color: onlyReliquats ? undefined : 'var(--violet)' }} /> Reliquats <b>{reliquatsOpen}</b>
         </button>
-      </div>
-
-      <div className="pf-views">
-        {(
-          [
-            ['liste', 'Vue liste', List],
-            ['semaine', 'Par semaine d’expédition', Calendar],
-            ['fournisseur', 'Par fournisseur', Landmark],
-          ] as const
-        ).map(([id, label, Icon]) => (
-          <button key={id} className={view === id ? 'active' : ''} onClick={() => setView(id)}>
-            <Icon size={19} /> {label}
+        {cancelled.length > 0 && (
+          <button
+            className={`pf-chip ${showCancelled ? 'active' : ''}`}
+            onClick={() => {
+              if (showCancelled) params.delete('annulees');
+              else params.set('annulees', '1');
+              setParams(params);
+            }}
+          >
+            <Ban size={19} style={{ color: showCancelled ? undefined : 'var(--red, #c0392b)' }} /> Annulées <b>{cancelled.length}</b>
           </button>
-        ))}
+        )}
       </div>
 
-      {groups.length === 0 && <div className="card empty">Aucune proforma ne correspond à ces filtres.</div>}
-      {groups.map((g, i) => (
-        <Group
-          key={g.key + view + status}
-          title={g.title}
-          sub={g.sub}
-          items={g.items}
-          state={state}
-          showMoney={showMoney}
-          defaultOpen={i === 0 || view === 'liste'}
-          onSign={canSign ? sign : undefined}
-        />
-      ))}
+      {showCancelled ? (
+        <div className="card tbl-wrap">
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th>Proforma</th>
+                <th>Fournisseur</th>
+                <th>Intitulé</th>
+                <th>Annulée le</th>
+                <th>Par</th>
+                <th>Motif</th>
+              </tr>
+            </thead>
+            <tbody>
+              {cancelled.map((p) => (
+                <tr key={p.id} className="clickable" onClick={() => navigate(`/proformas/${p.id}`)}>
+                  <td className="bold">{p.id}</td>
+                  <td>{byId(state.suppliers, p.supplierId).shortName}</td>
+                  <td>{p.title}</td>
+                  <td>{fdate(p.cancelled!.at.slice(0, 10))}</td>
+                  <td>{p.cancelled!.by}</td>
+                  <td className="small">{p.cancelled!.reason}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <>
+          <div className="pf-views">
+            {(
+              [
+                ['liste', 'Vue liste', List],
+                ['semaine', 'Par semaine d’expédition', Calendar],
+                ['fournisseur', 'Par fournisseur', Landmark],
+              ] as const
+            ).map(([id, label, Icon]) => (
+              <button key={id} className={view === id ? 'active' : ''} onClick={() => setView(id)}>
+                <Icon size={19} /> {label}
+              </button>
+            ))}
+          </div>
+
+          {groups.length === 0 && <div className="card empty">Aucune proforma ne correspond à ces filtres.</div>}
+          {groups.map((g, i) => (
+            <Group
+              key={g.key + view + status}
+              title={g.title}
+              sub={g.sub}
+              items={g.items}
+              state={state}
+              showMoney={showMoney}
+              defaultOpen={i === 0 || view === 'liste'}
+              onSign={canSign ? sign : undefined}
+            />
+          ))}
+        </>
+      )}
       {signingPf && signingDoc && <SignDialog pf={signingPf} doc={signingDoc} onClose={() => setSigning(null)} />}
     </div>
   );
@@ -330,15 +370,17 @@ function StatusCell({ p, onSign }: { p: Proforma; onSign?: (id: string) => void 
         </span>
         {!pendingVersion(p) ? (
           <small className="pf-bk-wait">Attente de la proforma du fournisseur</small>
-        ) : onSign && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onSign(p.id);
-            }}
-          >
-            <PenLine size={11} /> Signer maintenant
-          </button>
+        ) : (
+          onSign && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onSign(p.id);
+              }}
+            >
+              <PenLine size={11} /> Signer maintenant
+            </button>
+          )
         )}
       </div>
     );
@@ -352,7 +394,9 @@ function BookingStatus({ p, children }: { p: Proforma; children?: React.ReactNod
       {children}
       <ProformaStatusPill status={p.status} big />
       <BookingRequestButton pf={p} variant="chip" />
-      {p.booking && !p.booking.answeredAt && <small className="pf-bk-wait">Booking demandé · {p.booking.proposal ? 'proposition à valider' : p.booking.ackAt ? `attente ${p.booking.forwarder}` : 'attente fournisseur'}</small>}
+      {p.booking && !p.booking.answeredAt && (
+        <small className="pf-bk-wait">Booking demandé · {p.booking.proposal ? 'proposition à valider' : p.booking.ackAt ? `attente ${p.booking.forwarder}` : 'attente fournisseur'}</small>
+      )}
     </div>
   );
 }
@@ -362,9 +406,7 @@ function AmountCell({ p, amount, deposit, amountCur, currency }: { p: Proforma; 
     <div className="pf-amount">
       <b>{eur(amount)}</b>
       {currency && currency !== 'EUR' && amountCur !== undefined && (
-        <small className="pf-cur">
-          {new Intl.NumberFormat('fr-FR', { style: 'currency', currency, maximumFractionDigits: 0 }).format(amountCur)}
-        </small>
+        <small className="pf-cur">{new Intl.NumberFormat('fr-FR', { style: 'currency', currency, maximumFractionDigits: 0 }).format(amountCur)}</small>
       )}
       <small>Acompte : {eur(deposit)}</small>
       {p.depositPaid ? (
