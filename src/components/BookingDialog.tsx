@@ -6,7 +6,6 @@ import { FORWARDERS, type Forwarder, type Proforma } from '../data/types';
 import { estimateContainers, toast } from './ui-shared';
 import { addDays, dec, fdate, weekLabel } from '../lib/format';
 
-
 /**
  * Demande de booking d'une proforma : nombre de containers, date souhaitée et transitaire choisi par JONAS.
  * Le fournisseur prend en compte (plan, marchandise prête), le transitaire propose, le fournisseur et JONAS acceptent.
@@ -64,8 +63,8 @@ export function BookingRequestDialog({ pf, onClose }: { pf: Proforma; onClose: (
             <input id="bk-note" className="input" placeholder="Ex. grouper avec la commande suivante" value={note} onChange={(e) => setNote(e.target.value)} />
           </label>
           <p className="small muted">
-            Départ prévu {fdate(pf.etd)} ({weekLabel(pf.etd)}). {sup.shortName} prend en compte (plan de chargement, marchandise prête), puis {fwd} fait sa
-            proposition de booking, à accepter par le fournisseur et par JONAS.
+            Départ prévu {fdate(pf.etd)} ({weekLabel(pf.etd)}). {sup.shortName} prend en compte (plan de chargement, marchandise prête), puis {fwd} fait sa proposition de booking, à accepter par le
+            fournisseur et par JONAS.
           </p>
         </div>
         <footer className="rc-foot">
@@ -86,7 +85,7 @@ export function BookingRequestDialog({ pf, onClose }: { pf: Proforma; onClose: (
  * Bouton « Demande de booking » : visible sur toute proforma pas encore bookée.
  * S'il ne peut pas encore servir (proforma à signer, droits), il explique pourquoi au lieu de disparaître.
  */
-export function BookingRequestButton({ pf, variant = 'btn' }: { pf: Proforma; variant?: 'btn' | 'chip' }) {
+export function BookingRequestButton({ pf, variant = 'btn' }: { pf: Proforma; variant?: 'btn' | 'chip' | 'row' }) {
   const { state } = useStore();
   const auth = useAuth();
   const [open, setOpen] = useState(false);
@@ -94,10 +93,9 @@ export function BookingRequestButton({ pf, variant = 'btn' }: { pf: Proforma; va
   if (!me || ROLE_DEFS[me.role].portal) return null;
   if (pf.booking || ['booke', 'en_transit', 'arrive'].includes(pf.status)) return null;
   const allowed = auth.allowed({ type: 'requestPfBooking', proformaId: pf.id, containers: 1, dateWanted: pf.etd, forwarder: 'Logfret' });
-  const reason =
-    pf.status === 'a_signer'
-      ? 'Signez d’abord la proforma pour pouvoir demander le booking'
-      : 'Demande de booking réservée à la logistique et aux acheteurs';
+  // Ligne de la liste des proformas : bouton discret, seulement quand la demande est possible
+  if (variant === 'row' && !allowed) return null;
+  const reason = pf.status === 'a_signer' ? 'Signez d’abord la proforma pour pouvoir demander le booking' : 'Demande de booking réservée à la logistique et aux acheteurs';
   const click = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (allowed) setOpen(true);
@@ -106,11 +104,11 @@ export function BookingRequestButton({ pf, variant = 'btn' }: { pf: Proforma; va
   return (
     <>
       <button
-        className={variant === 'chip' ? `pf-bk-btn ${allowed ? '' : 'locked'}` : `btn ${allowed ? 'primary' : 'locked'}`}
+        className={variant === 'row' ? 'pfx-bk' : variant === 'chip' ? `pf-bk-btn ${allowed ? '' : 'locked'}` : `btn ${allowed ? 'primary' : 'locked'}`}
         title={allowed ? 'Envoyer la demande de booking au fournisseur' : reason}
         onClick={click}
       >
-        {allowed ? <Ship size={variant === 'chip' ? 11 : 16} /> : <Lock size={variant === 'chip' ? 11 : 16} />} Demande de booking
+        {allowed ? <Ship size={variant === 'chip' ? 11 : 16} /> : <Lock size={variant === 'chip' ? 11 : 16} />} {variant === 'row' ? 'Booking' : 'Demande de booking'}
       </button>
       {open && (
         <div onClick={(e) => e.stopPropagation()}>

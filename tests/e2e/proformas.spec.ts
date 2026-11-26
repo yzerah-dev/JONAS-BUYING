@@ -29,13 +29,13 @@ test.describe('Proformas et logistique', () => {
   test('demande de booking depuis la liste des proformas et depuis l’onglet Suivi & Logistique', async ({ page }) => {
     await loginAs(page, 'Logistique');
     await go(page, 'proformas');
-    await page.getByRole('button', { name: 'Vue liste' }).click();
-    await page.getByPlaceholder(/Rechercher une proforma/).fill('PF-2026-0151');
-    await page.locator('tr', { hasText: 'PF-2026-0151' }).locator('.pf-bk-btn').click();
+    await page.getByLabel('Affichage').selectOption('liste');
+    await page.getByLabel('Rechercher une proforma').fill('PF-2026-0151');
+    await page.locator('tr', { hasText: 'PF-2026-0151' }).getByRole('button', { name: 'Booking' }).click();
     await page.getByRole('button', { name: 'Envoyer au fournisseur' }).click();
     await expect(toast(page)).toContainText('Demande de booking envoyée à Nova Beauty');
     await expect(page).toHaveURL(/#\/proformas$/);
-    await expect(page.locator('.pf-bk-wait').first()).toBeVisible();
+    await expect(page.locator('tr', { hasText: 'PF-2026-0151' }).getByRole('button', { name: 'Booking' })).toHaveCount(0);
 
     await go(page, 'proformas/PF-2026-0148');
     await page.getByRole('button', { name: 'Suivi & Logistique' }).click();
@@ -61,17 +61,16 @@ test.describe('Proformas et logistique', () => {
 
   test('signature des proformas à signer : la proforma déposée par le fournisseur', async ({ page }) => {
     await go(page, 'proformas');
-    const chips = page.locator('.pf-chips');
     const count = async (label: string) => {
-      const txt = (await chips.innerText()).replace(/\n/g, ' ');
-      const m = txt.match(new RegExp(label + ' (\\d+)'));
+      const txt = (await page.getByLabel('Statut').locator('option').allInnerTexts()).join(' ');
+      const m = txt.match(new RegExp(label + ' \\((\\d+)\\)'));
       return m ? Number(m[1]) : 0;
     };
+    await expect.poll(() => count('À signer')).toBeGreaterThan(0);
     const toSign = await count('À signer');
-    expect(toSign).toBeGreaterThan(0);
 
-    await page.getByRole('button', { name: /^Signer \(/ }).click();
-    await page.getByRole('button', { name: 'Signer maintenant' }).first().click();
+    await page.getByLabel('Statut').selectOption('a_signer');
+    await page.locator('.pfx').getByRole('button', { name: 'Signer', exact: true }).first().click();
     await page.locator('#sg-etd').fill('2026-12-09');
     await page.getByRole('button', { name: 'Signer et tamponner' }).click();
     await expect(toast(page)).toContainText('signée et tamponnée');

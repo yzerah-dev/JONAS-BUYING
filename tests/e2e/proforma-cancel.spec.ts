@@ -27,7 +27,7 @@ test('annuler une proforma (motif obligatoire), la retrouver dans « Annulées �
   const st = await state(page);
   expect(st.proformas.find((p) => p.id === 'PF-2026-0146')!.cancelled!.reason).toBe('Commande remplacée par une nouvelle proforma');
   expect(st.containers.some((c) => c.allocations.some((a) => a.proformaId === 'PF-2026-0146'))).toBe(false);
-  await page.getByRole('button', { name: /Annulées/ }).click();
+  await page.getByLabel('Statut').selectOption('annulees');
   await page.locator('tr', { hasText: 'PF-2026-0146' }).click();
   await expect(page.locator('main')).toContainText('Motif : Commande remplacée par une nouvelle proforma');
   // L'acheteur ne supprime pas définitivement

@@ -2105,38 +2105,80 @@ tr.pf-moving td, .pf-line.pf-moving { background: #fff6e8 !important; outline: 2
 .pfp-pack.todo { background: #f1f3f2; color: var(--ink); }
 .pfp-figs b { font-size: 16px; }
 
-/* Liste des proformas : 5 colonnes, lignes hautes, gros caractères */
-.pf-table thead th { font-size: 15px; padding: 12px 14px; }
-.pf-table tbody td { padding: 20px 14px; font-size: 16px; }
-.pf-table .pf-ref { gap: 12px; align-items: center; }
-.pf-ident { display: grid; gap: 2px; min-width: 0; }
-.pf-ident .pf-id { font-size: 20px; font-weight: 900; letter-spacing: -0.01em; }
-.pf-ident .pf-title { font-size: 16px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 420px; }
-.pf-ident .pf-supname { font-size: 13.5px; color: var(--muted); }
-.pf-when { display: grid; gap: 2px; justify-items: center; }
-.pf-when b { font-size: 26px; font-weight: 900; }
-.pf-when small { font-size: 13px; color: var(--muted); white-space: nowrap; }
-.pf-table .pf-amount b { font-size: 20px; }
-.pf-table .pf-ok, .pf-table .pf-pack-n { font-size: 18px; }
-.pf-table .pf-big { font-size: 22px; font-weight: 900; } .pf-table .pf-ok { font-size: 16px; padding: 6px 14px; }
-/* Grands écrans (l'appli se réduit) : liste des proformas encore plus lisible */
-.pf-table tbody td { padding: 20px 14px; }
-.pf-ident .pf-id { font-size: 21px; }
-.pf-ident .pf-title { font-size: 17px; }
-.pf-ident .pf-supname { font-size: 14px; }
-.pf-table .pf-ref .pf-grip { width: 34px; height: 34px; }
-.pf-when b { font-size: 27px; }
-.pf-when small { font-size: 13.5px; }
-.pf-table .pf-amount b { font-size: 21px; }
-.pf-table .pf-amount small { font-size: 12.5px; }
-.pf-table .pf-amount .todo, .pf-table .pf-amount .ok { font-size: 15px; padding: 3px 14px; }
-.pf-table .pf-big { font-size: 24px; }
-.pf-table .pf-ok { font-size: 19px; padding: 8px 18px; border-radius: 10px; }
-.pf-table td.c .pill { font-size: 16px; padding: 6px 14px; }
-.pf-table td.c .pill svg { width: 16px; height: 16px; }
-.pf-table .pf-bk-btn, .pf-table .pf-bk-wait, .pf-table .pf-sign small { font-size: 13px; }
-.pf-table thead th { font-size: 16px; padding: 14px 16px; }
-.pf-table .pf-bkcell .pill, .pf-table td.c .pill { font-size: 15px !important; padding: 6px 14px !important; } .pf-table .pf-sign span { font-size: 18px; } .pf-table .pf-sign button { font-size: 13px; padding: 4px 12px; }
+/* Liste des proformas (maquette épurée) : commande, packs, statut, montant, une action */
+.pfx-top { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.pfx-top .pf-title { margin: 0; }
+.pfx-top .pf-btn.primary { margin-left: auto; font-size: 19px; padding: 0 28px; gap: 10px; }
+.pfx-toolbar { align-items: center; }
+.pfx-select { position: relative; display: flex; align-items: center; gap: 10px; height: 52px; padding: 0 14px; border: 1px solid var(--line); border-radius: 12px; background: #fff; color: var(--ink); min-width: 230px; cursor: pointer; }
+.pfx-select select { appearance: none; -webkit-appearance: none; border: 0; background: transparent; font: inherit; font-size: 17px; color: var(--ink); flex: 1; min-width: 0; padding-right: 26px; cursor: pointer; outline: none; }
+.pfx-select > svg:last-child { position: absolute; right: 14px; pointer-events: none; }
+.pfx-select:focus-within { border-color: var(--green); box-shadow: 0 0 0 3px var(--green-soft); }
+.pfx-page .pf-week { border-radius: 16px; }
+.pfx-page .pf-week-head { gap: 20px; padding: 14px 22px; }
+.pfx-page .pf-week-title { width: 230px; flex-shrink: 0; min-width: 0; padding-right: 22px; border-right: 1px solid #c9d6d1; }
+.pfx-page .pf-week-title h2 { font-size: 27px; }
+.pfx-page .pf-week-title span { font-size: 16px; }
+.pfx-metrics { display: flex; align-items: center; flex-wrap: wrap; row-gap: 6px; }
+.pfx-metrics > * { padding: 0 18px; font-size: 18px; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pfx-metrics > * + * { border-left: 1px solid #c9d6d1; }
+.pfx-metrics > :first-child { padding-left: 0; }
+.pfx-count { color: var(--green-dark); font-weight: 700 !important; }
+.pfx-metrics b { font-size: 23px; font-weight: 800; }
+.pfx { width: 100%; border-collapse: separate; border-spacing: 0; }
+.pfx thead th { background: #e9f3ef; font-size: 15px; font-weight: 700; color: var(--ink); text-align: left; padding: 12px 16px; white-space: nowrap; }
+.pfx thead th:first-child { padding-left: 22px; }
+.pfx th.c, .pfx td.c { text-align: center; }
+.pfx th.r, .pfx td.r { text-align: right; }
+.pfx tbody td { padding: 14px 16px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.pfx tbody tr:last-child td { border-bottom: 0; }
+.pfx tbody tr { cursor: pointer; }
+.pfx tbody tr:hover td { background: #fafcfb; }
+.pfx tbody td:first-child { padding-left: 22px; }
+.pfx-cmd { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.pfx-cmd > div { display: grid; gap: 2px; min-width: 0; }
+.pfx-cmd b { font-size: 21px; font-weight: 800; letter-spacing: -0.01em; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 460px; }
+.pfx-cmd small { font-size: 15px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pfx-packs { font-size: 21px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.pfx-ok { display: inline-flex; align-items: center; gap: 6px; color: var(--green-dark); font-size: 20px; font-weight: 800; }
+.pfx-st { display: inline-flex; align-items: center; gap: 10px; padding: 7px 16px; border-radius: 10px; font-size: 17px; font-weight: 600; white-space: nowrap; }
+.pfx-st i { width: 10px; height: 10px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.pfx-st.a_signer { background: #fde8e8; color: #b42318; }
+.pfx-st.en_dev { background: #efe9fd; color: #5b21b6; }
+.pfx-st.en_production { background: #fff1e0; color: #b45309; }
+.pfx-st.en_production i { background: #f97316; }
+.pfx-st.booke { background: #e3f4ea; color: #146c43; }
+.pfx-st.en_transit { background: #fdf6d8; color: #8a6d00; }
+.pfx-st.en_transit i { background: #c9a400; }
+.pfx-st.arrive { background: #eef1f0; color: #3d4a46; }
+.pfx-note { display: block; margin-top: 4px; font-size: 13px; color: var(--muted); }
+.pfx-amount { display: inline-grid; justify-items: end; line-height: 1.2; }
+.pfx-amount b { font-size: 21px; font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pfx-amount small { font-size: 15px; color: #b42318; font-weight: 600; white-space: nowrap; }
+.pfx-act { width: 1%; white-space: nowrap; text-align: right; padding-right: 20px !important; color: var(--ink); }
+.pfx-act-row { display: inline-flex; align-items: center; gap: 12px; }
+.pfx-sign { border: 0; background: #14532d; background: linear-gradient(180deg, #1f6b45, #14532d); color: #fff; font-size: 17px; font-weight: 700; padding: 10px 24px; border-radius: 10px; cursor: pointer; box-shadow: 0 2px 6px rgba(20, 83, 45, 0.25); }
+.pfx-sign:hover { filter: brightness(1.08); }
+.pfx-bk { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: #fff; color: var(--green-dark); font-size: 13px; font-weight: 700; padding: 6px 12px; border-radius: 9px; cursor: pointer; }
+.pfx-bk:hover { border-color: var(--green); background: var(--green-softer); }
+.pfx-past { align-self: center; border: 0; background: none; color: var(--green-dark); font-weight: 600; font-size: 15px; cursor: pointer; text-decoration: underline; padding: 6px; }
+@media (max-width: 1350px) {
+  .pfx-cmd b { max-width: 300px; font-size: 19px; }
+  .pfx-select { min-width: 190px; }
+}
+@media (max-width: 820px) {
+  .pfx { display: none; }
+  .pfx-top .pf-btn.primary { margin-left: 0; flex: 1; font-size: 16px; }
+  .pfx-select { flex: 1 1 45%; min-width: 0; height: 46px; }
+  .pfx-select { padding: 0 10px; gap: 6px; }
+  .pfx-select > svg:first-child:not(:last-child) { display: none; }
+  .pfx-select > svg:last-child { right: 8px; }
+  .pfx-select select { font-size: 14px; padding-right: 20px; }
+  .pfx-page .pf-week-title { width: auto; flex: 1; border-right: 0; padding-right: 0; }
+  .pfx-metrics { flex: 1 1 100%; }
+  .pfx-metrics > * { font-size: 14px; padding: 0 10px; }
+  .pfx-metrics b { font-size: 16px; }
+}
 
 /* Logo déposé par le fournisseur (remplace le monogramme) */
 .supplier-img { display: inline-grid; place-items: center; flex-shrink: 0; background: #fff; border: 1px solid var(--line, #e5e7eb); overflow: hidden; box-sizing: border-box; }

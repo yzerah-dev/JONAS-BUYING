@@ -1,18 +1,20 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowUpDown, Ban, Calendar, Check, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, Landmark, Layers, List, PenLine, Search, SlidersHorizontal, Split } from 'lucide-react';
+import { ArrowUpDown, Calendar, Check, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, PenLine, Search } from 'lucide-react';
 import { byId, isReliquat, openReliquats, shipmentLabel, pendingRevision, pendingVersion, proformaTotals, useAuth, useStore, PROFORMA_STATUS_LABEL, type State, hasDeposit } from '../data/store';
 import { PROFORMA_STATUSES, type Proforma, type ProformaStatus } from '../data/types';
-import { ContainerGlyph, ProformaStatusPill, SupplierMark } from '../components/ui';
-import { PROFORMA_ICON, toast } from '../components/ui-shared';
+import { ProformaStatusPill, SupplierMark } from '../components/ui';
+import { toast } from '../components/ui-shared';
 import { TODAY, addDays, dec, diffDays, eur, fdate, weekKey, weekLabel, weekRange, weekStart } from '../lib/format';
 import { pressable } from '../lib/a11y';
 import { BookingRequestButton } from '../components/BookingDialog';
 import { SignDialog } from '../components/ProformaVersions';
 import { NewProformaButton } from '../components/NewProforma';
-import Combobox from '../components/Combobox';
 
 type View = 'liste' | 'semaine' | 'fournisseur';
+
+/** Libellés de la liste (maquette) : « En développement » en toutes lettres */
+const STATUS_TEXT: Record<ProformaStatus, string> = { ...PROFORMA_STATUS_LABEL, en_dev: 'En développement' };
 
 /** Déplacer une proforma vers une autre semaine d'expédition : même jour de la semaine, dans la semaine choisie */
 const etdInWeek = (etd: string, weekDate: string) => addDays(weekStart(weekDate), diffDays(etd, weekStart(etd)));
@@ -41,8 +43,6 @@ export default function Proformas() {
   const cancelled = state.archived ?? [];
   const [view, setView] = useState<View>('semaine');
   const [q, setQ] = useState('');
-  const [supplier, setSupplier] = useState('all');
-  const [showFilter, setShowFilter] = useState(false);
   const [showPast, setShowPast] = useState(false);
 
   const filtered = useMemo(() => {
@@ -50,7 +50,6 @@ export default function Proformas() {
     return state.proformas
       .filter((p) => status === 'all' || p.status === status)
       .filter((p) => !onlyReliquats || (isReliquat(p) && p.status !== 'arrive'))
-      .filter((p) => supplier === 'all' || p.supplierId === supplier)
       .filter((p) => {
         if (!s) return true;
         const sup = byId(state.suppliers, p.supplierId);
@@ -61,7 +60,7 @@ export default function Proformas() {
         return `${p.id} ${p.poNumber} ${sup.name} ${refs.join(' ')}`.toLowerCase().includes(s);
       })
       .sort((a, b) => a.etd.localeCompare(b.etd));
-  }, [state, status, supplier, q, onlyReliquats]);
+  }, [state, status, q, onlyReliquats]);
 
   const groups = useMemo(() => {
     if (view === 'liste') return [{ key: 'all', title: 'Toutes les proformas', sub: `${filtered.length} proformas`, items: filtered, kind: 'liste' as const }];
@@ -100,13 +99,6 @@ export default function Proformas() {
     },
     canMove: (p) => view === 'semaine' && auth.allowed({ type: 'setProformaEtd', id: p.id, etd: addDays(p.etd, 7) }),
   };
-  const toSign = state.proformas.filter((p) => p.status === 'a_signer');
-  const setStatus = (s: string) => {
-    params.delete('reliquats');
-    if (s === 'all') params.delete('statut');
-    else params.set('statut', s);
-    setParams(params);
-  };
   const reliquatsOpen = openReliquats(state).length;
   const [signing, setSigning] = useState<string | null>(null);
   const sign = (id: string) => {
@@ -117,85 +109,49 @@ export default function Proformas() {
   const signingPf = signing ? state.proformas.find((p) => p.id === signing) : undefined;
   const signingDoc = signingPf ? pendingVersion(signingPf) : undefined;
 
-  return (
-    <div className="pf-page">
-      <h1 className="pf-title">Proformas</h1>
+  const statusValue = showCancelled ? 'annulees' : onlyReliquats ? 'reliquats' : status;
+  const pickStatus = (v: string) => {
+    for (const k of ['statut', 'reliquats', 'annulees']) params.delete(k);
+    if (v === 'reliquats') params.set('reliquats', '1');
+    else if (v === 'annulees') params.set('annulees', '1');
+    else if (v !== 'all') params.set('statut', v);
+    setParams(params);
+  };
 
-      <div className="pf-toolbar">
-        <label className="pf-search">
-          <Search size={20} />
-          <input placeholder="Rechercher une proforma, un fournisseur, une référence…" value={q} onChange={(e) => setQ(e.target.value)} />
-        </label>
-        <div style={{ position: 'relative' }}>
-          <button className={`pf-btn ${supplier !== 'all' ? 'on' : ''}`} onClick={() => setShowFilter(!showFilter)}>
-            <SlidersHorizontal size={19} /> Filtrer
-          </button>
-          {showFilter && (
-            <div className="card pf-popover">
-              <label className="xs muted" htmlFor="pf-sup">
-                Fournisseur
-              </label>
-              <Combobox
-                id="pf-sup"
-                value={supplier}
-                onChange={setSupplier}
-                placeholder="Tapez un fournisseur…"
-                options={[
-                  { id: 'all', label: 'Tous les fournisseurs' },
-                  ...state.suppliers.map((s) => ({ id: s.id, label: s.name, sub: `${s.flag} ${s.city}`, keywords: `${s.name} ${s.shortName}` })),
-                ]}
-              />
-              {pastWeeks > 0 && (
-                <label className="row small" style={{ gap: 6 }}>
-                  <input type="checkbox" checked={showPast} onChange={(e) => setShowPast(e.target.checked)} /> Afficher les semaines passées ({pastWeeks})
-                </label>
-              )}
-            </div>
-          )}
-        </div>
-        <NewProformaButton onCreated={(id) => navigate(`/proformas/${id}`)} />
-        {canSign && (
-          <button className="pf-btn primary" onClick={() => setStatus('a_signer')}>
-            <PenLine size={21} /> Signer ({toSign.length})
-          </button>
-        )}
+  return (
+    <div className="pf-page pfx-page">
+      <div className="pfx-top">
+        <h1 className="pf-title">Proformas</h1>
+        <NewProformaButton className="pf-btn primary" onCreated={(id) => navigate(`/proformas/${id}`)} />
       </div>
 
-      <div className="pf-chips">
-        <button className={`pf-chip ${status === 'all' && !onlyReliquats ? 'active' : ''}`} onClick={() => setStatus('all')}>
-          <Layers size={19} /> Toutes <b>{state.proformas.length}</b>
-        </button>
-        {PROFORMA_STATUSES.map((s) => {
-          const Icon = PROFORMA_ICON[s].icon;
-          return (
-            <button key={s} className={`pf-chip ${status === s && !onlyReliquats ? 'active' : ''}`} onClick={() => setStatus(s)}>
-              <Icon size={19} style={{ color: status === s ? undefined : PROFORMA_ICON[s].color }} /> {PROFORMA_STATUS_LABEL[s]} <b>{state.proformas.filter((p) => p.status === s).length}</b>
-            </button>
-          );
-        })}
-        <button
-          className={`pf-chip ${onlyReliquats ? 'active' : ''}`}
-          onClick={() => {
-            params.delete('statut');
-            if (onlyReliquats) params.delete('reliquats');
-            else params.set('reliquats', '1');
-            setParams(params);
-          }}
-        >
-          <Split size={19} style={{ color: onlyReliquats ? undefined : 'var(--violet)' }} /> Reliquats <b>{reliquatsOpen}</b>
-        </button>
-        {cancelled.length > 0 && (
-          <button
-            className={`pf-chip ${showCancelled ? 'active' : ''}`}
-            onClick={() => {
-              if (showCancelled) params.delete('annulees');
-              else params.set('annulees', '1');
-              setParams(params);
-            }}
-          >
-            <Ban size={19} style={{ color: showCancelled ? undefined : 'var(--red, #c0392b)' }} /> Annulées <b>{cancelled.length}</b>
-          </button>
-        )}
+      <div className="pf-toolbar pfx-toolbar">
+        <label className="pf-search">
+          <Search size={20} />
+          <input placeholder="Rechercher une commande, un fournisseur, une référence…" aria-label="Rechercher une proforma" value={q} onChange={(e) => setQ(e.target.value)} />
+        </label>
+        <label className="pfx-select">
+          <select aria-label="Statut" value={statusValue} onChange={(e) => pickStatus(e.target.value)}>
+            <option value="all">Tous les statuts ({state.proformas.length})</option>
+            {PROFORMA_STATUSES.map((st) => (
+              <option key={st} value={st}>
+                {STATUS_TEXT[st]} ({state.proformas.filter((p) => p.status === st).length})
+              </option>
+            ))}
+            <option value="reliquats">Reliquats ({reliquatsOpen})</option>
+            {cancelled.length > 0 && <option value="annulees">Annulées ({cancelled.length})</option>}
+          </select>
+          <ChevronDown size={20} />
+        </label>
+        <label className="pfx-select">
+          <Calendar size={20} />
+          <select aria-label="Affichage" value={view} onChange={(e) => setView(e.target.value as View)} disabled={showCancelled}>
+            <option value="semaine">Par semaine</option>
+            <option value="fournisseur">Par fournisseur</option>
+            <option value="liste">Liste</option>
+          </select>
+          <ChevronDown size={20} />
+        </label>
       </div>
 
       {showCancelled ? (
@@ -227,20 +183,6 @@ export default function Proformas() {
         </div>
       ) : (
         <>
-          <div className="pf-views">
-            {(
-              [
-                ['liste', 'Vue liste', List],
-                ['semaine', 'Par semaine d’expédition', Calendar],
-                ['fournisseur', 'Par fournisseur', Landmark],
-              ] as const
-            ).map(([id, label, Icon]) => (
-              <button key={id} className={view === id ? 'active' : ''} onClick={() => setView(id)}>
-                <Icon size={19} /> {label}
-              </button>
-            ))}
-          </div>
-
           {moving && view === 'semaine' && (
             <div className="pf-movebar" role="region" aria-label="Déplacer vers la semaine">
               <b>
@@ -284,6 +226,11 @@ export default function Proformas() {
               move={move}
             />
           ))}
+          {pastWeeks > 0 && (
+            <button type="button" className="pfx-past" onClick={() => setShowPast(!showPast)}>
+              {showPast ? 'Masquer les semaines passées' : `Afficher les semaines passées (${pastWeeks})`}
+            </button>
+          )}
         </>
       )}
       {signingPf && signingDoc && <SignDialog pf={signingPf} doc={signingDoc} onClose={() => setSigning(null)} />}
@@ -343,45 +290,31 @@ function Group({
         {...pressable(() => (target ? move.drop(weekDate!) : setOpen(!open)), target ? `Déplacer ${move.moving} en ${title}` : `${title} : ${open ? 'replier' : 'déplier'}`)}
         aria-expanded={open}
       >
-        <Calendar className="pf-week-cal" size={38} strokeWidth={1.8} />
+        <Calendar className="pf-week-cal" size={34} strokeWidth={1.8} />
         <div className="pf-week-title">
           <h2>{title}</h2>
           <span>{sub}</span>
         </div>
-        <span className="pf-count">
-          {items.length} proforma{items.length > 1 ? 's' : ''}
-        </span>
-        <div className="pf-metrics">
-          <div className="pf-metric">
-            <small>CBM</small>
-            <b>{dec(cbm)}</b>
-          </div>
-          <div className="pf-metric">
-            <small>
-              <ContainerGlyph size={18} />
-            </small>
-            <b>≈ {dec(cbm / 69)}</b>
-          </div>
-          {showMoney && (
-            <div className="pf-metric pf-metric-amount">
-              <small>Montant</small>
-              <b>{eur(amount)}</b>
-            </div>
-          )}
+        <div className="pfx-metrics">
+          <span className="pfx-count">
+            {items.length} proforma{items.length > 1 ? 's' : ''}
+          </span>
+          <span>{dec(cbm)} m³</span>
+          <span>≈ {dec(cbm / 69)} containers</span>
+          {showMoney && <b>{eur(amount)}</b>}
         </div>
         <span className="pf-chevron">{open ? <ChevronUp size={24} /> : <ChevronDown size={24} />}</span>
       </header>
 
       {open && (
         <div className="pf-body">
-          <table className="pf-table">
+          <table className="pfx">
             <thead>
               <tr>
-                <th>Proforma</th>
+                <th>Commande</th>
                 <th className="c">Packs</th>
-                <th className="c">Statut</th>
-                <th className="c">Chargement</th>
-                {showMoney && <th className="c">Montant</th>}
+                <th>Statut</th>
+                {showMoney && <th className="r">Montant</th>}
                 <th />
               </tr>
             </thead>
@@ -522,14 +455,28 @@ function PackCell({ ok, total, done }: { ok: number; total: number; done: boolea
   );
 }
 
+/** Statut en pastille : point de couleur + libellé (maquette) */
+function StatusDot({ status }: { status: ProformaStatus }) {
+  return (
+    <span className={`pfx-st ${status}`}>
+      <i /> {STATUS_TEXT[status]}
+    </span>
+  );
+}
+
 function Row({ p, state, showMoney, onSign, onOpen, move }: RowProps) {
   const { t, sup, title, packsDone } = useRowData(p, state);
   const movable = !!move?.canMove(p);
+  const revision = pendingRevision(p);
+  // Une seule action par ligne : signer (proforma déposée par le fournisseur, ou modification), sinon demander le booking
+  const signable = !!onSign && (revision || (p.status === 'a_signer' && pendingVersion(p)));
+  const depositDue = hasDeposit(p) && !p.depositPaid;
   return (
     <tr
       {...pressable(onOpen, `Ouvrir ${p.id}`)}
       className={move?.moving === p.id ? 'pf-moving' : undefined}
       draggable={movable}
+      title={movable ? 'Glissez la ligne sur une autre semaine pour changer la date d’expédition' : undefined}
       onDragStart={(e) => {
         e.dataTransfer.setData('text/plain', p.id);
         e.dataTransfer.effectAllowed = 'move';
@@ -538,50 +485,59 @@ function Row({ p, state, showMoney, onSign, onOpen, move }: RowProps) {
       onDragEnd={() => move?.setDragging(null)}
     >
       <td>
-        <div className="pf-ref">
-          {movable && (
-            <button
-              type="button"
-              className="pf-grip"
-              title="Déplacer vers une autre semaine (glisser, ou toucher puis choisir la semaine)"
-              aria-label={`Déplacer ${p.id}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                move!.start(p.id);
-              }}
-            >
-              <ArrowUpDown size={15} />
-            </button>
-          )}
-          <SupplierMark supplier={sup} size={40} />
-          <div className="pf-ident">
-            <b className="pf-id">{p.id}</b>
-            <span className="pf-title">{title}</span>
-            <small className="pf-supname">{sup.name}</small>
+        <div className="pfx-cmd">
+          <SupplierMark supplier={sup} size={34} />
+          <div>
+            <b>{title}</b>
+            <small>
+              {sup.name} · {p.id}
+            </small>
           </div>
         </div>
       </td>
       <td className="c">
-        <PackCell ok={t.packsOk} total={t.packsTotal} done={packsDone} />
+        {packsDone ? (
+          <span className="pfx-ok">
+            <Check size={22} strokeWidth={3} /> OK
+          </span>
+        ) : (
+          <span className="pfx-packs">
+            {t.packsOk}/{t.packsTotal}
+          </span>
+        )}
       </td>
-      <td className="c">
-        <StatusCell p={p} onSign={onSign} />
-      </td>
-      <td className="c">
-        <div className="pf-when">
-          <b>{weekLabel(p.etd)}</b>
-          <small>
-            arrivée {weekLabel(p.eta)} · {dec(t.cbm)} m³
-          </small>
-        </div>
+      <td>
+        <StatusDot status={p.status} />
+        {revision && <small className="pfx-note">Modification v{revision.version} à signer</small>}
+        {p.status === 'a_signer' && !pendingVersion(p) && <small className="pfx-note">Attente de la proforma du fournisseur</small>}
       </td>
       {showMoney && (
-        <td className="c">
-          <AmountCell p={p} amount={t.amount} deposit={t.deposit} amountCur={t.amountCur} currency={t.currency} />
+        <td className="r">
+          <div className="pfx-amount">
+            <b>{eur(t.amount)}</b>
+            {depositDue && <small>Acompte à faire</small>}
+          </div>
         </td>
       )}
-      <td className="pf-go">
-        <ChevronRight size={22} />
+      <td className="pfx-act">
+        {signable ? (
+          <button
+            type="button"
+            className="pfx-sign"
+            title={revision ? `Signer la modification v${revision.version}` : 'Signer la proforma déposée par le fournisseur'}
+            onClick={(e) => {
+              e.stopPropagation();
+              onSign!(p.id);
+            }}
+          >
+            Signer
+          </button>
+        ) : (
+          <span className="pfx-act-row">
+            <BookingRequestButton pf={p} variant="row" />
+            <ChevronRight size={24} />
+          </span>
+        )}
       </td>
     </tr>
   );

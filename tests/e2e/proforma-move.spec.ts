@@ -12,12 +12,13 @@ const plusDays = (d: string, n: number) => {
   return x.toISOString().slice(0, 10);
 };
 
-test('toucher ⇅ puis choisir la semaine : la proforma change de semaine (ETA suit)', async ({ page }) => {
+test('téléphone : toucher ⇅ puis choisir la semaine : la proforma change de semaine (ETA suit)', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   await resetApp(page);
   await loginAs(page, 'David');
   await go(page, 'proformas');
   const before = await pfOf(page, 'PF-2026-0146');
-  await page.getByRole('button', { name: 'Déplacer PF-2026-0146', exact: true }).click();
+  await page.getByRole('button', { name: 'Déplacer PF-2026-0146 (carte)', exact: true }).click();
   const bar = page.getByRole('region', { name: 'Déplacer vers la semaine' });
   await expect(bar).toContainText('PF-2026-0146');
   // Deux semaines plus tard
@@ -43,7 +44,7 @@ test('glisser-déposer une proforma sur une autre semaine', async ({ page }) => 
   await loginAs(page, 'David');
   await go(page, 'proformas');
   const before = await pfOf(page, 'PF-2026-0146');
-  const row = page.locator('.pf-table tr', { hasText: 'PF-2026-0146' });
+  const row = page.locator('.pfx tr', { hasText: 'PF-2026-0146' });
   const other = page
     .locator('.pf-week')
     .filter({ hasNot: page.locator('tr', { hasText: 'PF-2026-0146' }) })
