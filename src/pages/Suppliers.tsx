@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { NewSupplierButton } from '../components/NewSupplier';
 import { Check, Mail, User } from 'lucide-react';
 import { supplierStats, useStore } from '../data/store';
 import { Pill, SupplierLogo } from '../components/ui';
@@ -12,6 +13,8 @@ export default function Suppliers() {
       <div className="page-head">
         <h1>Fournisseurs</h1>
         <span className="pill green">{state.suppliers.length} fournisseurs</span>
+        <div className="grow" />
+        <NewSupplierButton onCreated={(id) => navigate(`/fournisseurs/${id}`)} />
       </div>
       <div className="gallery" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' }}>
         {state.suppliers.map((s) => {
@@ -28,7 +31,11 @@ export default function Suppliers() {
                     {s.flag} {s.country} – {s.city}
                   </div>
                 </div>
-                {s.active && <Pill color="green" icon={<Check size={12} />}>Actif</Pill>}
+                {s.active && (
+                  <Pill color="green" icon={<Check size={12} />}>
+                    Actif
+                  </Pill>
+                )}
               </div>
               <div className="small muted row" style={{ gap: 6 }}>
                 <User size={13} /> {s.contact.name} · {s.contact.role}

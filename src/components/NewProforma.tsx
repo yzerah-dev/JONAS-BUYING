@@ -7,6 +7,7 @@ import { TODAY, addDays } from '../lib/format';
 import { useT } from '../i18n';
 import { toast } from './ui-shared';
 import FileDrop from './FileDrop';
+import { NewSupplierButton } from './NewSupplier';
 import Combobox from './Combobox';
 import LinesEditor from './LinesEditor';
 import { emptyLine, fromExtraction, toImport, withLinePhotos, type EditLine } from '../lib/editLines';
@@ -111,7 +112,13 @@ function NewProformaDialog({ onClose, onCreated }: { onClose: () => void; onCrea
 
   return (
     <div className="palette-back" onMouseDown={onClose}>
-      <form className="card rc-dialog bk-dialog np-dialog" role="dialog" aria-label={supplierSide ? t('np.title', { id }) : t('po.title', { id })} onMouseDown={(e) => e.stopPropagation()} onSubmit={submit}>
+      <form
+        className="card rc-dialog bk-dialog np-dialog"
+        role="dialog"
+        aria-label={supplierSide ? t('np.title', { id }) : t('po.title', { id })}
+        onMouseDown={(e) => e.stopPropagation()}
+        onSubmit={submit}
+      >
         <header className="rc-head">
           <div>
             <h2>{supplierSide ? t('np.title', { id }) : t('po.title', { id })}</h2>
@@ -129,10 +136,16 @@ function NewProformaDialog({ onClose, onCreated }: { onClose: () => void; onCrea
                 id="np-sup"
                 value={supplierId}
                 placeholder="Tapez le nom du fournisseur…"
-                options={state.suppliers
-                  .filter((s) => s.active)
-                  .map((s) => ({ id: s.id, label: s.name, sub: `${s.flag} ${s.city} · ${s.country}`, keywords: s.shortName }))}
+                options={state.suppliers.filter((s) => s.active).map((s) => ({ id: s.id, label: s.name, sub: `${s.flag} ${s.city} · ${s.country}`, keywords: s.shortName }))}
                 onChange={(v) => {
+                  setSupplierId(v);
+                  setLines([emptyLine()]);
+                }}
+              />
+              <NewSupplierButton
+                className="btn sm ghost np-newsup"
+                label="Créer un nouveau fournisseur"
+                onCreated={(v) => {
                   setSupplierId(v);
                   setLines([emptyLine()]);
                 }}

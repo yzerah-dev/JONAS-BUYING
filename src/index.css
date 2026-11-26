@@ -1972,3 +1972,4 @@ select.pi-input { cursor: pointer; }
 .sr-hero { width: 100%; height: 220px; border-radius: 12px; font-size: 110px; overflow: hidden; display: grid; place-items: center; }
 .sr-hero .product-pic { width: 100%; height: 100%; object-fit: contain; }
 @media (max-width: 560px) { .sr-hero { height: 180px; font-size: 90px; } }
+.np-newsup { justify-self: start; width: fit-content; margin-top: 4px; color: var(--green-dark); }

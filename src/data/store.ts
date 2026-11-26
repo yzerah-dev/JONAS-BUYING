@@ -135,6 +135,7 @@ export type Action =
       file?: { fileId: string; name: string; size: number; mime: string };
     }
   | { type: 'setSupplierTerms'; supplierId: string; terms: SupplierTerms }
+  | { type: 'addSupplier'; supplier: Supplier }
   | { type: 'cancelOrder'; id: string }
   | { type: 'requestSplit'; id: string; lines: { productId: string; qtyNow: number }[]; etdLater: ISODate; reason: string }
   | { type: 'acceptSplit'; id: string }
@@ -393,6 +394,8 @@ export function isAllowed(s: State, a: Action): boolean {
       const pf = s.proformas.find((x) => x.id === a.id);
       return !!pf?.order && !pf.versions?.length && pf.status === 'a_signer' && (can(u, 'proforma.edit') || can(u, 'proforma.sign'));
     }
+    case 'addSupplier':
+      return canAddSupplier(u) && !!a.supplier.id && !!a.supplier.name.trim() && !s.suppliers.some((x) => x.id === a.supplier.id);
     case 'setSupplierTerms':
       return !!s.suppliers.find((x) => x.id === a.supplierId) && (can(u, 'finance.pay') || can(u, 'proforma.sign')) && a.terms.depositPct >= 0 && a.terms.depositPct <= 100 && a.terms.balanceDays >= 0;
     case 'createProforma': {
@@ -968,6 +971,8 @@ function applyAction(s: State, a: Action): State {
       return { ...s, proformas: s.proformas.filter((p) => p.id !== a.id) };
     case 'setSupplierTerms':
       return { ...s, suppliers: s.suppliers.map((x) => (x.id === a.supplierId ? { ...x, terms: a.terms } : x)) };
+    case 'addSupplier':
+      return { ...s, suppliers: [...s.suppliers, a.supplier] };
     case 'requestSplit': {
       const u = currentUser(s);
       return mapPF(s, a.id, (pf) => ({
@@ -1720,6 +1725,8 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
       const n = a.items.reduce((t, i) => t + i.photos.length, 0);
       return { target: a.items.length === 1 ? a.items[0].productId : undefined, text: `${n} photo(s) importée(s) pour ${a.items.length} produit(s)` };
     }
+    case 'addSupplier':
+      return { target: a.supplier.id, text: `Nouveau fournisseur : ${a.supplier.name} (${a.supplier.city}, ${a.supplier.country})` };
     case 'setSupplierTerms':
       return { text: `${s.suppliers.find((x) => x.id === a.supplierId)?.shortName} : devise ${a.terms.currency}, acompte ${a.terms.depositPct} %, solde J+${a.terms.balanceDays}` };
     case 'requestSplit':
@@ -2111,6 +2118,23 @@ export function lineCbm(p: Product, qty: number) {
 }
 
 export type PackState = 'ok' | 'en_cours' | 'a_faire';
+
+/** Créer un fournisseur : l'équipe achats (pilote, Direction, acheteurs) */
+export const canAddSupplier = (u: User) => u.active && !isSupplier(u) && u.role !== 'transitaire' && (u.role === 'pilote' || can(u, 'proforma.edit') || can(u, 'proforma.sign'));
+
+/** Identifiant libre pour un nouveau fournisseur, tiré de son nom */
+export function newSupplierId(s: State, name: string) {
+  const base =
+    name
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '')
+      .slice(0, 20) || 'fournisseur';
+  let id = base;
+  for (let i = 2; s.suppliers.some((x) => x.id === id); i++) id = `${base}${i}`;
+  return id;
+}
 
 /** Un pack est terminé uniquement après les quatre validations. */
 export function packState(p: Product): PackState {
