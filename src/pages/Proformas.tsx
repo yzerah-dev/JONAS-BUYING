@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Ban, Calendar, Check, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, Landmark, Layers, List, PenLine, Search, SlidersHorizontal, Split } from 'lucide-react';
+import { ArrowUpDown, Ban, Calendar, Check, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, Landmark, Layers, List, PenLine, Search, SlidersHorizontal, Split } from 'lucide-react';
 import { byId, isReliquat, openReliquats, shipmentLabel, pendingRevision, pendingVersion, proformaTotals, useAuth, useStore, PROFORMA_STATUS_LABEL, type State, hasDeposit } from '../data/store';
 import { PROFORMA_STATUSES, type Proforma, type ProformaStatus } from '../data/types';
 import { ContainerGlyph, ProformaStatusPill, SupplierMark } from '../components/ui';
 import { PROFORMA_ICON, toast } from '../components/ui-shared';
-import { TODAY, dec, eur, fdate, weekKey, weekLabel, weekRange } from '../lib/format';
+import { TODAY, addDays, dec, diffDays, eur, fdate, weekKey, weekLabel, weekRange, weekStart } from '../lib/format';
 import { pressable } from '../lib/a11y';
 import { BookingRequestButton } from '../components/BookingDialog';
 import { SignDialog } from '../components/ProformaVersions';
@@ -13,6 +13,20 @@ import { NewProformaButton } from '../components/NewProforma';
 import Combobox from '../components/Combobox';
 
 type View = 'liste' | 'semaine' | 'fournisseur';
+
+/** Déplacer une proforma vers une autre semaine d'expédition : même jour de la semaine, dans la semaine choisie */
+const etdInWeek = (etd: string, weekDate: string) => addDays(weekStart(weekDate), diffDays(etd, weekStart(etd)));
+
+interface MoveCtx {
+  /** Proforma choisie au toucher (barre des semaines affichée) */
+  moving: string | null;
+  /** Proforma en cours de glisser-déposer (pas de barre : la page ne bouge pas sous la souris) */
+  dragging: string | null;
+  start: (id: string) => void;
+  setDragging: (id: string | null) => void;
+  drop: (weekDate: string, id?: string) => void;
+  canMove: (p: Proforma) => boolean;
+}
 
 export default function Proformas() {
   const { state } = useStore();
@@ -66,6 +80,26 @@ export default function Proformas() {
   }, [filtered, view, state.suppliers, showPast, status]);
   const pastWeeks = view === 'semaine' && status === 'all' ? new Set(filtered.filter((p) => weekKey(p.etd) < weekKey(TODAY)).map((p) => weekKey(p.etd))).size : 0;
 
+  const { dispatch } = useStore();
+  const [moving, setMoving] = useState<string | null>(null);
+  const [dragging, setDragging] = useState<string | null>(null);
+  const move: MoveCtx = {
+    moving,
+    dragging,
+    start: (id) => setMoving(moving === id ? null : id),
+    setDragging,
+    drop: (weekDate, id) => {
+      const pf = state.proformas.find((p) => p.id === (id ?? moving ?? dragging));
+      setMoving(null);
+      setDragging(null);
+      if (!pf) return;
+      const etd = etdInWeek(pf.etd, weekDate);
+      if (etd === pf.etd) return;
+      dispatch({ type: 'setProformaEtd', id: pf.id, etd });
+      toast(`${pf.id} déplacée en ${weekLabel(etd)} (départ ${fdate(etd)})`);
+    },
+    canMove: (p) => view === 'semaine' && auth.allowed({ type: 'setProformaEtd', id: p.id, etd: addDays(p.etd, 7) }),
+  };
   const toSign = state.proformas.filter((p) => p.status === 'a_signer');
   const setStatus = (s: string) => {
     params.delete('reliquats');
@@ -207,6 +241,34 @@ export default function Proformas() {
             ))}
           </div>
 
+          {moving && view === 'semaine' && (
+            <div className="pf-movebar" role="region" aria-label="Déplacer vers la semaine">
+              <b>
+                <ArrowUpDown size={16} /> {moving} : choisissez la semaine d’expédition
+              </b>
+              <div className="pf-movebar-weeks">
+                {Array.from({ length: 20 }, (_, i) => addDays(weekStart(TODAY), i * 7)).map((w) => (
+                  <button
+                    key={w}
+                    type="button"
+                    className={`pf-wk ${weekKey(w) === weekKey(state.proformas.find((p) => p.id === moving)?.etd ?? '') ? 'cur' : ''}`}
+                    onClick={() => move.drop(w)}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      move.drop(w);
+                    }}
+                  >
+                    <b>{weekLabel(w)}</b>
+                    <small>{fdate(w).slice(0, 5)}</small>
+                  </button>
+                ))}
+              </div>
+              <button type="button" className="btn sm ghost" onClick={() => setMoving(null)}>
+                Annuler
+              </button>
+            </div>
+          )}
           {groups.length === 0 && <div className="card empty">Aucune proforma ne correspond à ces filtres.</div>}
           {groups.map((g, i) => (
             <Group
@@ -218,6 +280,8 @@ export default function Proformas() {
               showMoney={showMoney}
               defaultOpen={i === 0 || view === 'liste'}
               onSign={canSign ? sign : undefined}
+              weekDate={g.kind === 'semaine' ? g.items[0].etd : undefined}
+              move={move}
             />
           ))}
         </>
@@ -235,6 +299,8 @@ function Group({
   defaultOpen,
   onSign,
   showMoney,
+  weekDate,
+  move,
 }: {
   title: string;
   sub: string;
@@ -243,16 +309,40 @@ function Group({
   defaultOpen: boolean;
   onSign?: (id: string) => void;
   showMoney: boolean;
+  weekDate?: string;
+  move: MoveCtx;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  const [over, setOver] = useState(false);
+  const target = !!weekDate && !!(move.moving || move.dragging);
   const navigate = useNavigate();
   const totals = items.map((p) => proformaTotals(state, p));
   const cbm = totals.reduce((s, t) => s + t.cbm, 0);
   const amount = totals.reduce((s, t) => s + t.amount, 0);
 
   return (
-    <section className={`pf-week ${open ? 'open' : ''}`}>
-      <header className="pf-week-head" {...pressable(() => setOpen(!open), `${title} : ${open ? 'replier' : 'déplier'}`)} aria-expanded={open}>
+    <section
+      className={`pf-week ${open ? 'open' : ''} ${target ? 'drop-target' : ''} ${over ? 'drop-over' : ''}`}
+      onDragOver={(e) => {
+        if (!weekDate) return;
+        e.preventDefault();
+        setOver(true);
+      }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(e) => {
+        if (!weekDate) return;
+        const id = e.dataTransfer.getData('text/plain');
+        if (!id && !move.moving) return;
+        e.preventDefault();
+        setOver(false);
+        move.drop(weekDate, id || undefined);
+      }}
+    >
+      <header
+        className="pf-week-head"
+        {...pressable(() => (target ? move.drop(weekDate!) : setOpen(!open)), target ? `Déplacer ${move.moving} en ${title}` : `${title} : ${open ? 'replier' : 'déplier'}`)}
+        aria-expanded={open}
+      >
         <Calendar className="pf-week-cal" size={38} strokeWidth={1.8} />
         <div className="pf-week-title">
           <h2>{title}</h2>
@@ -302,7 +392,7 @@ function Group({
             </thead>
             <tbody>
               {items.map((p) => (
-                <Row key={p.id} p={p} state={state} showMoney={showMoney} onSign={onSign} onOpen={() => navigate(`/proformas/${p.id}`)} />
+                <Row key={p.id} p={p} state={state} showMoney={showMoney} onSign={onSign} onOpen={() => navigate(`/proformas/${p.id}`)} move={move} />
               ))}
             </tbody>
           </table>
@@ -316,7 +406,7 @@ function Group({
               <span />
             </div>
             {items.map((p) => (
-              <Card key={p.id} p={p} state={state} showMoney={showMoney} onSign={onSign} onOpen={() => navigate(`/proformas/${p.id}`)} />
+              <Card key={p.id} p={p} state={state} showMoney={showMoney} onSign={onSign} onOpen={() => navigate(`/proformas/${p.id}`)} move={move} />
             ))}
           </div>
         </div>
@@ -331,6 +421,7 @@ interface RowProps {
   showMoney: boolean;
   onSign?: (id: string) => void;
   onOpen: () => void;
+  move?: MoveCtx;
 }
 
 function useRowData(p: Proforma, state: State) {
@@ -436,12 +527,37 @@ function PackCell({ ok, total, done }: { ok: number; total: number; done: boolea
   );
 }
 
-function Row({ p, state, showMoney, onSign, onOpen }: RowProps) {
+function Row({ p, state, showMoney, onSign, onOpen, move }: RowProps) {
   const { t, sup, title, packsDone } = useRowData(p, state);
+  const movable = !!move?.canMove(p);
   return (
-    <tr {...pressable(onOpen, `Ouvrir ${p.id}`)}>
+    <tr
+      {...pressable(onOpen, `Ouvrir ${p.id}`)}
+      className={move?.moving === p.id ? 'pf-moving' : undefined}
+      draggable={movable}
+      onDragStart={(e) => {
+        e.dataTransfer.setData('text/plain', p.id);
+        e.dataTransfer.effectAllowed = 'move';
+        move?.setDragging(p.id);
+      }}
+      onDragEnd={() => move?.setDragging(null)}
+    >
       <td>
         <div className="pf-ref">
+          {movable && (
+            <button
+              type="button"
+              className="pf-grip"
+              title="Déplacer vers une autre semaine (glisser, ou toucher puis choisir la semaine)"
+              aria-label={`Déplacer ${p.id}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                move!.start(p.id);
+              }}
+            >
+              <ArrowUpDown size={15} />
+            </button>
+          )}
           <SupplierMark supplier={sup} size={30} />
           <b>{p.id}</b>
         </div>
@@ -482,11 +598,17 @@ function Row({ p, state, showMoney, onSign, onOpen }: RowProps) {
 }
 
 /** Téléphone : ligne fine (identité, état pack, chargement) ; le détail s'ouvre au toucher. */
-function Card({ p, state, showMoney, onSign, onOpen }: RowProps) {
+function Card({ p, state, showMoney, onSign, onOpen, move }: RowProps) {
   const { t, sup, title, packsDone } = useRowData(p, state);
   const [open, setOpen] = useState(false);
+  const movable = !!move?.canMove(p);
   return (
-    <article className={`pf-line ${open ? 'open' : ''}`}>
+    <article className={`pf-line ${open ? 'open' : ''} ${move?.moving === p.id ? 'pf-moving' : ''}`}>
+      {movable && (
+        <button type="button" className="pf-grip pf-grip-card" aria-label={`Déplacer ${p.id} (carte)`} onClick={() => move!.start(p.id)}>
+          <ArrowUpDown size={15} />
+        </button>
+      )}
       <button className="pf-line-main" onClick={() => setOpen(!open)} aria-expanded={open}>
         <SupplierMark supplier={sup} size={22} />
         <span className="pf-line-id">

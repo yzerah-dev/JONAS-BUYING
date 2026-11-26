@@ -2072,3 +2072,22 @@ select.pi-input { cursor: pointer; }
 .cart-sup .tbl td { vertical-align: middle; }
 .cart-sup { grid-column: 1 / -1; }
 .cq-input { flex: 0 0 55%; width: 55%; }
+
+/* Déplacer une proforma vers une autre semaine (glisser-déposer ou toucher) */
+.pf-grip { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; border: 1px dashed var(--green); background: #fff; color: var(--green-dark); cursor: grab; flex: none; }
+.pf-grip:hover { background: var(--green-soft); }
+.pf-grip-card { position: absolute; right: 8px; top: 8px; z-index: 2; }
+.pf-line { position: relative; }
+tr[draggable='true'] { cursor: grab; }
+tr.pf-moving td, .pf-line.pf-moving { background: #fff6e8 !important; outline: 2px dashed var(--orange); outline-offset: -2px; }
+.pf-week.drop-target { outline: 2px dashed var(--green); outline-offset: 2px; }
+.pf-week.drop-over { outline: 3px solid var(--green); background: var(--green-soft); }
+.pf-movebar { position: sticky; top: 0; z-index: 20; display: grid; gap: 8px; padding: 10px 12px; margin-bottom: 12px; border-radius: 12px; background: #fff; border: 2px solid var(--orange); box-shadow: 0 6px 18px rgba(10, 20, 16, 0.12); }
+.pf-movebar > b { display: flex; align-items: center; gap: 6px; }
+.pf-movebar-weeks { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+.pf-wk { flex: none; display: grid; justify-items: center; gap: 1px; min-width: 62px; padding: 6px 8px; border-radius: 10px; border: 1px solid var(--line); background: #fff; cursor: pointer; }
+.pf-wk:hover { border-color: var(--green); background: var(--green-soft); }
+.pf-wk.cur { border-color: var(--orange); background: var(--orange-soft); }
+.pf-wk small { font-size: 11px; color: var(--muted); }
+.pf-movebar > .btn { justify-self: end; }
+.etd-select { height: 34px; font-weight: 800; font-size: 15px; padding: 2px 8px; margin-top: 2px; }

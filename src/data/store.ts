@@ -160,6 +160,7 @@ export type Action =
   | { type: 'allocate'; containerId: string; proformaId: string; productId: string; qty: number }
   | { type: 'deallocate'; containerId: string; proformaId: string; productId: string }
   | { type: 'deleteContainer'; containerId: string }
+  | { type: 'setProformaEtd'; id: string; etd: ISODate }
   | { type: 'setPaymentProof'; id: string; kind: 'deposit' | 'balance'; file: { fileId: string; name: string; size: number; type: string } }
   | { type: 'setAllocationQty'; containerId: string; proformaId: string; productId: string; qty: number }
   | { type: 'createContainer'; supplierId: string; etd: ISODate; eta: ISODate }
@@ -366,6 +367,18 @@ export function isAllowed(s: State, a: Action): boolean {
       const p = s.products.find((x) => x.id === a.productId);
       if (isSupplier(u)) return !!p && p.supplierId === u.supplierId;
       return can(u, 'pack.design');
+    }
+    case 'setProformaEtd': {
+      const pf = s.proformas.find((x) => x.id === a.id);
+      return (
+        !!pf &&
+        !!a.etd &&
+        a.etd !== pf.etd &&
+        !isSupplier(u) &&
+        pf.status !== 'en_transit' &&
+        pf.status !== 'arrive' &&
+        (can(u, 'proforma.edit') || can(u, 'proforma.sign') || can(u, 'logistics.plan'))
+      );
     }
     case 'setPaymentProof':
       return !isSupplier(u) && (can(u, 'finance.pay') || can(u, 'proforma.sign')) && s.proformas.some((p) => p.id === a.id);
@@ -579,6 +592,16 @@ export function shipmentsOf(s: State, pf: Proforma): Proforma[] {
   return s.proformas.filter((p) => p.id === root || p.split?.root === root).sort((a, b) => (a.split?.part ?? 1) - (b.split?.part ?? 1));
 }
 /** Devise et conditions de paiement d'un fournisseur (par défaut : EUR, 30 % d'acompte, solde à J+7 du départ) */
+/** « S05 » : semaine ISO d'une date */
+const weekLabelOf = (d: ISODate) => `S${String(isoWeekOf(d)).padStart(2, '0')}`;
+function isoWeekOf(iso: ISODate) {
+  const d = new Date(`${iso}T12:00:00Z`);
+  const day = (d.getUTCDay() + 6) % 7;
+  d.setUTCDate(d.getUTCDate() - day + 3);
+  const first = new Date(Date.UTC(d.getUTCFullYear(), 0, 4));
+  return 1 + Math.round(((d.getTime() - first.getTime()) / 86400000 - 3 + ((first.getUTCDay() + 6) % 7)) / 7);
+}
+
 /** Proforma avec acompte (0 % : pas d'acompte, donc pas d'échéance d'acompte) */
 export const hasDeposit = (pf: Pick<Proforma, 'depositPct'>) => (pf.depositPct ?? 0) > 0;
 /** Jours entre le départ et le paiement du solde */
@@ -1306,6 +1329,18 @@ function applyAction(s: State, a: Action): State {
       });
       return syncProformaStatuses(next);
     }
+    case 'setProformaEtd':
+      return mapPF(s, a.id, (pf) => {
+        const shift = diffDays(a.etd, pf.etd);
+        const balanceDue = pf.balancePaid || realDeparture(s, pf) ? pf.balanceDue : addDays(a.etd, balanceDaysOf(s, pf));
+        return {
+          ...pf,
+          etd: a.etd,
+          eta: addDays(pf.eta, shift),
+          balanceDue,
+          history: [...pf.history, hist(me, `Semaine d’expédition : ${weekLabelOf(pf.etd)} → ${weekLabelOf(a.etd)} (départ ${a.etd})`)],
+        };
+      });
     case 'setPaymentProof': {
       const proof = { ...a.file, at: nowStamp(), by: me };
       return mapPF(s, a.id, (pf) =>
@@ -1978,6 +2013,10 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
       return { target: ctn(a.containerId), text: `${a.qty} pcs ${ref(a.productId)} affectées (${a.proformaId})` };
     case 'deallocate':
       return { target: ctn(a.containerId), text: `${ref(a.productId)} retiré du conteneur` };
+    case 'setProformaEtd': {
+      const pf = s.proformas.find((x) => x.id === a.id);
+      return { target: a.id, text: `Semaine d’expédition : ${pf ? weekLabelOf(pf.etd) : ''} → ${weekLabelOf(a.etd)}` };
+    }
     case 'setPaymentProof':
       return { target: a.id, text: `Copie du virement ${a.kind === 'deposit' ? 'd’acompte' : 'de solde'} déposée : ${a.file.name}` };
     case 'deleteContainer': {

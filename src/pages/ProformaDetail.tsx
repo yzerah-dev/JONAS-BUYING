@@ -61,7 +61,7 @@ import { BookingRequestButton } from '../components/BookingDialog';
 import BookingReview, { LastRejection } from '../components/BookingReview';
 import ProformaVersions, { SignDialog } from '../components/ProformaVersions';
 import ShipmentsPanel from '../components/Shipments';
-import { addDays, dec, eur2, fdate, m3, money, num, weekLabel } from '../lib/format';
+import { TODAY, addDays, dec, diffDays, eur2, fdate, m3, money, num, weekLabel, weekStart } from '../lib/format';
 import { useT, type I18n } from '../i18n/context';
 import type { Key } from '../i18n/dict';
 
@@ -151,7 +151,7 @@ export default function ProformaDetail() {
           <div className="kpis" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(170px, 100%), 1fr))' }}>
             <Info icon={<ClipboardList size={18} />} label="N° commande Jonas" value={pf.poNumber} />
             <Info icon={<Calendar size={18} />} label="Date de la proforma" value={fdate(pf.date)} />
-            <Info icon={<Ship size={18} />} label="ETD" value={weekLabel(pf.etd)} sub={`du ${fdate(pf.etd)}`} />
+            <EtdWeek pf={pf} />
             <Info icon={<Ship size={18} />} label="ETA" value={weekLabel(pf.eta)} sub={`du ${fdate(pf.eta)}`} />
             <Info icon={<Ctn size={18} />} label="Conteneurs" value={dec(t.eq40)} sub="(40HC)" />
             <Info icon={<Boxes size={18} />} label="CBM total" value={m3(t.cbm)} />
@@ -225,6 +225,46 @@ export default function ProformaDetail() {
         </Pill>
       </div>
     </>
+  );
+}
+
+/** ETD : la semaine d'expédition se change ici (même jour de la semaine, ETA et échéance du solde suivent) */
+function EtdWeek({ pf }: { pf: Proforma }) {
+  const { dispatch } = useStore();
+  const auth = useAuth();
+  const canMove = auth.allowed({ type: 'setProformaEtd', id: pf.id, etd: addDays(pf.etd, 7) });
+  if (!canMove) return <Info icon={<Ship size={18} />} label="ETD" value={weekLabel(pf.etd)} sub={`du ${fdate(pf.etd)}`} />;
+  const offset = diffDays(pf.etd, weekStart(pf.etd));
+  const first = weekStart(addDays(TODAY, -28));
+  const weeks = Array.from({ length: 40 }, (_, i) => addDays(first, i * 7));
+  if (!weeks.includes(weekStart(pf.etd))) weeks.unshift(weekStart(pf.etd));
+  return (
+    <div className="row" style={{ gap: 10, alignItems: 'flex-start' }}>
+      <span className="muted" style={{ marginTop: 2 }}>
+        <Ship size={18} />
+      </span>
+      <div>
+        <label className="muted xs" htmlFor={`etd-${pf.id}`}>
+          ETD · semaine d’expédition
+        </label>
+        <select
+          id={`etd-${pf.id}`}
+          className="input etd-select"
+          value={weekStart(pf.etd)}
+          onChange={(e) => {
+            const etd = addDays(e.target.value, offset);
+            dispatch({ type: 'setProformaEtd', id: pf.id, etd });
+            toast(`${pf.id} déplacée en ${weekLabel(etd)} (départ ${fdate(etd)})`);
+          }}
+        >
+          {weeks.map((w) => (
+            <option key={w} value={w}>
+              {weekLabel(w)} · {fdate(addDays(w, offset))}
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
   );
 }
 
