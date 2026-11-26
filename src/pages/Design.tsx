@@ -1,7 +1,28 @@
 import { getBlob, saveBlob, zipBlobs } from '../lib/files';
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, Box, Calendar, Users, Check, ChevronDown, ChevronUp, Download, FileText, Flame, History, Layers, Paperclip, Play, Scissors, Search, Send, X } from 'lucide-react';
+import {
+  AlertTriangle,
+  Box,
+  Calendar,
+  Users,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Download,
+  FileText,
+  Flame,
+  History,
+  LayoutGrid,
+  Layers,
+  List,
+  Paperclip,
+  Play,
+  Scissors,
+  Search,
+  Send,
+  X,
+} from 'lucide-react';
 import PackFiles from '../components/PackFiles';
 import { pressable } from '../lib/a11y';
 import { brandOf, byId, capacityOf, matchTrack, packDone, packLate, packTrack, TRACK_CHIPS, TRACK_ORDER, useAuth, useStore, type State, type TrackFilter } from '../data/store';
@@ -96,6 +117,22 @@ function DesignPage() {
   const [designer, setDesigner] = useState(auth.user.designerName ?? 'all');
   // Vues : par semaine de deadline, par designer, par fournisseur (+ case du planning)
   const [view, setView] = useState<'case' | 'semaine' | 'designer' | 'fournisseur'>('semaine');
+  // Liste ou galerie (grandes photos) : choix gardé dans ce navigateur
+  const [layout, setLayoutState] = useState<'liste' | 'galerie'>(() => {
+    try {
+      return localStorage.getItem('jonas-buying-design-layout') === 'galerie' ? 'galerie' : 'liste';
+    } catch {
+      return 'liste';
+    }
+  });
+  const setLayout = (l: 'liste' | 'galerie') => {
+    setLayoutState(l);
+    try {
+      localStorage.setItem('jonas-buying-design-layout', l);
+    } catch {
+      /* choix gardé le temps de la session */
+    }
+  };
   const [showPlan, setShowPlan] = useState(false);
   // Cartes semaine repliées / dépliées (par défaut : semaine en cours et suivante ouvertes)
   const [toggled, setToggled] = useState<Set<string>>(new Set());
@@ -323,6 +360,16 @@ function DesignPage() {
                 </button>
               ),
             )}
+            {view !== 'case' && (
+              <span className="pk-layout" role="group" aria-label="Présentation">
+                <button type="button" aria-pressed={layout === 'liste'} className={layout === 'liste' ? 'on' : ''} onClick={() => setLayout('liste')}>
+                  <List size={16} /> Liste
+                </button>
+                <button type="button" aria-pressed={layout === 'galerie'} className={layout === 'galerie' ? 'on' : ''} onClick={() => setLayout('galerie')}>
+                  <LayoutGrid size={16} /> Galerie
+                </button>
+              </span>
+            )}
           </div>
           {view !== 'case' && (
             <div className="pk-designers" role="group" aria-label="Designer">
@@ -482,7 +529,7 @@ function DesignPage() {
           )}
 
           <div className="card pk-list">
-            <div className="pk-head">
+            <div className={`pk-head ${layout === 'galerie' && view !== 'case' ? 'pk-head-gal' : ''}`}>
               <input type="checkbox" checked={allChecked} onChange={() => setSelected(allChecked ? new Set() : new Set(list.map((p) => p.id)))} aria-label="Tout sélectionner" />
               <span className="pk-c-prod">Produit · {list.length}</span>
               <span className="pk-c-brand">Marque</span>
@@ -494,6 +541,7 @@ function DesignPage() {
             </div>
             {list.length === 0 && <div className="empty">Aucun pack pour ce filtre.</div>}
             {groups.map(([g, items]) => {
+              const gallery = layout === 'galerie' && view !== 'case';
               const nextWeek = weekKey(addDays(TODAY, 7));
               const isCard = view !== 'case';
               const tk = `${view}:${g}`;
@@ -529,7 +577,31 @@ function DesignPage() {
                       </div>
                     )
                   )}
+                  {open && gallery && (
+                    <div className="pk-gal">
+                      {items.map((p) => (
+                        <PackCard
+                          key={p.id}
+                          p={p}
+                          state={state}
+                          active={sel?.id === p.id}
+                          showDesigner={designer === 'all'}
+                          color={colorOf(p.pack.designer)}
+                          draggable={canAssign}
+                          onDragStart={(e) => {
+                            e.dataTransfer.setData(DRAG_MIME, JSON.stringify(dragIds(p.id)));
+                            e.dataTransfer.effectAllowed = 'move';
+                          }}
+                          onOpen={() => {
+                            setSelId(p.id);
+                            revealPanel();
+                          }}
+                        />
+                      ))}
+                    </div>
+                  )}
                   {open &&
+                    !gallery &&
                     items.map((p) => (
                       <PackRow
                         key={p.id}
@@ -655,6 +727,56 @@ function WeekHead({
   );
 }
 
+/** Galerie : grande photo, référence, nom, état du pack et deadline (clic : ouvre le pack) */
+function PackCard({
+  p,
+  state,
+  active,
+  showDesigner,
+  color,
+  draggable,
+  onDragStart,
+  onOpen,
+}: {
+  p: Product;
+  state: State;
+  active: boolean;
+  showDesigner: boolean;
+  color: string;
+  draggable: boolean;
+  onDragStart: (e: React.DragEvent) => void;
+  onOpen: () => void;
+}) {
+  const [label, tone] = packStatus(p);
+  const late = packLate(p);
+  return (
+    <div className={`pk-card ${active ? 'active' : ''} ${late ? 'late' : ''}`} {...pressable(onOpen, `Ouvrir le pack ${p.ref}`)} draggable={draggable} onDragStart={onDragStart}>
+      <div className="pk-card-pic" style={{ background: p.tint }}>
+        <ProductPic product={p} />
+        {p.urgent && (
+          <span className="pk-card-urgent" title="PUSH URGENT">
+            <Flame size={16} />
+          </span>
+        )}
+        {showDesigner && (
+          <span className="dev-avatar pk-card-who" style={{ background: color }} title={p.pack.designer}>
+            {initials(p.pack.designer)}
+          </span>
+        )}
+      </div>
+      <div className="pk-card-body">
+        <b>{p.ref}</b>
+        <span className="pk-card-name">{p.name}</span>
+        <small className="muted">{byId(state.suppliers, p.supplierId).shortName}</small>
+        <div className="pk-card-foot">
+          <Pill color={late ? 'red' : tone}>{late ? 'En retard' : label}</Pill>
+          <span className={late ? 'red bold' : 'muted'}>{fshort(p.pack.artworkDeadline)}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PackRow({
   p,
   state,
@@ -693,7 +815,9 @@ function PackRow({
     >
       <input type="checkbox" checked={checked} onClick={(e) => e.stopPropagation()} onChange={onCheck} aria-label={`Sélectionner ${p.ref}`} />
       <span className="pk-c-prod">
-        <ProductThumb product={p} size={32} />
+        <span className="pk-thumb">
+          <ProductThumb product={p} size={64} />
+        </span>
         <span className="pk-id">
           <b>
             {p.ref}
