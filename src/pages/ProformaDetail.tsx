@@ -684,6 +684,23 @@ export function LogisticsTab({ pf, portal }: { pf: Proforma; portal?: boolean })
                     <span className="bold small">{c.type}</span>
                     <div className="grow" />
                     {c.planValidated && <Check size={16} className="green" />}
+                    {auth.allowed({ type: 'deleteContainer', containerId: c.id }) && (
+                      <button
+                        type="button"
+                        className="icon-btn danger-ico ccard-del"
+                        title={t('cp.delete')}
+                        aria-label={`${t('cp.delete')} ${c.number ?? c.id}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const n = containerQty(c);
+                          if (n > 0 && !window.confirm(t('cp.deleteConfirm', { id: c.number ?? c.id, n: num(n) }))) return;
+                          dispatch({ type: 'deleteContainer', containerId: c.id });
+                          toast(t('cp.deleted', { id: c.number ?? c.id }));
+                        }}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
                   </div>
                   <div className="xs muted">{c.number ?? c.id}</div>
                   <div className="row">

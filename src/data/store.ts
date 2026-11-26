@@ -159,6 +159,7 @@ export type Action =
   | { type: 'forwardPack'; productId: string }
   | { type: 'allocate'; containerId: string; proformaId: string; productId: string; qty: number }
   | { type: 'deallocate'; containerId: string; proformaId: string; productId: string }
+  | { type: 'deleteContainer'; containerId: string }
   | { type: 'setAllocationQty'; containerId: string; proformaId: string; productId: string; qty: number }
   | { type: 'createContainer'; supplierId: string; etd: ISODate; eta: ISODate }
   | { type: 'autoLoad'; proformaId: string }
@@ -364,6 +365,13 @@ export function isAllowed(s: State, a: Action): boolean {
       const p = s.products.find((x) => x.id === a.productId);
       if (isSupplier(u)) return !!p && p.supplierId === u.supplierId;
       return can(u, 'pack.design');
+    }
+    case 'deleteContainer': {
+      // Supprimer un conteneur prévisionnel : tant qu'il n'est pas booké (ses quantités redeviennent « à affecter »)
+      const c = s.containers.find((x) => x.id === a.containerId);
+      if (!c || !['a_booker', 'booking_demande'].includes(c.status) || c.bookingNo || c.planValidated) return false;
+      if (isSupplier(u)) return c.supplierId === u.supplierId;
+      return can(u, 'logistics.plan');
     }
     case 'setAllocationQty':
       if (!Number.isInteger(a.qty) || a.qty <= 0 || a.qty > maxAllocQty(s, a.containerId, a.proformaId, a.productId)) return false;
@@ -1267,6 +1275,8 @@ function applyAction(s: State, a: Action): State {
       });
       return syncProformaStatuses(next);
     }
+    case 'deleteContainer':
+      return syncProformaStatuses({ ...s, containers: s.containers.filter((c) => c.id !== a.containerId) });
     case 'setAllocationQty':
       return syncProformaStatuses(
         mapC(s, a.containerId, (c) => ({
@@ -1919,6 +1929,11 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
       return { target: ctn(a.containerId), text: `${a.qty} pcs ${ref(a.productId)} affectées (${a.proformaId})` };
     case 'deallocate':
       return { target: ctn(a.containerId), text: `${ref(a.productId)} retiré du conteneur` };
+    case 'deleteContainer': {
+      const c = s.containers.find((x) => x.id === a.containerId);
+      const n = c?.allocations.reduce((t, x) => t + x.qty, 0) ?? 0;
+      return { text: `Conteneur ${c?.number ?? a.containerId} supprimé${n ? ` (${n} pcs remises à affecter)` : ''}` };
+    }
     case 'setAllocationQty':
       return { target: ctn(a.containerId), text: `${ref(a.productId)} : ${a.qty} pcs dans le conteneur (${a.proformaId})` };
     case 'createContainer':

@@ -703,6 +703,9 @@ export const fr = {
   'pp.view.gallery': 'Galerie',
   'pp.size': 'Taille',
   'pp.sizeFromSupplier': 'Lue dans le texte du fournisseur',
+  'cp.delete': 'Supprimer le conteneur',
+  'cp.deleteConfirm': 'Supprimer {id} ? Ses {n} pcs redeviennent à affecter.',
+  'cp.deleted': '{id} supprimé',
 };
 
 export type Key = keyof typeof fr;
@@ -1387,6 +1390,9 @@ export const en: Record<Key, string> = {
   'pp.view.gallery': 'Gallery',
   'pp.size': 'Size',
   'pp.sizeFromSupplier': 'Read from the supplier text',
+  'cp.delete': 'Delete container',
+  'cp.deleteConfirm': 'Delete {id}? Its {n} pcs go back to unallocated.',
+  'cp.deleted': '{id} deleted',
 };
 
 /**

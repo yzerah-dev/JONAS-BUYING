@@ -144,3 +144,19 @@ test('Mes proformas : lignes en liste ou en galerie (choix mémorisé)', async (
   await cards.first().click();
   await expect(page).toHaveURL(/portail\/produits\//);
 });
+
+test('plan de chargement : supprimer un conteneur pas encore booké (ses quantités redeviennent à affecter)', async ({ page }) => {
+  await resetApp(page);
+  await loginAs(page, 'Ms. Park');
+  await go(page, 'portail/chargement');
+  await page.locator('.ccard', { hasText: 'Nouveau conteneur' }).first().click();
+  const count = () =>
+    page.evaluate(() => {
+      const k = Object.keys(localStorage).find((x) => x.startsWith('jonas-buying-state'))!;
+      return (JSON.parse(localStorage.getItem(k)!).containers as { id: string }[]).filter((c) => /^PLAN-[A-Z]+-\d{3}$/.test(c.id)).length;
+    });
+  expect(await count()).toBe(1);
+  await page.getByRole('button', { name: /^Supprimer le conteneur PLAN-[A-Z]+-001$/ }).click();
+  await expect(toast(page)).toContainText('supprimé');
+  expect(await count()).toBe(0);
+});

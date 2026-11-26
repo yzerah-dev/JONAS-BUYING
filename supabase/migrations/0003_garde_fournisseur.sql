@@ -2,7 +2,7 @@
 -- Les règles d'accès (0001) laissent un fournisseur écrire ses propres produits, proformas et conteneurs
 -- (c'est nécessaire au portail : dépôt de proforma, die cut, validation du pack, plan de chargement, documents).
 -- Ce déclencheur empêche en plus, même en passant hors de l'application :
---   · toute suppression par un fournisseur ;
+--   · toute suppression par un fournisseur (sauf ses conteneurs prévisionnels pas encore bookés) ;
 --   · de marquer un acompte ou un solde comme payé, d'annuler une proforma, de la rattacher à un autre fournisseur ;
 --   · de changer la référence JONAS, l'EAN, la marque ou le fournisseur d'un produit.
 -- L'équipe JONAS et les transitaires ne sont pas concernés. À exécuter une fois dans l'éditeur SQL de Supabase.
@@ -18,6 +18,10 @@ begin
   end if;
 
   if tg_op = 'DELETE' then
+    -- Seule exception : ses propres conteneurs prévisionnels pas encore bookés
+    if old.collection = 'containers' and old.data ->> 'status' in ('a_booker', 'booking_demande') and coalesce(old.data ->> 'bookingNo', '') = '' then
+      return old;
+    end if;
     raise exception 'JONAS BUYING : un fournisseur ne peut pas supprimer de données (%/%)', old.collection, old.id;
   end if;
 

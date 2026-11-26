@@ -670,6 +670,9 @@ export const zh: Record<Key, string> = {
   'pp.view.gallery': '图库',
   'pp.size': '尺寸',
   'pp.sizeFromSupplier': '取自供应商描述',
+  'cp.delete': '删除集装箱',
+  'cp.deleteConfirm': '删除 {id}？其 {n} 件将恢复为待分配。',
+  'cp.deleted': '{id} 已删除',
 };
 
 /** Valeurs issues des données (français) traduites en chinois */
