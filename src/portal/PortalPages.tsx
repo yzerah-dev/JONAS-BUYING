@@ -21,7 +21,7 @@ import {
   brandOf,
 } from '../data/store';
 import SupplierPackRounds from './SupplierPackRounds';
-import { BrandLogo, ContainerStatusPill, Kpi, PackPill, Pill, ProductPic, ProductThumb, ProformaStatusPill, Seg, ValidationCircuit } from '../components/ui';
+import { BrandLogo, ContainerStatusPill, Kpi, PackPill, Pill, ProductPic, ProductThumb, Seg, ValidationCircuit } from '../components/ui';
 import { toast } from '../components/ui-shared';
 import type { Proforma } from '../data/types';
 import BookingEntry from '../components/BookingEntry';
@@ -30,7 +30,7 @@ import ShipmentsPanel from '../components/Shipments';
 import { NewProformaButton } from '../components/NewProforma';
 import BookingReview, { LastRejection } from '../components/BookingReview';
 import { LogisticsTab } from '../pages/ProformaDetail';
-import { TODAY } from '../lib/format';
+import { TODAY, addDays, weekStart } from '../lib/format';
 import { useT } from '../i18n';
 import { usePortal } from './usePortal';
 import { productSize } from '../lib/productSize';
@@ -141,6 +141,35 @@ export function PortalHome() {
   );
 }
 
+type PfFilter = 'all' | 'wait' | 'dev' | 'ok' | 'shipped';
+/** Où en est la proforma, vu du fournisseur */
+const filterOf = (pf: Proforma): Exclude<PfFilter, 'all'> =>
+  pf.status === 'a_signer' ? 'wait' : pf.status === 'en_dev' ? 'dev' : pf.status === 'en_production' || pf.status === 'booke' ? 'ok' : 'shipped';
+
+/** Gros badge d'état : qui doit agir (JONAS doit signer, à vous de déposer…) et où en sont les produits */
+function StageBadge({ pf }: { pf: Proforma }) {
+  const { state } = usePortal();
+  const { t } = useT();
+  const pending = pendingVersion(pf);
+  const tot = proformaTotals(state, pf);
+  let cls = 'green';
+  let text = t('pfl.stage.ok');
+  if (pf.status === 'a_signer') {
+    cls = pending ? 'violet' : 'orange';
+    text = pending ? t('pfl.stage.sign') : t('pfl.stage.upload');
+  } else if (pending) {
+    cls = 'violet';
+    text = t('pfl.stage.revision', { n: pending.version });
+  } else if (pf.status === 'en_dev') {
+    cls = 'blue';
+    text = t('pfl.stage.dev', { ok: tot.packsOk, total: tot.packsTotal });
+  } else if (pf.status === 'en_transit' || pf.status === 'arrive') {
+    cls = 'grey';
+    text = t('pfl.stage.shipped');
+  }
+  return <span className={`pfl-stage ${cls}`}>{text}</span>;
+}
+
 // ---------------------------------------------------------------------------
 export function PortalProformas() {
   const { state, proformas } = usePortal();
@@ -163,6 +192,28 @@ export function PortalProformas() {
       /* préférence non mémorisée */
     }
   };
+  const filter = (params.get('etat') as PfFilter | null) ?? 'all';
+  const pickFilter = (f: PfFilter) => {
+    const next = new URLSearchParams(params);
+    if (f === 'all') next.delete('etat');
+    else next.set('etat', f);
+    setParams(next);
+  };
+  const [sort, setSort] = useState<'week' | 'recent'>('week');
+  const count = (f: PfFilter) => proformas.filter((p) => filterOf(p) === f).length;
+  const shown = proformas.filter((p) => filter === 'all' || filterOf(p) === filter);
+  const groups: { key: string; title?: string; items: Proforma[] }[] = [];
+  if (sort === 'recent') groups.push({ key: 'all', items: [...shown].sort((x, y) => y.date.localeCompare(x.date)) });
+  else
+    for (const pf of [...shown].sort((x, y) => x.etd.localeCompare(y.etd))) {
+      const ws = weekStart(pf.etd);
+      let g = groups.find((x) => x.key === ws);
+      if (!g) {
+        g = { key: ws, title: tr('pfl.week', { week: weekLabel(pf.etd), from: fshort(ws), to: fshort(addDays(ws, 6)) }), items: [] };
+        groups.push(g);
+      }
+      g.items.push(pf);
+    }
   return (
     <>
       <div className="page-head">
@@ -170,200 +221,236 @@ export function PortalProformas() {
         <div className="grow" />
         <NewProformaButton className="btn primary" onCreated={(id) => setParams({ pf: id })} />
       </div>
-      {[...proformas]
-        .sort((a, b) => b.etd.localeCompare(a.etd))
-        .map((pf) => {
-          const t = proformaTotals(state, pf);
-          const open = openId === pf.id;
-          return (
-            <div key={pf.id} className="card week">
-              <div className={`week-head ${open ? 'open' : ''}`} onClick={() => setParams(open ? {} : { pf: pf.id })}>
-                <div className="cal-icon">
-                  <FileText size={22} />
-                </div>
-                <div style={{ minWidth: 170 }}>
-                  <div style={{ fontSize: 18, fontWeight: 800 }}>{pf.id}</div>
-                  <div className="muted small">
-                    {pf.poNumber} · {fdate(pf.date)}
+      <div className="row wrap mb pfl-bar">
+        <Seg
+          value={filter}
+          onChange={pickFilter}
+          options={[
+            { id: 'all', label: tr('pfl.f.all', { n: proformas.length }) },
+            { id: 'wait', label: tr('pfl.f.wait', { n: count('wait') }) },
+            { id: 'dev', label: tr('pfl.f.dev', { n: count('dev') }) },
+            { id: 'ok', label: tr('pfl.f.ok', { n: count('ok') }) },
+            { id: 'shipped', label: tr('pfl.f.shipped', { n: count('shipped') }) },
+          ]}
+        />
+        <div className="grow" />
+        <Seg
+          value={sort}
+          onChange={setSort}
+          options={[
+            { id: 'week', label: tr('pfl.sort.week') },
+            { id: 'recent', label: tr('pfl.sort.recent') },
+          ]}
+        />
+      </div>
+      {!shown.length && <div className="card empty">{tr('pfl.none')}</div>}
+      {groups.map((g) => (
+        <div key={g.key} className="pfl-group">
+          {g.title && (
+            <h3 className="pfl-week">
+              {g.title} <span className="pill grey">{tr('pfl.count', { n: g.items.length })}</span>
+            </h3>
+          )}
+          {g.items.map((pf) => {
+            const t = proformaTotals(state, pf);
+            const open = openId === pf.id;
+            return (
+              <div key={pf.id} className="card week">
+                <div
+                  className={`week-head ${open ? 'open' : ''}`}
+                  onClick={() => {
+                    const next = new URLSearchParams(params);
+                    if (open) next.delete('pf');
+                    else next.set('pf', pf.id);
+                    setParams(next);
+                  }}
+                >
+                  <div className="cal-icon">
+                    <FileText size={22} />
                   </div>
-                </div>
-                <ProformaStatusPill status={pf.status} />
-                {shipmentsOf(state, pf).length > 1 && <Pill color="violet">{tr('sp.part', { n: pf.split?.part ?? 1, total: shipmentsOf(state, pf).length })}</Pill>}
-                {pf.splitRequest && <Pill color="orange">{tr('sp.split')}</Pill>}
-                {pf.status === 'a_signer' && !pendingVersion(pf) && <Pill color="orange">{tr('pv.toUpload')}</Pill>}
-                {pendingVersion(pf) && <Pill color="violet">{signedVersion(pf) ? tr('pv.pendingRevision', { n: pendingVersion(pf)!.version }) : tr('pv.st.a_signer')}</Pill>}
-                <div className="grow" />
-                <div className="metric">
-                  <div className="l">{tr('col.etd')}</div>
-                  <div className="v" style={{ fontSize: 16 }}>
-                    {weekLabel(pf.etd)} · {fshort(pf.etd)}
-                  </div>
-                </div>
-                <div className="metric">
-                  <div className="l">{tr('col.eta')}</div>
-                  <div className="v" style={{ fontSize: 16 }}>
-                    {weekLabel(pf.eta)} · {fshort(pf.eta)}
-                  </div>
-                </div>
-                <div className="metric">
-                  <div className="l">{tr('col.cbm')}</div>
-                  <div className="v" style={{ fontSize: 16 }}>
-                    {dec(t.cbm)}
-                  </div>
-                </div>
-                <div className="metric">
-                  <div className="l">{tr('col.amount')}</div>
-                  <div className="v" style={{ fontSize: 16 }}>
-                    {money(t.amountCur, t.currency)}
-                  </div>
-                </div>
-              </div>
-              {open && (
-                <div style={{ padding: 16 }}>
-                  <div className="mb">
-                    <ProformaVersions pf={pf} />
-                  </div>
-                  <div className="mb">
-                    <ShipmentsPanel pf={pf} />
-                  </div>
-                  <div className="row mb">
-                    <div className="grow" />
-                    <Seg
-                      value={view}
-                      onChange={pickView}
-                      options={[
-                        { id: 'liste', label: tr('pp.view.list'), icon: <List size={15} /> },
-                        { id: 'galerie', label: tr('pp.view.gallery'), icon: <LayoutGrid size={15} /> },
-                      ]}
-                    />
-                  </div>
-                  {view === 'galerie' ? (
-                    <div className="gallery pp-gallery pf-lines-gallery">
-                      {pf.lines.map((l) => {
-                        const p = byId(state.products, l.productId);
-                        const size = productSize(p);
-                        return (
-                          <Link key={p.id} to={`/portail/produits/${p.id}`} className="pcard" aria-label={`${p.ref} · ${p.name}`}>
-                            <div className="photo" style={{ background: p.tint }}>
-                              <ProductPic product={p} />
-                            </div>
-                            <div className="row">
-                              <span className="ref-tag">{p.ref}</span>
-                              <div className="grow" />
-                              <PackPill product={p} />
-                            </div>
-                            <div className="small pcard-name">{p.name}</div>
-                            {size && (
-                              <div className="xs">
-                                {tr('pp.size')} : <b>{size.text}</b>
-                              </div>
-                            )}
-                            <div className="mini-grid">
-                              <div>
-                                <div className="l">{tr('col.price')}</div>
-                                <div className="v">{money(l.price, t.currency)}</div>
-                              </div>
-                              <div>
-                                <div className="l">{tr('col.qty')}</div>
-                                <div className="v">{num(l.qty)}</div>
-                              </div>
-                              <div>
-                                <div className="l">{tr('col.cbm')}</div>
-                                <div className="v">{dec(lineCbm(p, l.qty), 2)}</div>
-                              </div>
-                              <div>
-                                <div className="l">{tr('col.amount')}</div>
-                                <div className="v">{money(l.qty * l.price, t.currency)}</div>
-                              </div>
-                              <div>
-                                <div className="l">{tr('col.loaded')}</div>
-                                <div className="v">{num(allocatedQty(state, pf.id, p.id))}</div>
-                              </div>
-                              <div>
-                                <div className="l">{tr('col.artworkDeadline')}</div>
-                                <div className="v">{fshort(p.pack.artworkDeadline)}</div>
-                              </div>
-                            </div>
-                          </Link>
-                        );
-                      })}
+                  <div style={{ minWidth: 170 }}>
+                    <div style={{ fontSize: 18, fontWeight: 800 }}>{pf.id}</div>
+                    <div className="muted small">
+                      {pf.poNumber} · {fdate(pf.date)}
                     </div>
-                  ) : (
-                    <div className="tbl-wrap">
-                      <table className="tbl">
-                        <thead>
-                          <tr>
-                            <th>{tr('col.product')}</th>
-                            <th className="num">{tr('col.price')}</th>
-                            <th className="num">{tr('col.qty')}</th>
-                            <th className="num">{tr('col.cbm')}</th>
-                            <th className="num">{tr('col.amount')}</th>
-                            <th className="num">{tr('col.loaded')}</th>
-                            <th>{tr('col.artworkDeadline')}</th>
-                            <th>{tr('col.packState')}</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {pf.lines.map((l) => {
-                            const p = byId(state.products, l.productId);
-                            return (
-                              <tr key={p.id}>
-                                <td>
-                                  <div className="row">
-                                    <ProductThumb product={p} size={34} />
-                                    <div>
-                                      <span className="ref-tag">{p.ref}</span>
-                                      <div className="small">{p.name}</div>
-                                      {productSize(p) && (
-                                        <div className="xs muted">
-                                          {tr('pp.size')} : {productSize(p)!.text}
-                                        </div>
-                                      )}
+                  </div>
+                  <StageBadge pf={pf} />
+                  {shipmentsOf(state, pf).length > 1 && <Pill color="violet">{tr('sp.part', { n: pf.split?.part ?? 1, total: shipmentsOf(state, pf).length })}</Pill>}
+                  {pf.splitRequest && <Pill color="orange">{tr('sp.split')}</Pill>}
+                  <div className="grow" />
+                  <div className="metric pfl-loading">
+                    <div className="l">{signedVersion(pf) ? tr('pfl.loading') : tr('pfl.loadingWish')}</div>
+                    <div className="v">
+                      {weekLabel(pf.etd)} · {fshort(pf.etd)}
+                    </div>
+                  </div>
+                  <div className="metric">
+                    <div className="l">{tr('col.eta')}</div>
+                    <div className="v" style={{ fontSize: 16 }}>
+                      {weekLabel(pf.eta)} · {fshort(pf.eta)}
+                    </div>
+                  </div>
+                  <div className="metric">
+                    <div className="l">{tr('col.cbm')}</div>
+                    <div className="v" style={{ fontSize: 16 }}>
+                      {dec(t.cbm)}
+                    </div>
+                  </div>
+                  <div className="metric">
+                    <div className="l">{tr('col.amount')}</div>
+                    <div className="v" style={{ fontSize: 16 }}>
+                      {money(t.amountCur, t.currency)}
+                    </div>
+                  </div>
+                </div>
+                {open && (
+                  <div style={{ padding: 16 }}>
+                    <div className="mb">
+                      <ProformaVersions pf={pf} />
+                    </div>
+                    <div className="mb">
+                      <ShipmentsPanel pf={pf} />
+                    </div>
+                    <div className="row mb">
+                      <div className="grow" />
+                      <Seg
+                        value={view}
+                        onChange={pickView}
+                        options={[
+                          { id: 'liste', label: tr('pp.view.list'), icon: <List size={15} /> },
+                          { id: 'galerie', label: tr('pp.view.gallery'), icon: <LayoutGrid size={15} /> },
+                        ]}
+                      />
+                    </div>
+                    {view === 'galerie' ? (
+                      <div className="gallery pp-gallery pf-lines-gallery">
+                        {pf.lines.map((l) => {
+                          const p = byId(state.products, l.productId);
+                          const size = productSize(p);
+                          return (
+                            <Link key={p.id} to={`/portail/produits/${p.id}`} className="pcard" aria-label={`${p.ref} · ${p.name}`}>
+                              <div className="photo" style={{ background: p.tint }}>
+                                <ProductPic product={p} />
+                              </div>
+                              <div className="row">
+                                <span className="ref-tag">{p.ref}</span>
+                                <div className="grow" />
+                                <PackPill product={p} />
+                              </div>
+                              <div className="small pcard-name">{p.name}</div>
+                              {size && (
+                                <div className="xs">
+                                  {tr('pp.size')} : <b>{size.text}</b>
+                                </div>
+                              )}
+                              <div className="mini-grid">
+                                <div>
+                                  <div className="l">{tr('col.price')}</div>
+                                  <div className="v">{money(l.price, t.currency)}</div>
+                                </div>
+                                <div>
+                                  <div className="l">{tr('col.qty')}</div>
+                                  <div className="v">{num(l.qty)}</div>
+                                </div>
+                                <div>
+                                  <div className="l">{tr('col.cbm')}</div>
+                                  <div className="v">{dec(lineCbm(p, l.qty), 2)}</div>
+                                </div>
+                                <div>
+                                  <div className="l">{tr('col.amount')}</div>
+                                  <div className="v">{money(l.qty * l.price, t.currency)}</div>
+                                </div>
+                                <div>
+                                  <div className="l">{tr('col.loaded')}</div>
+                                  <div className="v">{num(allocatedQty(state, pf.id, p.id))}</div>
+                                </div>
+                                <div>
+                                  <div className="l">{tr('col.artworkDeadline')}</div>
+                                  <div className="v">{fshort(p.pack.artworkDeadline)}</div>
+                                </div>
+                              </div>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="tbl-wrap">
+                        <table className="tbl">
+                          <thead>
+                            <tr>
+                              <th>{tr('col.product')}</th>
+                              <th className="num">{tr('col.price')}</th>
+                              <th className="num">{tr('col.qty')}</th>
+                              <th className="num">{tr('col.cbm')}</th>
+                              <th className="num">{tr('col.amount')}</th>
+                              <th className="num">{tr('col.loaded')}</th>
+                              <th>{tr('col.artworkDeadline')}</th>
+                              <th>{tr('col.packState')}</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {pf.lines.map((l) => {
+                              const p = byId(state.products, l.productId);
+                              return (
+                                <tr key={p.id}>
+                                  <td>
+                                    <div className="row">
+                                      <ProductThumb product={p} size={34} />
+                                      <div>
+                                        <span className="ref-tag">{p.ref}</span>
+                                        <div className="small">{p.name}</div>
+                                        {productSize(p) && (
+                                          <div className="xs muted">
+                                            {tr('pp.size')} : {productSize(p)!.text}
+                                          </div>
+                                        )}
+                                      </div>
                                     </div>
-                                  </div>
-                                </td>
-                                <td className="num">{money(l.price, t.currency)}</td>
-                                <td className="num">{num(l.qty)}</td>
-                                <td className="num">{dec(lineCbm(p, l.qty), 2)}</td>
-                                <td className="num">{money(l.qty * l.price, t.currency)}</td>
-                                <td className="num">{num(allocatedQty(state, pf.id, p.id))}</td>
-                                <td>{fdate(p.pack.artworkDeadline)}</td>
-                                <td>
-                                  <PackPill product={p} />
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                  <div className="row wrap mt">
-                    {pf.documents.map((d) => (
-                      <button
-                        key={d}
-                        className="btn sm"
-                        onClick={async () => {
-                          const r = await proformaDocPdf(pf, d, { supplier: byId(state.suppliers, pf.supplierId), products: state.products, company: state.settings.company });
-                          if (r) await saveBlob(r.blob, r.name);
-                          else toast(tr('proformas.download', { file: d }));
-                        }}
-                      >
-                        <Download size={13} /> {d}
-                      </button>
-                    ))}
-                    <div className="grow" />
-                    {!['en_transit', 'arrive'].includes(pf.status) && (
-                      <Link to={`/portail/chargement?pf=${pf.id}`} className="btn primary sm">
-                        <Truck size={13} /> {tr('proformas.loadingPlan')}
-                      </Link>
+                                  </td>
+                                  <td className="num">{money(l.price, t.currency)}</td>
+                                  <td className="num">{num(l.qty)}</td>
+                                  <td className="num">{dec(lineCbm(p, l.qty), 2)}</td>
+                                  <td className="num">{money(l.qty * l.price, t.currency)}</td>
+                                  <td className="num">{num(allocatedQty(state, pf.id, p.id))}</td>
+                                  <td>{fdate(p.pack.artworkDeadline)}</td>
+                                  <td>
+                                    <PackPill product={p} />
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
                     )}
+                    <div className="row wrap mt">
+                      {pf.documents.map((d) => (
+                        <button
+                          key={d}
+                          className="btn sm"
+                          onClick={async () => {
+                            const r = await proformaDocPdf(pf, d, { supplier: byId(state.suppliers, pf.supplierId), products: state.products, company: state.settings.company });
+                            if (r) await saveBlob(r.blob, r.name);
+                            else toast(tr('proformas.download', { file: d }));
+                          }}
+                        >
+                          <Download size={13} /> {d}
+                        </button>
+                      ))}
+                      <div className="grow" />
+                      {!['en_transit', 'arrive'].includes(pf.status) && (
+                        <Link to={`/portail/chargement?pf=${pf.id}`} className="btn primary sm">
+                          <Truck size={13} /> {tr('proformas.loadingPlan')}
+                        </Link>
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ))}
     </>
   );
 }

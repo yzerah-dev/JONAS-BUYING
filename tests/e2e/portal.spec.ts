@@ -160,3 +160,47 @@ test('plan de chargement : supprimer un conteneur pas encore booké (ses quantit
   await expect(toast(page)).toContainText('supprimé');
   expect(await count()).toBe(0);
 });
+
+test('Mes proformas : état mis en avant, chargement demandé, tri par semaine et filtres par état', async ({ page }) => {
+  await resetApp(page);
+  await loginAs(page, 'Mr. Chen');
+  await go(page, 'portail/proformas');
+  // Groupées par semaine d'expédition, la plus proche d'abord
+  const weeks = page.locator('.pfl-week');
+  await expect(weeks.first()).toContainText('S49');
+  await expect(page.locator('.pfl-loading').first()).toContainText('Chargement demandé');
+  // Filtre : produits validés
+  await page.getByRole('button', { name: /^Confirmées · produits validés/ }).click();
+  await expect(page).toHaveURL(/etat=ok/);
+  await expect(page.locator('.week-head')).toHaveCount(2);
+  await expect(page.locator('.pfl-stage').first()).toHaveText('Confirmée · produits validés');
+  // Plus récentes : une seule liste
+  await page.getByRole('button', { name: 'Plus récentes' }).click();
+  await expect(page.locator('.pfl-week')).toHaveCount(0);
+});
+
+test('proforma déposée par le fournisseur : « En attente : JONAS doit signer » bien visible', async ({ page }) => {
+  await resetApp(page);
+  await loginAs(page, 'Wang Lei');
+  await go(page, 'portail/proformas');
+  await page.getByRole('button', { name: 'Nouvelle proforma' }).click();
+  const dlg = page.getByRole('dialog');
+  await page.locator('#np-title').fill('Coussins');
+  await page.locator('#ln-prod-0').click();
+  await page.getByRole('option').nth(1).click();
+  await dlg.getByLabel('Quantité 1').fill('100');
+  await dlg.getByLabel('Prix unitaire 1').fill('2');
+  await dlg
+    .getByLabel(/Proforma du fournisseur/)
+    .setInputFiles({
+      name: 'PI.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d4944415478da63f8cfc0f01f0005000201a5f1d9f30000000049454e44ae426082', 'hex'),
+    });
+  await dlg.getByRole('button', { name: 'Envoyer à JONAS' }).click();
+  await expect(toast(page)).toContainText('envoyée à JONAS');
+  await page.getByRole('button', { name: /^En attente de signature \(1\)/ }).click();
+  await expect(page).toHaveURL(/etat=wait/);
+  await expect(page.locator('.pfl-stage')).toHaveText('En attente : JONAS doit signer');
+  await expect(page.locator('.pfl-loading')).toContainText('Chargement souhaité');
+});
