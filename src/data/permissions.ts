@@ -62,13 +62,13 @@ export const ROLE_DEFS: Record<Role, RoleDef> = {
     label: 'Direction',
     description: 'Vision complète, signature des proformas, validation Direction des packs.',
     modules: ALL_MODULES,
-    perms: ['proforma.sign', 'finance.view', 'pack.reject'],
+    perms: ['proforma.sign', 'finance.view', 'pack.reject', 'pack.assign'],
   },
   acheteur: {
     label: 'Acheteur',
     description: 'Proformas, développement produit, consolidation des conteneurs.',
     modules: ['home', 'proformas', 'produits', 'developpement', 'design', 'conteneurs', 'booking', 'fournisseurs', 'parametres'],
-    perms: ['proforma.edit', 'finance.view', 'dev.advance', 'logistics.plan', 'pack.reject'],
+    perms: ['proforma.edit', 'finance.view', 'dev.advance', 'logistics.plan', 'pack.reject', 'pack.assign'],
   },
   designer: {
     label: 'Designer',

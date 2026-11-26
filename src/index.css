@@ -2263,3 +2263,25 @@ tr.pf-moving td, .pf-line.pf-moving { background: #fff6e8 !important; outline: 2
   .pfg-row { flex-wrap: wrap; }
   .pfg-pic { font-size: 36px; }
 }
+
+/* Espace Design : déplacer les packs (semaine, date de rendu) */
+.pk-wkbar { flex: 1 1 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-top: 6px; border-top: 1px solid rgba(255, 255, 255, 0.2); }
+.pk-wkbar > span { font-weight: 700; font-size: 13px; margin-right: 4px; }
+.pk-wk { display: grid; justify-items: center; min-width: 52px; padding: 4px 8px; border-radius: 9px; border: 1px solid rgba(255, 255, 255, 0.35); background: #fff; color: var(--ink); cursor: pointer; line-height: 1.1; }
+.pk-wk b { font-size: 14px; }
+.pk-wk small { font-size: 10.5px; color: var(--muted); }
+.pk-wk:hover { background: var(--green-soft); }
+.pk-wk.cur { background: var(--orange-soft); border-color: var(--orange); }
+.pk-date { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; margin-left: 8px; }
+.pk-date .input { height: 32px; padding: 0 8px; width: auto; }
+.pk-movebtn { display: inline-grid; place-items: center; width: 26px; height: 26px; margin-left: 6px; border-radius: 8px; border: 1px dashed var(--green); background: #fff; color: var(--green-dark); cursor: pointer; vertical-align: middle; }
+.pk-movebtn:hover { background: var(--green-soft); }
+.pk-c-due { display: inline-flex; align-items: center; }
+.pk-card-check { position: absolute; left: 8px; bottom: 8px; width: 20px; height: 20px; accent-color: var(--green); cursor: pointer; }
+.pk-card-move { position: absolute; right: 8px; bottom: 8px; width: 30px; height: 30px; margin: 0; }
+.pk-card.checked { outline: 3px solid var(--green); outline-offset: -1px; }
+.pk-week.pk-drop-over { outline: 3px solid var(--green); outline-offset: 2px; background: var(--green-soft); }
+.pk-card[draggable='true'] { cursor: grab; }
+.pk-bulk .input, .pk-bulk select { color: var(--ink); background: #fff; }
+.pk-bulk .pk-move .btn { background: #fff; color: var(--ink); }
+.pk-bulk .pk-move .btn:disabled { opacity: 0.6; }

@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   AlertTriangle,
+  ArrowUpDown,
   Box,
   Calendar,
   Users,
@@ -31,7 +32,7 @@ import type { Product } from '../data/types';
 import { VALIDATION_LABELS, VALIDATION_STEPS } from '../data/types';
 import { BrandLogo, ProductPic, Pill, ProductThumb, Tabs, ValidationCircuit } from '../components/ui';
 import { designerColor, toast } from '../components/ui-shared';
-import { TODAY, addDays, fdate, fshort, fstamp, initials, weekKey, weekLabel, weekRange } from '../lib/format';
+import { TODAY, addDays, fdate, fshort, fstamp, initials, weekKey, weekLabel, weekRange, weekStart } from '../lib/format';
 
 function packStatus(p: Product): [string, string] {
   const v = p.pack.validations;
@@ -146,6 +147,9 @@ function DesignPage() {
   const [limit, setLimit] = useState(50);
   const [sortBy, setSortBy] = useState<SortBy>('priorite');
   const [dropKey, setDropKey] = useState<string | null>(null);
+  // Semaines proposées pour déplacer : de la semaine précédente à +20 semaines
+  const targetWeeks = useMemo(() => Array.from({ length: 22 }, (_, i) => addDays(weekStart(TODAY), (i - 1) * 7)), []);
+  const [moveDate, setMoveDate] = useState('');
   const [moveTo, setMoveTo] = useState<{ designer: string; week: string }>({ designer: '', week: '' });
   const canAssign = auth.can('pack.assign');
   const canPush = auth.can('dev.advance');
@@ -244,6 +248,11 @@ function DesignPage() {
     setSelId(null);
     setStatus('all');
     setLimit(50);
+  };
+  // « Déplacer » sur un pack : il devient la sélection, la barre propose les semaines
+  const pickToMove = (id: string) => {
+    setSelected(new Set([id]));
+    requestAnimationFrame(() => document.querySelector('.pk-bulk')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
   };
   const toggle = (id: string) => {
     const n = new Set(selected);
@@ -508,9 +517,9 @@ function DesignPage() {
                   </select>
                   <select className="input" value={moveTo.week} onChange={(e) => setMoveTo({ ...moveTo, week: e.target.value })} aria-label="Semaine cible">
                     <option value="">Même semaine</option>
-                    {weeks.map((w) => (
-                      <option key={w.key} value={w.sample}>
-                        {weekLabel(w.sample)}
+                    {targetWeeks.map((w) => (
+                      <option key={w} value={w}>
+                        {weekLabel(w)}
                       </option>
                     ))}
                   </select>
@@ -518,6 +527,38 @@ function DesignPage() {
                     Déplacer
                   </button>
                 </span>
+              )}
+              {canAssign && (
+                <div className="pk-wkbar" role="group" aria-label="Déplacer vers la semaine">
+                  <span>Déplacer vers :</span>
+                  {targetWeeks.slice(0, 14).map((w) => {
+                    const cur = chosen.length > 0 && chosen.every((p) => weekKey(p.pack.artworkDeadline) === weekKey(w));
+                    return (
+                      <button key={w} type="button" className={`pk-wk ${cur ? 'cur' : ''}`} onClick={() => move([...selected], undefined, w)} title={`Semaine du ${fdate(weekStart(w))}`}>
+                        <b>{weekLabel(w)}</b>
+                        <small>{fshort(weekStart(w))}</small>
+                      </button>
+                    );
+                  })}
+                  <label className="pk-date">
+                    Date de rendu
+                    <input type="date" className="input" value={moveDate} onChange={(e) => setMoveDate(e.target.value)} aria-label="Date de rendu artwork (lot)" />
+                  </label>
+                  <button
+                    type="button"
+                    className="btn sm primary"
+                    disabled={!moveDate}
+                    onClick={() => {
+                      const ids = [...selected].filter((id) => auth.allowed({ type: 'reassignPack', productId: id, deadline: moveDate }));
+                      ids.forEach((id) => dispatch({ type: 'reassignPack', productId: id, deadline: moveDate }));
+                      toast(`${ids.length} pack${ids.length > 1 ? 's' : ''} : rendu artwork le ${fdate(moveDate)}`);
+                      setSelected(new Set());
+                      setMoveDate('');
+                    }}
+                  >
+                    Appliquer la date
+                  </button>
+                </div>
               )}
               {canValidate.length + canDieCut.length + canForward.length + canStart.length === 0 && !canPush && !canAssign && (
                 <span className="small muted">Aucune action possible pour votre rôle sur cette sélection.</span>
@@ -557,7 +598,11 @@ function DesignPage() {
                 });
               const sup = view === 'fournisseur' ? byId(state.suppliers, g) : undefined;
               return (
-                <div key={g || 'all'} className={isCard ? `pf-week pk-week ${open ? 'open' : ''}` : undefined}>
+                <div
+                  key={g || 'all'}
+                  className={isCard ? `pf-week pk-week ${open ? 'open' : ''} ${dropKey === `grp-${g}` ? 'pk-drop-over' : ''}` : undefined}
+                  {...(view === 'semaine' ? dropZone(`grp-${g}`, undefined, items[0].pack.artworkDeadline) : view === 'designer' ? dropZone(`grp-${g}`, g) : {})}
+                >
                   {isCard ? (
                     <WeekHead
                       items={items}
@@ -584,6 +629,9 @@ function DesignPage() {
                           key={p.id}
                           p={p}
                           state={state}
+                          checked={selected.has(p.id)}
+                          onCheck={() => toggle(p.id)}
+                          onMove={canAssign ? () => pickToMove(p.id) : undefined}
                           active={sel?.id === p.id}
                           showDesigner={designer === 'all'}
                           color={colorOf(p.pack.designer)}
@@ -607,6 +655,7 @@ function DesignPage() {
                         key={p.id}
                         p={p}
                         state={state}
+                        onMove={canAssign ? () => pickToMove(p.id) : undefined}
                         checked={selected.has(p.id)}
                         active={sel?.id === p.id}
                         showDesigner={designer === 'all'}
@@ -731,6 +780,9 @@ function WeekHead({
 function PackCard({
   p,
   state,
+  checked,
+  onCheck,
+  onMove,
   active,
   showDesigner,
   color,
@@ -740,6 +792,9 @@ function PackCard({
 }: {
   p: Product;
   state: State;
+  checked: boolean;
+  onCheck: () => void;
+  onMove?: () => void;
   active: boolean;
   showDesigner: boolean;
   color: string;
@@ -750,13 +805,33 @@ function PackCard({
   const [label, tone] = packStatus(p);
   const late = packLate(p);
   return (
-    <div className={`pk-card ${active ? 'active' : ''} ${late ? 'late' : ''}`} {...pressable(onOpen, `Ouvrir le pack ${p.ref}`)} draggable={draggable} onDragStart={onDragStart}>
+    <div
+      className={`pk-card ${active ? 'active' : ''} ${late ? 'late' : ''} ${checked ? 'checked' : ''}`}
+      {...pressable(onOpen, `Ouvrir le pack ${p.ref}`)}
+      draggable={draggable}
+      onDragStart={onDragStart}
+    >
       <div className="pk-card-pic" style={{ background: p.tint }}>
         <ProductPic product={p} />
+        <input type="checkbox" className="pk-card-check" checked={checked} onClick={(e) => e.stopPropagation()} onChange={onCheck} aria-label={`Sélectionner ${p.ref}`} />
         {p.urgent && (
           <span className="pk-card-urgent" title="PUSH URGENT">
             <Flame size={16} />
           </span>
+        )}
+        {onMove && (
+          <button
+            type="button"
+            className="pk-movebtn pk-card-move"
+            title="Déplacer vers une autre semaine"
+            aria-label={`Déplacer ${p.ref}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onMove();
+            }}
+          >
+            <ArrowUpDown size={15} />
+          </button>
         )}
         {showDesigner && (
           <span className="dev-avatar pk-card-who" style={{ background: color }} title={p.pack.designer}>
@@ -780,6 +855,7 @@ function PackCard({
 function PackRow({
   p,
   state,
+  onMove,
   checked,
   active,
   showDesigner,
@@ -793,6 +869,7 @@ function PackRow({
 }: {
   p: Product;
   state: State;
+  onMove?: () => void;
   checked: boolean;
   active: boolean;
   showDesigner: boolean;
@@ -859,7 +936,23 @@ function PackRow({
       <span className="pk-c-val">
         <PackTrackDots p={p} />
       </span>
-      <span className={`pk-c-due ${late ? 'red' : ''}`}>{fshort(p.pack.artworkDeadline)}</span>
+      <span className={`pk-c-due ${late ? 'red' : ''}`}>
+        {fshort(p.pack.artworkDeadline)}
+        {onMove && (
+          <button
+            type="button"
+            className="pk-movebtn"
+            title="Déplacer vers une autre semaine / changer la date de rendu"
+            aria-label={`Déplacer ${p.ref}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onMove();
+            }}
+          >
+            <ArrowUpDown size={13} />
+          </button>
+        )}
+      </span>
       <span className="pk-c-st">
         {onStart ? (
           <button
@@ -961,10 +1054,10 @@ function PackPanel({ p }: { p: Product }) {
             value={p.pack.artworkDeadline}
             onChange={(e) => {
               if (!e.target.value) return;
-              dispatch({ type: 'reassignPack', productId: p.id, weekOf: e.target.value });
-              toast(`${p.ref} → semaine ${weekLabel(e.target.value)}`);
+              dispatch({ type: 'reassignPack', productId: p.id, deadline: e.target.value });
+              toast(`${p.ref} : rendu artwork le ${fdate(e.target.value)} (${weekLabel(e.target.value)})`);
             }}
-            aria-label="Semaine"
+            aria-label="Date de rendu artwork"
           />
         </div>
       )}

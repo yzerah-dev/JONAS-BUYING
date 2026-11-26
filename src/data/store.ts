@@ -216,7 +216,7 @@ export type Action =
   | { type: 'renameListValue'; key: ListKey; from: string; to: string }
   | { type: 'updateProducts'; items: { productId: string; patch: ProductPatch }[]; brands?: Brand[]; source?: 'fiche' | 'excel' }
   | { type: 'markDeveloped'; productId: string }
-  | { type: 'reassignPack'; productId: string; designer?: string; weekOf?: ISODate }
+  | { type: 'reassignPack'; productId: string; designer?: string; weekOf?: ISODate; /** date de rendu exacte */ deadline?: ISODate }
   | { type: 'startPack'; productId: string }
   | { type: 'planPack'; productId: string; date: ISODate | null }
   | { type: 'setPackBrief'; productId: string; brief: string }
@@ -1876,14 +1876,15 @@ function applyAction(s: State, a: Action): State {
     case 'reassignPack':
       return mapP(s, a.productId, (p) => {
         let deadline = p.pack.artworkDeadline;
-        if (a.weekOf) {
+        if (a.deadline) deadline = a.deadline;
+        else if (a.weekOf) {
           // Même jour ouvré dans la semaine cible
           const day = Math.min(4, (parse(deadline).getUTCDay() + 6) % 7);
           deadline = addDays(weekStart(a.weekOf), day);
         }
         return {
           ...p,
-          devDeadline: a.weekOf ? deadline : p.devDeadline,
+          devDeadline: a.weekOf || a.deadline ? deadline : p.devDeadline,
           pack: { ...p.pack, designer: a.designer ?? p.pack.designer, artworkDeadline: deadline },
         };
       });
@@ -2110,7 +2111,10 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
     case 'markDeveloped':
       return { target: ref(a.productId), text: 'Marqué développé' };
     case 'reassignPack':
-      return { target: ref(a.productId), text: `Réaffecté${a.designer ? ` à ${a.designer}` : ''}${a.weekOf ? ` · semaine du ${a.weekOf}` : ''}` };
+      return {
+        target: ref(a.productId),
+        text: a.deadline ? `Date de rendu artwork → ${a.deadline}` : `Réaffecté${a.designer ? ` à ${a.designer}` : ''}${a.weekOf ? ` · semaine du ${a.weekOf}` : ''}`,
+      };
     case 'startPack':
       return { target: ref(a.productId), text: 'Pack commencé' };
     case 'planPack':
