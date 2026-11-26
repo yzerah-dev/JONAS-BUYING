@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { Languages, Pencil, Save, X } from 'lucide-react';
+import { Languages, Pencil, Save, Sparkles, X } from 'lucide-react';
+import { frenchTexts } from '../lib/frTexts';
+import { frenchPatch } from '../lib/frPatch';
 import { useAuth, useStore } from '../data/store';
 import type { Product } from '../data/types';
 import { toast } from './ui-shared';
@@ -12,6 +14,7 @@ export default function ProductDescription({ product: p }: { product: Product })
   const { dispatch } = useStore();
   const { allowed } = useAuth();
   const [edit, setEdit] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [name, setName] = useState(p.name);
   const [en, setEn] = useState(p.description?.en ?? '');
   const [fr, setFr] = useState(p.description?.fr ?? '');
@@ -21,6 +24,20 @@ export default function ProductDescription({ product: p }: { product: Product })
     setEn(p.description?.en ?? '');
     setFr(p.description?.fr ?? '');
     setEdit(true);
+  };
+  /** Claude rédige la désignation et la description françaises depuis le texte anglais */
+  const generate = async () => {
+    const source = p.description?.en?.trim() || p.name;
+    setBusy(true);
+    try {
+      const res = await frenchTexts([{ id: p.id, en: source }]);
+      if (res === 'not_configured') return toast('Traduction automatique pas encore activée : la clé Claude (ANTHROPIC_API_KEY) doit être ajoutée dans Vercel.');
+      if (typeof res === 'string' || !res.length) return toast('Français non généré : réessayez dans un instant.');
+      dispatch(frenchPatch({ ...p, description: { ...p.description, en: source } }, res[0]));
+      toast(`Français généré pour ${p.ref}`);
+    } finally {
+      setBusy(false);
+    }
   };
   const save = () => {
     if (!name.trim()) return toast('La désignation est obligatoire');
@@ -34,6 +51,11 @@ export default function ProductDescription({ product: p }: { product: Product })
         <Languages size={18} className="green" />
         <h3 style={{ margin: 0 }}>Description</h3>
         <div className="grow" />
+        {canEdit && !edit && (p.description?.en || p.name) && (
+          <button type="button" className="btn sm" onClick={generate} disabled={busy} title="Désignation courte et description longue en français, rédigées par Claude depuis le texte anglais">
+            <Sparkles size={14} /> {busy ? 'Rédaction…' : p.description?.fr ? 'Refaire le français' : 'Générer le français'}
+          </button>
+        )}
         {canEdit && !edit && (
           <button type="button" className="btn sm" onClick={start}>
             <Pencil size={14} /> Modifier

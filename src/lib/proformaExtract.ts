@@ -123,7 +123,7 @@ type Sample = ((input: string, opts?: object) => Promise<{ text: string }>) & {
 };
 type ClaudeWin = { claude?: { use?: (n: string) => Promise<unknown> } };
 
-async function sampleCap(): Promise<Sample | null> {
+export async function sampleCap(): Promise<Sample | null> {
   const host = (window as unknown as ClaudeWin).claude;
   if (!host?.use) return null;
   try {

@@ -10,6 +10,7 @@ import { ContainerGlyph, Toaster } from './ui';
 import UserSwitcher from './UserSwitcher';
 import { Forbidden } from './Guard';
 import Assistant from './Assistant';
+import AutoFrench from './AutoFrench';
 
 // Menu principal (maquette) puis modules complémentaires
 const NAV: { to: string; label: string; icon: typeof Layers; module: Module }[] = [
@@ -111,6 +112,7 @@ export default function Layout() {
       </nav>
       <main className="main" ref={mainRef}>
         {allowedHere ? <Outlet /> : <Forbidden />}
+        <AutoFrench />
       </main>
       <Assistant />
       <Toaster />
