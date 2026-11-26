@@ -34,7 +34,15 @@ export const LANG_STORAGE_KEY = (() => {
 
 /** Navigation HashRouter : go(page, 'design') -> /#/design */
 export async function go(page: Page, route = '') {
-  await page.goto('/#/' + route.replace(/^\/+/, ''));
+  const r = route.replace(/^\/+/, '');
+  await page.goto('/#/' + r);
+  if (!r) return;
+  // Une redirection encore en cours (connexion, page d'accueil du rôle) peut écraser la navigation : on vérifie la route
+  const want = '#/' + r.split('?')[0];
+  await expect(async () => {
+    if (!page.url().includes(want)) await page.goto('/#/' + r);
+    expect(page.url()).toContain(want);
+  }).toPass({ timeout: 10_000 });
 }
 
 /** État propre : vide le localStorage (sauf langue FR) puis recharge (données réinitialisées depuis le seed). */
@@ -45,6 +53,7 @@ export async function resetApp(page: Page, route = '') {
     if (langKey) localStorage.setItem(langKey, 'fr');
   }, LANG_STORAGE_KEY);
   await page.reload();
+  await expect(page.locator('main')).toBeVisible();
   if (route) await go(page, route);
   await expect(page.locator('main')).toBeVisible();
 }

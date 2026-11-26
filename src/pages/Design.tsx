@@ -990,6 +990,76 @@ async function downloadPackKind(p: Product, kind: 'pack' | 'diecut') {
   else await saveBlob(await zipBlobs(items), `${p.ref}_die-cut.zip`);
 }
 
+/** Planning du pack : semaine de réalisation (début prévu) et deadline de rendu de l'artwork */
+function PackPlanning({ p }: { p: Product }) {
+  const { dispatch } = useStore();
+  const auth = useAuth();
+  const canPlan = !p.pack.startedAt && auth.allowed({ type: 'planPack', productId: p.id, date: null });
+  const canDeadline = auth.allowed({ type: 'reassignPack', productId: p.id, deadline: p.pack.artworkDeadline });
+  const weeks = useMemo(() => Array.from({ length: 24 }, (_, i) => addDays(weekStart(TODAY), (i - 1) * 7)), []);
+  const planned = p.pack.plannedStart;
+  const plannedWeek = planned ? weekStart(planned) : '';
+  const tooLate = !!planned && weekKey(planned) > weekKey(p.pack.artworkDeadline);
+  if (!canPlan && !canDeadline && !planned) return null;
+  return (
+    <div className="pk-planbox mt" role="group" aria-label="Planning du pack">
+      <div className="bold small">Planning du pack</div>
+      <div className="pk-planrow">
+        <label>
+          <span className="xs muted">Semaine de réalisation</span>
+          {canPlan ? (
+            <select
+              className="input"
+              aria-label="Semaine de réalisation"
+              value={plannedWeek}
+              onChange={(e) => {
+                const w = e.target.value;
+                dispatch({ type: 'planPack', productId: p.id, date: w || null });
+                toast(w ? `${p.ref} : réalisation planifiée en ${weekLabel(w)} (semaine du ${fdate(w)})` : `${p.ref} : semaine de réalisation retirée`);
+              }}
+            >
+              <option value="">À planifier</option>
+              {plannedWeek && !weeks.includes(plannedWeek) && <option value={plannedWeek}>{weekLabel(plannedWeek)}</option>}
+              {weeks.map((w) => (
+                <option key={w} value={w}>
+                  {weekLabel(w)} · {weekRange(w).replace(/ \d{4}$/, '')}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <b>{p.pack.startedAt ? `Commencé le ${fdate(p.pack.startedAt.slice(0, 10))}` : planned ? `${weekLabel(planned)} · ${weekRange(planned)}` : 'À planifier'}</b>
+          )}
+        </label>
+        <label>
+          <span className="xs muted">Deadline rendu artwork</span>
+          {canDeadline ? (
+            <input
+              className="input"
+              type="date"
+              aria-label="Deadline rendu artwork"
+              value={p.pack.artworkDeadline}
+              onChange={(e) => {
+                if (!e.target.value) return;
+                dispatch({ type: 'reassignPack', productId: p.id, deadline: e.target.value });
+                toast(`${p.ref} : rendu artwork le ${fdate(e.target.value)} (${weekLabel(e.target.value)})`);
+              }}
+            />
+          ) : (
+            <b>
+              {fdate(p.pack.artworkDeadline)} · {weekLabel(p.pack.artworkDeadline)}
+            </b>
+          )}
+        </label>
+      </div>
+      {tooLate && (
+        <div className="small red">
+          <AlertTriangle size={13} /> La semaine de réalisation est après la deadline ({weekLabel(p.pack.artworkDeadline)}).
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PackPanel({ p }: { p: Product }) {
   const { state, dispatch } = useStore();
   const auth = useAuth();
@@ -1034,7 +1104,7 @@ function PackPanel({ p }: { p: Product }) {
       </div>
       {auth.can('pack.assign') && (
         <div className="pk-assign mt">
-          <span className="xs muted">Affectation</span>
+          <span className="xs muted">Designer</span>
           <select
             className="input"
             value={p.pack.designer}
@@ -1048,19 +1118,9 @@ function PackPanel({ p }: { p: Product }) {
               <option key={d}>{d}</option>
             ))}
           </select>
-          <input
-            className="input"
-            type="date"
-            value={p.pack.artworkDeadline}
-            onChange={(e) => {
-              if (!e.target.value) return;
-              dispatch({ type: 'reassignPack', productId: p.id, deadline: e.target.value });
-              toast(`${p.ref} : rendu artwork le ${fdate(e.target.value)} (${weekLabel(e.target.value)})`);
-            }}
-            aria-label="Date de rendu artwork"
-          />
         </div>
       )}
+      <PackPlanning p={p} />
       {packLate(p) && (
         <div className="pill red mt">
           <AlertTriangle size={13} /> Date limite artwork dépassée ({fdate(p.pack.artworkDeadline)})

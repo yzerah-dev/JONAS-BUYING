@@ -58,7 +58,26 @@ test('galerie : cocher des cartes et les déplacer ; date exacte depuis le déta
   const card = page.locator('.pk-week.open .pk-card').first();
   const ref = (await card.locator('.pk-card-body b').innerText()).trim();
   await card.click();
-  await page.getByLabel('Date de rendu artwork', { exact: true }).fill('2026-12-02');
+  await page.getByLabel('Deadline rendu artwork').fill('2026-12-02');
   await expect(toast(page)).toContainText(`${ref} : rendu artwork le 02/12/2026`);
   expect(await deadlineOf(page, ref)).toBe('2026-12-02');
+});
+
+test('détail du pack : planifier la semaine de réalisation et la deadline (acheteur)', async ({ page }) => {
+  await resetApp(page);
+  await loginAs(page, 'David');
+  await go(page, 'design');
+  await page.locator('.pk-chip', { hasText: 'Pas commencés' }).click();
+  const row = page.locator('.pk-row').first();
+  const ref = (await row.locator('.pk-id b').innerText()).split('\n')[0].trim();
+  await row.click();
+  const plan = page.getByRole('group', { name: 'Planning du pack' });
+  const sel = plan.getByLabel('Semaine de réalisation');
+  const opts = await sel.locator('option').evaluateAll((os) => os.map((o) => (o as HTMLOptionElement).value).filter(Boolean));
+  await sel.selectOption(opts[3]);
+  await expect(toast(page)).toContainText(`${ref} : réalisation planifiée en`);
+  await expect(page.locator('.pk-row', { hasText: ref }).locator('.pk-c-st')).toContainText('prévu');
+  await plan.getByLabel('Deadline rendu artwork').fill('2027-02-10');
+  await expect(toast(page)).toContainText(`${ref} : rendu artwork le 10/02/2027`);
+  expect(await deadlineOf(page, ref)).toBe('2027-02-10');
 });

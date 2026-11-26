@@ -361,8 +361,9 @@ export function isAllowed(s: State, a: Action): boolean {
       return canEditProduct(u) && s.products.some((x) => x.id === a.productId);
     case 'startPack':
     case 'planPack': {
-      // Le designer du pack (ou le Pilote) annonce son démarrage
+      // Le designer du pack (ou le Pilote) annonce son démarrage ; la semaine de réalisation se planifie aussi par l'achat et la Direction
       const p = s.products.find((x) => x.id === a.productId);
+      if (a.type === 'planPack' && !!p && can(u, 'pack.assign')) return true;
       return !!p && (u.role === 'pilote' || (u.role === 'designer' && u.designerName === p.pack.designer));
     }
     case 'receiveDieCut': {
