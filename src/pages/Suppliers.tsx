@@ -3,7 +3,8 @@ import { NewSupplierButton } from '../components/NewSupplier';
 import { Check, Mail, User } from 'lucide-react';
 import { supplierStats, useStore } from '../data/store';
 import { Pill, SupplierLogo } from '../components/ui';
-import { eur, num } from '../lib/format';
+import { num } from '../lib/format';
+import { curSumLabel } from '../lib/curr';
 
 export default function Suppliers() {
   const { state } = useStore();
@@ -64,7 +65,7 @@ export default function Suppliers() {
               <div className="row small">
                 <span className="muted">Montant commandes</span>
                 <div className="grow" />
-                <b>{eur(st.amount)}</b>
+                <b>{curSumLabel(st.amountCur)}</b>
               </div>
             </div>
           );

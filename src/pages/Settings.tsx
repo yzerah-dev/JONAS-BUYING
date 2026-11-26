@@ -93,9 +93,7 @@ export default function Settings() {
                           className="input"
                           disabled={!admin}
                           value={u.validationStep ?? ''}
-                          onChange={(e) =>
-                            dispatch({ type: 'setUserRole', userId: u.id, role: u.role, validationStep: (e.target.value || null) as ValidationStep | null })
-                          }
+                          onChange={(e) => dispatch({ type: 'setUserRole', userId: u.id, role: u.role, validationStep: (e.target.value || null) as ValidationStep | null })}
                         >
                           <option value="">—</option>
                           {VALIDATION_STEPS.filter((s) => s !== 'fournisseur').map((s) => (
@@ -248,8 +246,7 @@ export default function Settings() {
           </table>
         </div>
         <div className="xs muted mt">
-          Le portail fournisseur ne montre que les données du fournisseur connecté : ses produits, proformas, packs à valider, die cuts, plans de chargement, conteneurs, documents et
-          paiements.
+          Le portail fournisseur ne montre que les données du fournisseur connecté : ses produits, proformas, packs à valider, die cuts, plans de chargement, conteneurs, documents et paiements.
         </div>
       </div>
 
@@ -326,7 +323,10 @@ function CompanyCard() {
             className="btn primary"
             disabled={!dirty}
             onClick={() => {
-              dispatch({ type: 'setCompany', company: { name: c.name.trim(), address: c.address.trim(), city: c.city.trim(), vat: c.vat.trim().toUpperCase(), gs1Prefix: (c.gs1Prefix ?? '').replace(/\D/g, '') || undefined } });
+              dispatch({
+                type: 'setCompany',
+                company: { name: c.name.trim(), address: c.address.trim(), city: c.city.trim(), vat: c.vat.trim().toUpperCase(), gs1Prefix: (c.gs1Prefix ?? '').replace(/\D/g, '') || undefined },
+              });
               toast('Tampon de la société enregistré');
             }}
           >

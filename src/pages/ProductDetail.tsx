@@ -29,7 +29,8 @@ import ProductDescription from '../components/ProductDescription';
 import ProductEdit from '../components/ProductEdit';
 import ProductInfoView from '../components/ProductInfoView';
 import { BrandLogo, ContainerStatusPill, PackPill, Pill, ProformaStatusPill, Progress, Tabs, ValidationCircuit, PA } from '../components/ui';
-import { TODAY, dec, eur, fdate, fshort, money, num, weekLabel } from '../lib/format';
+import { TODAY, dec, fdate, fshort, money, num, weekLabel } from '../lib/format';
+import { cur0, curSumLabel, sumCur } from '../lib/curr';
 
 type Tab = 'info' | 'overview' | 'design' | 'dev' | 'commandes' | 'production' | 'logistique' | 'stock' | 'docs';
 
@@ -319,7 +320,7 @@ function DevCard({ p }: { p: Product }) {
 function OrdersCard({ p, state }: { p: Product; state: State }) {
   const rows = state.proformas.flatMap((pf) => pf.lines.filter((l) => l.productId === p.id).map((l) => ({ pf, l })));
   const total = rows.reduce((s, r) => s + r.l.qty, 0);
-  const amount = rows.reduce((s, r) => s + r.l.qty * r.l.price, 0);
+  const amount = sumCur(rows.map((r) => ({ currency: r.pf.currency ?? 'EUR', v: r.l.qty * r.l.price })));
   return (
     <Card title={`Commandes & proformas (${rows.length})`} icon={<ShoppingCart size={18} className="green" />}>
       <div className="tbl-wrap">
@@ -344,7 +345,7 @@ function OrdersCard({ p, state }: { p: Product; state: State }) {
                   </Link>
                 </td>
                 <td className="num">{num(l.qty)}</td>
-                <td className="num">{eur(l.qty * l.price)}</td>
+                <td className="num">{cur0(l.qty * l.price, pf.currency ?? 'EUR')}</td>
                 <td>{weekLabel(pf.etd)}</td>
                 <td>
                   <ProformaStatusPill status={pf.status} />
@@ -355,7 +356,7 @@ function OrdersCard({ p, state }: { p: Product; state: State }) {
               <td className="bold">Total</td>
               <td />
               <td className="num bold">{num(total)}</td>
-              <td className="num bold">{eur(amount)}</td>
+              <td className="num bold">{curSumLabel(amount)}</td>
               <td colSpan={2} />
             </tr>
           </tbody>

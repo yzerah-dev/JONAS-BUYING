@@ -5,8 +5,9 @@ import { byId, isReliquat, openReliquats, shipmentLabel, pendingRevision, pendin
 import { PROFORMA_STATUSES, type Proforma, type ProformaStatus } from '../data/types';
 import { ProformaStatusPill, SupplierMark } from '../components/ui';
 import { toast } from '../components/ui-shared';
-import { TODAY, addDays, dec, diffDays, eur, fdate, weekKey, weekLabel, weekRange, weekStart } from '../lib/format';
+import { TODAY, addDays, dec, diffDays, fdate, weekKey, weekLabel, weekRange, weekStart } from '../lib/format';
 import { pressable } from '../lib/a11y';
+import { cur0, curSumLabel, sumCur } from '../lib/curr';
 import { BookingRequestButton } from '../components/BookingDialog';
 import { SignDialog } from '../components/ProformaVersions';
 import { NewProformaButton } from '../components/NewProforma';
@@ -265,7 +266,7 @@ function Group({
   const navigate = useNavigate();
   const totals = items.map((p) => proformaTotals(state, p));
   const cbm = totals.reduce((s, t) => s + t.cbm, 0);
-  const amount = totals.reduce((s, t) => s + t.amount, 0);
+  const amount = sumCur(totals.map((t) => ({ currency: t.currency, v: t.amountCur })));
 
   return (
     <section
@@ -301,7 +302,7 @@ function Group({
           </span>
           <span>{dec(cbm)} m³</span>
           <span>≈ {dec(cbm / 69)} containers</span>
-          {showMoney && <b>{eur(amount)}</b>}
+          {showMoney && <b>{curSumLabel(amount)}</b>}
         </div>
         <span className="pf-chevron">{open ? <ChevronUp size={24} /> : <ChevronDown size={24} />}</span>
       </header>
@@ -420,16 +421,13 @@ function BookingStatus({ p, children }: { p: Proforma; children?: React.ReactNod
   );
 }
 
-function AmountCell({ p, amount, deposit, amountCur, currency }: { p: Proforma; amount: number; deposit: number; amountCur?: number; currency?: string }) {
+function AmountCell({ p, deposit, amountCur, currency }: { p: Proforma; deposit: number; amountCur: number; currency: string }) {
   return (
     <div className="pf-amount">
-      <b>{eur(amount)}</b>
-      {currency && currency !== 'EUR' && amountCur !== undefined && (
-        <small className="pf-cur">{new Intl.NumberFormat('fr-FR', { style: 'currency', currency, maximumFractionDigits: 0 }).format(amountCur)}</small>
-      )}
+      <b>{cur0(amountCur, currency)}</b>
       {hasDeposit(p) ? (
         <>
-          <small>Acompte : {eur(deposit)}</small>
+          <small>Acompte : {cur0(deposit, currency)}</small>
           {p.depositPaid ? (
             <span className="ok">
               <Check size={15} strokeWidth={3} />
@@ -487,7 +485,7 @@ function Row({ p, state, showMoney, onSign, onOpen, move }: RowProps) {
       <td>
         <div className="pfx-cmd">
           <span className="pfx-logo">
-            <SupplierMark supplier={sup} size={78} wide />
+            <SupplierMark supplier={sup} size={100} wide />
           </span>
           <div>
             <div className="pfx-line1">
@@ -517,7 +515,7 @@ function Row({ p, state, showMoney, onSign, onOpen, move }: RowProps) {
       {showMoney && (
         <td className="r">
           <div className="pfx-amount">
-            <b>{eur(t.amount)}</b>
+            <b>{cur0(t.amountCur, t.currency)}</b>
             {depositDue && <small>Acompte à faire</small>}
           </div>
         </td>
@@ -601,7 +599,7 @@ function Card({ p, state, showMoney, onSign, onOpen, move }: RowProps) {
           </div>
           <div className="pf-card-bottom">
             <StatusCell p={p} onSign={onSign} />
-            {showMoney && <AmountCell p={p} amount={t.amount} deposit={t.deposit} amountCur={t.amountCur} currency={t.currency} />}
+            {showMoney && <AmountCell p={p} deposit={t.depositCur} amountCur={t.amountCur} currency={t.currency} />}
           </div>
           <button className="pf-btn pf-line-open" onClick={onOpen}>
             Ouvrir la proforma <ChevronRight size={18} />

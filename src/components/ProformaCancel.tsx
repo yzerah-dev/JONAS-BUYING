@@ -5,7 +5,8 @@ import { byId, cancelBlock, canCancelProforma, canDeleteProforma, currentUser, p
 import type { Proforma } from '../data/types';
 import { ProformaStatusPill } from './ui';
 import { toast } from './ui-shared';
-import { eur, fdate, num } from '../lib/format';
+import { fdate, num } from '../lib/format';
+import { cur0 } from '../lib/curr';
 
 type Mode = 'cancel' | 'delete';
 
@@ -179,7 +180,7 @@ export function CancelledProforma({ pf }: { pf: Proforma }) {
           <span>
             {num(t.qty)} pcs · {pf.lines.length} ligne(s)
           </span>
-          {auth.can('finance.view') && <span>{eur(t.amount)}</span>}
+          {auth.can('finance.view') && <span>{cur0(t.amountCur, t.currency)}</span>}
         </div>
         <div className="mt">
           <Link to="/proformas?annulees=1" className="small">

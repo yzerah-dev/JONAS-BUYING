@@ -2127,21 +2127,21 @@ tr.pf-moving td, .pf-line.pf-moving { background: #fff6e8 !important; outline: 2
 .pfx-metrics b { font-size: 23px; font-weight: 800; }
 .pfx { width: 100%; border-collapse: separate; border-spacing: 0; }
 .pfx thead th { background: #e9f3ef; font-size: 15px; font-weight: 700; color: var(--ink); text-align: left; padding: 12px 16px; white-space: nowrap; }
-.pfx thead th:first-child { padding-left: 22px; }
+.pfx thead th:first-child { padding-left: 22px; width: 56%; }
 .pfx th.c, .pfx td.c { text-align: center; }
 .pfx th.r, .pfx td.r { text-align: right; }
-.pfx tbody td { padding: 14px 16px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.pfx tbody td { padding: 20px 16px; border-bottom: 1px solid var(--line); vertical-align: middle; }
 .pfx tbody tr:last-child td { border-bottom: 0; }
 .pfx tbody tr { cursor: pointer; }
 .pfx tbody tr:hover td { background: #fafcfb; }
 .pfx tbody td:first-child { padding-left: 22px; }
-.pfx-cmd { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.pfx-cmd { display: flex; align-items: center; gap: 18px; min-width: 0; }
 .pfx-cmd > div { display: grid; gap: 2px; min-width: 0; }
-.pfx-cmd b { font-size: 21px; font-weight: 800; letter-spacing: -0.01em; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 380px; }
-.pfx-logo { width: 136px; display: flex; justify-content: center; align-items: center; flex-shrink: 0; }
-.pfx-line1 { display: flex; align-items: baseline; gap: 14px; min-width: 0; }
-.pfx-sup { font-size: 20px; font-weight: 900; color: var(--green-dark); text-transform: uppercase; letter-spacing: 0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 340px; padding-left: 14px; border-left: 2px solid #c9d6d1; line-height: 1.2; }
-.pfx-cmd small { font-size: 15px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pfx-cmd b { font-size: 24px; font-weight: 800; letter-spacing: -0.01em; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.pfx-logo { width: 176px; display: flex; justify-content: center; align-items: center; flex-shrink: 0; }
+.pfx-line1 { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 14px; min-width: 0; }
+.pfx-sup { font-size: 23px; font-weight: 900; color: var(--green-dark); text-transform: uppercase; letter-spacing: 0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; line-height: 1.2; }
+.pfx-cmd small { font-size: 16px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pfx-packs { font-size: 21px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .pfx-ok { display: inline-flex; align-items: center; gap: 6px; color: var(--green-dark); font-size: 20px; font-weight: 800; }
 .pfx-st { display: inline-flex; align-items: center; gap: 10px; padding: 7px 16px; border-radius: 10px; font-size: 17px; font-weight: 600; white-space: nowrap; }
@@ -2156,7 +2156,7 @@ tr.pf-moving td, .pf-line.pf-moving { background: #fff6e8 !important; outline: 2
 .pfx-st.arrive { background: #eef1f0; color: #3d4a46; }
 .pfx-note { display: block; margin-top: 4px; font-size: 13px; color: var(--muted); }
 .pfx-amount { display: inline-grid; justify-items: end; line-height: 1.2; }
-.pfx-amount b { font-size: 21px; font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pfx-amount b { font-size: 23px; font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .pfx-amount small { font-size: 15px; color: #b42318; font-weight: 600; white-space: nowrap; }
 .pfx-act { width: 1%; white-space: nowrap; text-align: right; padding-right: 20px !important; color: var(--ink); }
 .pfx-act-row { display: inline-flex; align-items: center; gap: 12px; }
@@ -2166,8 +2166,9 @@ tr.pf-moving td, .pf-line.pf-moving { background: #fff6e8 !important; outline: 2
 .pfx-bk:hover { border-color: var(--green); background: var(--green-softer); }
 .pfx-past { align-self: center; border: 0; background: none; color: var(--green-dark); font-weight: 600; font-size: 15px; cursor: pointer; text-decoration: underline; padding: 6px; }
 @media (max-width: 1350px) {
-  .pfx-cmd b { max-width: 260px; font-size: 19px; }
-  .pfx-sup { font-size: 17px; max-width: 220px; }
+  .pfx-cmd b { font-size: 20px; }
+  .pfx-sup { font-size: 19px; }
+  .pfx-logo { width: 130px; }
   .pfx-line1 { flex-wrap: wrap; row-gap: 2px; }
   .pfx-select { min-width: 190px; }
 }

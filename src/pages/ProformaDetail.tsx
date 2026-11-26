@@ -62,7 +62,7 @@ import { BookingRequestButton } from '../components/BookingDialog';
 import BookingReview, { LastRejection } from '../components/BookingReview';
 import ProformaVersions, { SignDialog } from '../components/ProformaVersions';
 import ShipmentsPanel from '../components/Shipments';
-import { TODAY, addDays, dec, diffDays, eur2, fdate, m3, money, num, weekLabel, weekStart } from '../lib/format';
+import { TODAY, addDays, dec, diffDays, fdate, m3, money, num, weekLabel, weekStart } from '../lib/format';
 import { useT, type I18n } from '../i18n/context';
 import type { Key } from '../i18n/dict';
 
@@ -156,7 +156,7 @@ export default function ProformaDetail() {
             <Info icon={<Ship size={18} />} label="ETA" value={weekLabel(pf.eta)} sub={`du ${fdate(pf.eta)}`} />
             <Info icon={<Ctn size={18} />} label="Conteneurs" value={dec(t.eq40)} sub="(40HC)" />
             <Info icon={<Boxes size={18} />} label="CBM total" value={m3(t.cbm)} />
-            {showMoney && <Info icon={<Euro size={18} />} label="Montant total" value={eur2(t.amount)} />}
+            {showMoney && <Info icon={<Euro size={18} />} label="Montant total" value={money(t.amountCur, t.currency)} />}
           </div>
         </div>
       </div>
@@ -215,7 +215,7 @@ export default function ProformaDetail() {
         <Metric l="Qté totale" v={`${num(t.qty)} pcs`} />
         <Metric l="CBM total" v={m3(t.cbm)} />
         <Metric l="Conteneurs" v={`${dec(t.eq40)} (40HC)`} />
-        {showMoney && <Metric l="Montant total" v={eur2(t.amount)} />}
+        {showMoney && <Metric l="Montant total" v={money(t.amountCur, t.currency)} />}
         <Metric l="Packs validés" v={`${t.packsOk}/${t.packsTotal}`} />
         <div className="grow" />
         <Pill color="green">
@@ -493,40 +493,24 @@ function DetailsTab({ pf, state }: { pf: Proforma; state: State }) {
           <dl className="kv">
             <dt>Montant total</dt>
             <dd>
-              {eur2(t.amount)}
+              {money(t.amountCur, t.currency)}
               {t.currency !== 'EUR' && (
-                <div className="small violet-t">
-                  {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: t.currency }).format(t.amountCur)} · 1 {t.currency} = {state.settings.fx[t.currency]} €
+                <div className="small muted">
+                  Devise du fournisseur · 1 {t.currency} = {state.settings.fx[t.currency]} €
                 </div>
               )}
             </dd>
             <dt>Acompte ({pf.depositPct} %)</dt>
             <dd>
               {hasDeposit(pf) ? (
-                <PayLine
-                  pf={pf}
-                  kind="deposit"
-                  amountCur={t.amountCur ? (t.deposit / t.amount) * t.amountCur : 0}
-                  amountEur={t.deposit}
-                  currency={t.currency}
-                  paid={pf.depositPaid}
-                  due={addDays(pf.date, 7)}
-                />
+                <PayLine pf={pf} kind="deposit" amountCur={t.depositCur} currency={t.currency} paid={pf.depositPaid} due={addDays(pf.date, 7)} />
               ) : (
                 <span className="muted">Pas d’acompte : rien à payer à la commande</span>
               )}
             </dd>
             <dt>Solde</dt>
             <dd>
-              <PayLine
-                pf={pf}
-                kind="balance"
-                amountCur={t.amountCur ? (t.balance / t.amount) * t.amountCur : 0}
-                amountEur={t.balance}
-                currency={t.currency}
-                paid={pf.balancePaid}
-                due={pf.balanceDue}
-              />
+              <PayLine pf={pf} kind="balance" amountCur={t.balanceCur} currency={t.currency} paid={pf.balancePaid} due={pf.balanceDue} />
               <div className="xs muted">
                 {realDeparture(state, pf)
                   ? `Échéance : départ réel du ${fdate(realDeparture(state, pf))} + ${balanceDaysOf(state, pf)} j`
@@ -553,29 +537,12 @@ function DetailsTab({ pf, state }: { pf: Proforma; state: State }) {
 }
 
 /** Une échéance (acompte ou solde) : montant dans la devise du fournisseur, état, copie du virement à déposer / télécharger */
-function PayLine({
-  pf,
-  kind,
-  amountCur,
-  amountEur,
-  currency,
-  paid,
-  due,
-}: {
-  pf: Proforma;
-  kind: 'deposit' | 'balance';
-  amountCur: number;
-  amountEur: number;
-  currency: string;
-  paid: boolean;
-  due: string;
-}) {
+function PayLine({ pf, kind, amountCur, currency, paid, due }: { pf: Proforma; kind: 'deposit' | 'balance'; amountCur: number; currency: string; paid: boolean; due: string }) {
   const auth = useAuth();
   const proof = kind === 'deposit' ? pf.depositProof : pf.balanceProof;
   return (
     <div className="pay-line">
       <b>{money(amountCur, currency)}</b>
-      {currency !== 'EUR' && <span className="small muted">≈ {eur2(amountEur)}</span>}
       {paid ? <Pill color="green">Payé</Pill> : <Pill color={kind === 'deposit' ? 'red' : 'orange'}>Échéance {fdate(due)}</Pill>}
       {proof && (
         <button

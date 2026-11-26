@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom';
 import { BarChart3 } from 'lucide-react';
 import { capacityOf, containerEta, packDone, packLate, proformaTotals, useStore } from '../data/store';
-import { TODAY, dec, diffDays, eur, num, weekKey, weekLabel } from '../lib/format';
+import { TODAY, dec, diffDays, num, weekKey, weekLabel } from '../lib/format';
+import { curSumLabel, sumCur } from '../lib/curr';
 import { SupplierLogo } from './ui';
 import { designerColor } from './ui-shared';
 import { initials } from '../lib/format';
@@ -29,7 +30,7 @@ export default function DirectionKpis() {
   // Valeur engagée au m³
   const open = state.proformas.filter((p) => p.status !== 'arrive');
   const tot = open.map((p) => proformaTotals(state, p));
-  const value = tot.reduce((t, x) => t + x.amount, 0);
+  const value = sumCur(tot.map((x) => ({ currency: x.currency, v: x.amountCur })));
   const cbm = tot.reduce((t, x) => t + x.cbm, 0);
 
   // Charge designers semaine en cours
@@ -48,9 +49,15 @@ export default function DirectionKpis() {
       const prods = state.products.filter((p) => p.supplierId === s.id);
       const lateP = prods.filter(packLate).length;
       const pfs = state.proformas.filter((p) => p.supplierId === s.id);
-      const amount = pfs.reduce((t, p) => t + proformaTotals(state, p).amount, 0);
+      const amount = pfs.reduce((t, p) => t + proformaTotals(state, p).amount, 0); // tri
+      const amountCur = sumCur(
+        pfs.map((p) => {
+          const t = proformaTotals(state, p);
+          return { currency: t.currency, v: t.amountCur };
+        }),
+      );
       const gaps = cs.filter((c) => c.reception && c.reception.lines.some((l) => l.received !== l.expected)).length;
-      return { s, pfs: pfs.length, amount, cs: cs.length, revised, lateP, gaps };
+      return { s, pfs: pfs.length, amount, amountCur, cs: cs.length, revised, lateP, gaps };
     })
     .filter((x) => x.pfs || x.cs)
     .sort((a, b) => b.amount - a.amount);
@@ -80,9 +87,9 @@ export default function DirectionKpis() {
         </div>
         <div className="kpi-box">
           <small>Valeur engagée au m³</small>
-          <b>{cbm ? eur(value / cbm) : '—'}</b>
+          <b>{cbm ? curSumLabel(Object.fromEntries(Object.entries(value).map(([c, v]) => [c, v / cbm]))) : '—'}</b>
           <span>
-            {eur(value)} · {dec(cbm, 0)} m³
+            {curSumLabel(value)} · {dec(cbm, 0)} m³
           </span>
         </div>
       </div>
@@ -129,7 +136,7 @@ export default function DirectionKpis() {
                       <SupplierLogo supplier={x.s} size={22} /> {x.s.shortName}
                     </Link>
                   </td>
-                  <td className="num">{eur(x.amount)}</td>
+                  <td className="num">{curSumLabel(x.amountCur)}</td>
                   <td className={`num ${x.revised ? 'red bold' : ''}`}>
                     {x.revised}/{x.cs}
                   </td>

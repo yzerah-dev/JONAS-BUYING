@@ -4,7 +4,8 @@ import { Search } from 'lucide-react';
 import { bookingStage, byId, openReliquats, proformaTotals, reliquatDelay, shipmentLabel, useAuth, useStore } from '../data/store';
 import type { Proforma } from '../data/types';
 import { ProductThumb, ProformaStatusPill, Seg, SupplierLogo } from '../components/ui';
-import { dec, eur, fshort, num, weekLabel } from '../lib/format';
+import { dec, fshort, num, weekLabel } from '../lib/format';
+import { cur0, curSumLabel, sumCur } from '../lib/curr';
 
 type Sort = 'retard' | 'date' | 'fournisseur';
 
@@ -44,7 +45,12 @@ export default function Reliquats() {
 
   const qty = (pf: Proforma) => pf.lines.reduce((s, l) => s + l.qty, 0);
   const totalQty = all.reduce((s, pf) => s + qty(pf), 0);
-  const totalAmount = all.reduce((s, pf) => s + proformaTotals(state, pf).amount, 0);
+  const totalAmount = sumCur(
+    all.map((pf) => {
+      const t = proformaTotals(state, pf);
+      return { currency: t.currency, v: t.amountCur };
+    }),
+  );
   const avg = all.length ? all.reduce((s, pf) => s + reliquatDelay(pf), 0) / all.length : 0;
   const suppliers = new Set(all.map((pf) => pf.supplierId)).size;
 
@@ -59,12 +65,18 @@ export default function Reliquats() {
         <div className="kpi-box">
           <small>Pièces en attente</small>
           <b>{num(totalQty)}</b>
-          <span>{dec(all.reduce((s, pf) => s + proformaTotals(state, pf).cbm, 0), 1)} m³</span>
+          <span>
+            {dec(
+              all.reduce((s, pf) => s + proformaTotals(state, pf).cbm, 0),
+              1,
+            )}{' '}
+            m³
+          </span>
         </div>
         {showMoney && (
           <div className="kpi-box">
             <small>Montant en attente</small>
-            <b>{eur(totalAmount)}</b>
+            <b>{curSumLabel(totalAmount)}</b>
             <span>au prorata des proformas</span>
           </div>
         )}
@@ -119,9 +131,7 @@ export default function Reliquats() {
                 <SupplierLogo supplier={sup} size={32} />
                 <span>
                   <b>{sup.shortName}</b>
-                  <small>
-                    {sup.port} → Le Havre
-                  </small>
+                  <small>{sup.port} → Le Havre</small>
                 </span>
               </div>
               <div className="bk-who">
@@ -130,7 +140,7 @@ export default function Reliquats() {
               <div className="bk-info">
                 <small>
                   {pf.lines.map((l) => `${byId(state.products, l.productId).ref} × ${num(l.qty)}`).join(' · ')}
-                  {showMoney ? ` · ${eur(proformaTotals(state, pf).amount)}` : ''}
+                  {showMoney ? ` · ${cur0(proformaTotals(state, pf).amountCur, proformaTotals(state, pf).currency)}` : ''}
                 </small>
                 <b className={delay > 14 ? 'red' : delay > 0 ? 'orange' : ''}>
                   {pf.split?.etdInitial ? `${fshort(pf.split.etdInitial)} → ` : ''}

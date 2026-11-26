@@ -89,15 +89,34 @@ function ListBox({
                   {r.label}
                   {r.sub && <small className="muted"> {r.sub}</small>}
                 </span>
-                <button type="button" className={`lp-count ${r.products.length ? '' : 'zero'}`} aria-expanded={open === r.id} onClick={() => setOpen(open === r.id ? null : r.id)} disabled={!r.products.length}>
+                <button
+                  type="button"
+                  className={`lp-count ${r.products.length ? '' : 'zero'}`}
+                  aria-expanded={open === r.id}
+                  onClick={() => setOpen(open === r.id ? null : r.id)}
+                  disabled={!r.products.length}
+                >
                   {r.products.length} produit(s)
                 </button>
                 {edit && (
                   <>
-                    <button type="button" className="icon-btn" aria-label={`Renommer ${r.label}`} title="Renommer (s'applique aux produits) — vers une valeur existante : fusion" onClick={() => setEditing({ id: r.id, v: r.label, sub: r.sub ?? '' })}>
+                    <button
+                      type="button"
+                      className="icon-btn"
+                      aria-label={`Renommer ${r.label}`}
+                      title="Renommer (s'applique aux produits) — vers une valeur existante : fusion"
+                      onClick={() => setEditing({ id: r.id, v: r.label, sub: r.sub ?? '' })}
+                    >
                       <Pencil size={14} />
                     </button>
-                    <button type="button" className="icon-btn" aria-label={`Retirer ${r.label}`} disabled={r.products.length > 0} title={r.products.length ? 'Utilisée par des produits : renommez-la ou fusionnez-la' : 'Retirer'} onClick={() => onRemove(r)}>
+                    <button
+                      type="button"
+                      className="icon-btn"
+                      aria-label={`Retirer ${r.label}`}
+                      disabled={r.products.length > 0}
+                      title={r.products.length ? 'Utilisée par des produits : renommez-la ou fusionnez-la' : 'Retirer'}
+                      onClick={() => onRemove(r)}
+                    >
                       <X size={14} />
                     </button>
                   </>
@@ -169,7 +188,8 @@ export default function ProductListsPage() {
         </div>
       </div>
       <p className="muted small mb">
-        Valeurs proposées dans les listes déroulantes de la fiche produit et de l'import Excel. Renommer une valeur la change sur tous les produits qui l'utilisent ; la renommer comme une valeur existante fusionne les deux. Une valeur utilisée ne peut pas être retirée.
+        Valeurs proposées dans les listes déroulantes de la fiche produit et de l'import Excel. Renommer une valeur la change sur tous les produits qui l'utilisent ; la renommer comme une valeur
+        existante fusionne les deux. Une valeur utilisée ne peut pas être retirée.
       </p>
       <div className="lp-grid">
         <ListBox

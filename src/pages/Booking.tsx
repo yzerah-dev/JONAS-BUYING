@@ -71,9 +71,7 @@ function BookingStages() {
   const booked = list.filter((pf) => pf.booking?.answeredAt && !shipped(pf)).sort((a, b) => (a.booking!.etd ?? a.etd).localeCompare(b.booking!.etd ?? b.etd));
   const gone = list.filter((pf) => pf.booking?.answeredAt && shipped(pf));
 
-  const delays = state.proformas
-    .filter((pf) => pf.booking?.answeredAt)
-    .map((pf) => diffDays(pf.booking!.answeredAt!.slice(0, 10), pf.booking!.requestedAt.slice(0, 10)));
+  const delays = state.proformas.filter((pf) => pf.booking?.answeredAt).map((pf) => diffDays(pf.booking!.answeredAt!.slice(0, 10), pf.booking!.requestedAt.slice(0, 10)));
   const remindRemove = (pf: Proforma, w: number) =>
     canBook && (
       <>
@@ -165,7 +163,13 @@ function BookingStages() {
         })}
       </Stage>
 
-      <Stage icon={<CalendarClock size={34} strokeWidth={1.8} />} tone="violet" title="Attente fournisseur" sub="Le fournisseur prend en compte : plan de chargement, date de marchandise prête, boîtes demandées au transitaire" items={atSupplier}>
+      <Stage
+        icon={<CalendarClock size={34} strokeWidth={1.8} />}
+        tone="violet"
+        title="Attente fournisseur"
+        sub="Le fournisseur prend en compte : plan de chargement, date de marchandise prête, boîtes demandées au transitaire"
+        items={atSupplier}
+      >
         {atSupplier.map((pf) => {
           const b = pf.booking!;
           const w = waitDays(pf);
@@ -186,7 +190,13 @@ function BookingStages() {
         })}
       </Stage>
 
-      <Stage icon={<Boxes size={34} strokeWidth={1.8} />} tone="violet" title="Attente transitaire" sub="Le transitaire choisi par JONAS prépare sa proposition (ou le fournisseur la saisit pour lui)" items={atForwarder}>
+      <Stage
+        icon={<Boxes size={34} strokeWidth={1.8} />}
+        tone="violet"
+        title="Attente transitaire"
+        sub="Le transitaire choisi par JONAS prépare sa proposition (ou le fournisseur la saisit pour lui)"
+        items={atForwarder}
+      >
         {atForwarder.map((pf) => {
           const b = pf.booking!;
           const w = waitDays(pf);
@@ -222,7 +232,13 @@ function BookingStages() {
         ))}
       </Stage>
 
-      <Stage icon={<CalendarCheck size={34} strokeWidth={1.8} />} tone="green" title="Bookés" sub="Proposition acceptée par le fournisseur et JONAS : compagnie, navire et dates réelles" items={booked}>
+      <Stage
+        icon={<CalendarCheck size={34} strokeWidth={1.8} />}
+        tone="green"
+        title="Bookés"
+        sub="Proposition acceptée par le fournisseur et JONAS : compagnie, navire et dates réelles"
+        items={booked}
+      >
         {booked.map((pf) => (
           <BookedRow key={pf.id} s={state} pf={pf} canShip={canBook} />
         ))}
@@ -257,7 +273,8 @@ function BookedRow({ s, pf, canShip }: { s: State; pf: Proforma; canShip?: boole
           Chargement {fshort(b.loadingDate)} · départ {fshort(b.etd)} · arrivée {fshort(b.eta)}
         </b>
         <span>
-          {b.bookedBy === 'transitaire' ? `Proposé par ${b.forwarder}` : `Saisi par ${b.bookedBy === 'fournisseur' ? 'le fournisseur' : 'JONAS'} pour ${b.forwarder ?? 'le transitaire'}`}, accepté le {fstamp(b.answeredAt)}
+          {b.bookedBy === 'transitaire' ? `Proposé par ${b.forwarder}` : `Saisi par ${b.bookedBy === 'fournisseur' ? 'le fournisseur' : 'JONAS'} pour ${b.forwarder ?? 'le transitaire'}`}, accepté le{' '}
+          {fstamp(b.answeredAt)}
           {b.vessel ? ` · ${b.vessel}` : ''}
           {b.supplierNote ? ` · « ${b.supplierNote} »` : ''}
         </span>
@@ -343,9 +360,7 @@ function Row({ s, pf, children, carrier }: { s: State; pf: Proforma; children: R
         <SupplierLogo supplier={sup} size={32} />
         <span>
           <b>{sup.shortName}</b>
-          <small>
-            {sup.port} → Le Havre
-          </small>
+          <small>{sup.port} → Le Havre</small>
         </span>
       </div>
       <div className="bk-who">{carrier ? <CarrierBadge carrier={carrier} /> : <ProformaStatusPill status={pf.status} />}</div>

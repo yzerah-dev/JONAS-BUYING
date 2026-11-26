@@ -4,7 +4,8 @@ import { AlertTriangle, Calendar, Check, Euro, Wallet } from 'lucide-react';
 import { byId, payments, useAuth, useStore, hasDeposit } from '../data/store';
 import { Kpi, Pill, Seg, SupplierLogo } from '../components/ui';
 import { toast } from '../components/ui-shared';
-import { TODAY, addDays, eur, fdate, weekLabel } from '../lib/format';
+import { TODAY, addDays, fdate, weekLabel } from '../lib/format';
+import { cur0, curSumLabel, sumCur } from '../lib/curr';
 
 export default function Finance() {
   const { state, dispatch } = useStore();
@@ -15,7 +16,8 @@ export default function Finance() {
   const late = open.filter((p) => p.due < TODAY);
   const next30 = open.filter((p) => p.due >= TODAY && p.due <= addDays(TODAY, 30));
   const list = f === 'open' ? open : f === 'late' ? late : f === 'paid' ? all.filter((p) => p.paid) : all;
-  const sum = (l: typeof all) => l.reduce((s, p) => s + p.amount, 0);
+  // Totaux par devise (devise de chaque fournisseur, sans conversion)
+  const sum = (l: typeof all) => curSumLabel(sumCur(l.map((p) => ({ currency: p.currency, v: p.amountCur }))));
 
   return (
     <>
@@ -24,10 +26,10 @@ export default function Finance() {
         <span className="page-sub">Acomptes, soldes et échéances reliés aux proformas et fournisseurs</span>
       </div>
       <div className="kpis mb">
-        <Kpi icon={<Wallet size={18} />} value={eur(sum(all.filter((p) => p.paid)))} label="Déjà payé" />
-        <Kpi icon={<Euro size={18} />} value={eur(sum(open))} label="Reste à payer" color="orange" />
-        <Kpi icon={<AlertTriangle size={18} />} value={eur(sum(late))} label={`En retard (${late.length})`} color="red" onClick={() => setF('late')} />
-        <Kpi icon={<Calendar size={18} />} value={eur(sum(next30))} label="Échéances à 30 jours" />
+        <Kpi icon={<Wallet size={18} />} value={sum(all.filter((p) => p.paid))} label="Déjà payé" />
+        <Kpi icon={<Euro size={18} />} value={sum(open)} label="Reste à payer" color="orange" />
+        <Kpi icon={<AlertTriangle size={18} />} value={sum(late)} label={`En retard (${late.length})`} color="red" onClick={() => setF('late')} />
+        <Kpi icon={<Calendar size={18} />} value={sum(next30)} label="Échéances à 30 jours" />
         <Kpi icon={<Check size={18} />} value={open.filter((p) => p.kind === 'Acompte').length} label="Acomptes à faire" color="red" />
       </div>
       <div className="mb">
@@ -77,7 +79,7 @@ export default function Finance() {
                     </Link>
                   </td>
                   <td>{p.kind}</td>
-                  <td className="num bold">{eur(p.amount)}</td>
+                  <td className="num bold">{cur0(p.amountCur, p.currency)}</td>
                   <td>{p.paid ? <Pill color="green">Payé</Pill> : isLate ? <Pill color="red">En retard</Pill> : <Pill color="orange">À payer</Pill>}</td>
                   <td>
                     {!p.paid && auth.can('finance.pay') && (

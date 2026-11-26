@@ -32,6 +32,7 @@ import type {
   ValidationStep,
 } from './types';
 import { ROLE_DEFS, can, canSee, canValidateStep, isForwarder, isSupplier, type Module, type Perm } from './permissions';
+import { addCur, type CurSum } from '../lib/curr';
 import { CONTAINER_CAPACITY, DEV_STAGES, VALIDATION_LABELS, VALIDATION_STEPS } from './types';
 import { TODAY, addDays, diffDays, parse, weekStart } from '../lib/format';
 
@@ -2465,9 +2466,13 @@ export function proformaTotals(s: State, pf: Proforma) {
     if (packDone(p)) packsOk++;
   }
   const deposit = pf.depositAmount ?? (amount * pf.depositPct) / 100;
+  // Acompte et solde dans la devise de la proforma (celle du fournisseur)
+  const toCur = amount ? amountCur / amount : fx ? 1 / fx : 1;
   return {
     amount,
     amountCur,
+    depositCur: deposit * toCur,
+    balanceCur: (amount - deposit) * toCur,
     currency: pf.currency ?? 'EUR',
     qty,
     cbm,
@@ -2499,6 +2504,17 @@ export function containerCbm(s: State, c: Container) {
 export function containerQty(c: Container) {
   return c.allocations.reduce((sum, a) => sum + a.qty, 0);
 }
+/** Valeur d'un conteneur par devise (devise de chaque proforma, sans conversion) */
+export function containerValueCur(s: State, c: Container): CurSum {
+  const m: CurSum = {};
+  for (const a of c.allocations) {
+    const pf = byId(s.proformas, a.proformaId);
+    const line = pf.lines.find((l) => l.productId === a.productId);
+    addCur(m, pf.currency ?? 'EUR', a.qty * (line?.price ?? 0));
+  }
+  return m;
+}
+
 export function containerValue(s: State, c: Container) {
   return c.allocations.reduce((sum, a) => {
     const pf = byId(s.proformas, a.proformaId);
@@ -2554,14 +2570,23 @@ export function supplierStats(s: State, supplierId: string) {
   let amount = 0;
   let depositPaid = 0;
   let balanceOpen = 0;
+  // Mêmes totaux dans la devise des proformas (celle du fournisseur) : ce sont eux qu'on affiche
+  const amountCur: CurSum = {};
+  const depositPaidCur: CurSum = {};
+  const balanceOpenCur: CurSum = {};
   for (const pf of pfs) {
     const t = proformaTotals(s, pf);
     amount += t.amount;
-    if (pf.depositPaid) depositPaid += t.deposit;
+    addCur(amountCur, t.currency, t.amountCur);
+    if (pf.depositPaid) {
+      depositPaid += t.deposit;
+      addCur(depositPaidCur, t.currency, t.depositCur);
+    }
     balanceOpen += pf.balancePaid ? 0 : pf.depositPaid ? t.balance : t.amount;
+    addCur(balanceOpenCur, t.currency, pf.balancePaid ? 0 : pf.depositPaid ? t.balanceCur : t.amountCur);
   }
   const cbm = cs.reduce((sum, c) => sum + containerCbm(s, c), 0);
-  return { prods, pfs, cs, amount, depositPaid, balanceOpen, cbm };
+  return { prods, pfs, cs, amount, depositPaid, balanceOpen, amountCur, depositPaidCur, balanceOpenCur, cbm };
 }
 
 /** Échéancier financier dérivé des proformas (acompte puis solde). */
@@ -2570,6 +2595,9 @@ export interface Payment {
   supplierId: string;
   kind: 'Acompte' | 'Solde';
   amount: number;
+  /** Devise de la proforma (celle du fournisseur) et montant dans cette devise : c'est lui qu'on affiche */
+  currency: string;
+  amountCur: number;
   due: ISODate;
   paid: boolean;
 }
@@ -2577,8 +2605,10 @@ export function payments(s: State): Payment[] {
   const out: Payment[] = [];
   for (const pf of s.proformas) {
     const t = proformaTotals(s, pf);
-    if (hasDeposit(pf)) out.push({ proformaId: pf.id, supplierId: pf.supplierId, kind: 'Acompte', amount: t.deposit, due: addDays(pf.date, 7), paid: pf.depositPaid });
-    out.push({ proformaId: pf.id, supplierId: pf.supplierId, kind: 'Solde', amount: t.balance, due: pf.balanceDue, paid: pf.balancePaid });
+    const c = t.currency;
+    if (hasDeposit(pf))
+      out.push({ proformaId: pf.id, supplierId: pf.supplierId, kind: 'Acompte', amount: t.deposit, currency: c, amountCur: t.depositCur, due: addDays(pf.date, 7), paid: pf.depositPaid });
+    out.push({ proformaId: pf.id, supplierId: pf.supplierId, kind: 'Solde', amount: t.balance, currency: c, amountCur: t.balanceCur, due: pf.balanceDue, paid: pf.balancePaid });
   }
   return out.sort((a, b) => a.due.localeCompare(b.due));
 }

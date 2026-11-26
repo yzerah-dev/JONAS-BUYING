@@ -11,7 +11,7 @@ import {
   containerEtd,
   containerProformas,
   containerQty,
-  containerValue,
+  containerValueCur,
   lineCbm,
   CONTAINER_PAYLOAD,
   containerWeight,
@@ -23,7 +23,8 @@ import ReceptionDialog from '../components/ReceptionDialog';
 import ContainerCard from '../components/ContainerCard';
 import { ContainerStatusPill, Pill, ProductThumb, Progress, Seg, SupplierLogo } from '../components/ui';
 import { toast } from '../components/ui-shared';
-import { TODAY, addDays, dec, diffDays, eur, fshort, m3, monthKey, monthLabel, num, shiftMonth, weekKey, weekLabel, weekRange } from '../lib/format';
+import { curSumLabel, mergeCur, type CurSum } from '../lib/curr';
+import { TODAY, addDays, dec, diffDays, fshort, m3, monthKey, monthLabel, num, shiftMonth, weekKey, weekLabel, weekRange } from '../lib/format';
 import Combobox from '../components/Combobox';
 
 const GROUP_COLOR: Record<ContainerStatus, string> = {
@@ -94,7 +95,7 @@ export default function Containers() {
   };
 
   const cbmOf = (list: Container[]) => list.reduce((s, c) => s + containerCbm(state, c), 0);
-  const transitValue = filtered.filter((c) => c.status === 'en_transit').reduce((s, c) => s + containerValue(state, c), 0);
+  const transitValue = filtered.filter((c) => c.status === 'en_transit').reduce((m, c) => mergeCur(m, containerValueCur(state, c)), {} as CurSum);
 
   return (
     <>
@@ -219,10 +220,10 @@ export default function Containers() {
 
         <div className="ctn-summary">
           <b>{filtered.length}</b> conteneur{filtered.length > 1 ? 's' : ''} · <b>{num(cbmOf(filtered))}</b> m³
-          {transitValue > 0 && (
+          {Object.keys(transitValue).length > 0 && (
             <>
               {' '}
-              · <b>{eur(transitValue)}</b> en transit
+              · <b>{curSumLabel(transitValue)}</b> en transit
             </>
           )}
         </div>
@@ -484,7 +485,7 @@ function ContainerDetail({ c, onClose }: { c: Container; onClose: () => void }) 
           <dt>Entrepôt</dt>
           <dd>{c.warehouse}</dd>
           <dt>Valeur</dt>
-          <dd>{eur(containerValue(state, c))}</dd>
+          <dd>{curSumLabel(containerValueCur(state, c))}</dd>
           <dt>Poids marchandise</dt>
           <dd className={containerWeight(state, c) > CONTAINER_PAYLOAD[c.type] ? 'red' : ''}>
             {dec(containerWeight(state, c) / 1000, 1)} t / {dec(CONTAINER_PAYLOAD[c.type] / 1000, 1)} t

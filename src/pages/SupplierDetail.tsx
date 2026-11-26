@@ -19,11 +19,12 @@ import {
   useStore,
 } from '../data/store';
 import { toast } from '../components/ui-shared';
+import { cur0, curSumLabel } from '../lib/curr';
 import { EditSupplierButton } from '../components/NewSupplier';
 import { SupplierLogoEdit } from '../components/SupplierLogoEdit';
 import { CONTAINER_STATUSES, type Currency, type SupplierTerms } from '../data/types';
 import { ContainerStatusPill, Kpi, Pill, ProductThumb, ProformaStatusPill, Ring, Seg, SupplierLogo, Tabs } from '../components/ui';
-import { TODAY, dec, eur, fdate, fshort, num, weekLabel } from '../lib/format';
+import { TODAY, dec, fdate, fshort, num, weekLabel } from '../lib/format';
 
 type Tab = 'dashboard' | 'produits' | 'proformas' | 'bookings' | 'conteneurs' | 'finance';
 
@@ -113,7 +114,7 @@ export default function SupplierDetail() {
             <Kpi icon={<Ctn size={18} />} value={st.cs.length} label="Conteneurs" />
             <Kpi icon={<Boxes size={18} />} value={`${num(st.cbm)} m³`} label="Total CBM" />
             <Kpi icon={<BarChart3 size={18} />} value={`${Math.round(prodRate * 100)} %`} label="Production" />
-            <Kpi icon={<Euro size={18} />} value={eur(st.amount)} label="Montant commandes" />
+            <Kpi icon={<Euro size={18} />} value={curSumLabel(st.amountCur)} label="Montant commandes" />
           </div>
           <div className="grid3 mb">
             <div className="card pad">
@@ -159,9 +160,9 @@ export default function SupplierDetail() {
                 <Ring value={st.amount ? st.depositPaid / st.amount : 0} size={100} stroke={11} />
                 <div className="col small">
                   <span className="muted">Acompte versé</span>
-                  <b style={{ fontSize: 18 }}>{eur(st.depositPaid)}</b>
+                  <b style={{ fontSize: 18 }}>{curSumLabel(st.depositPaidCur)}</b>
                   <span className="muted">Solde restant</span>
-                  <b style={{ fontSize: 18 }}>{eur(st.balanceOpen)}</b>
+                  <b style={{ fontSize: 18 }}>{curSumLabel(st.balanceOpenCur)}</b>
                 </div>
               </div>
               {nextDue && (
@@ -169,7 +170,7 @@ export default function SupplierDetail() {
                   <span>
                     Prochaine échéance · {fdate(nextDue.due)} ({nextDue.kind})
                   </span>
-                  <span>{eur(nextDue.amount)}</span>
+                  <span>{cur0(nextDue.amountCur, nextDue.currency)}</span>
                 </div>
               )}
             </div>
@@ -328,7 +329,7 @@ export default function SupplierDetail() {
                     </Link>
                   </td>
                   <td>{p.kind}</td>
-                  <td className="num">{eur(p.amount)}</td>
+                  <td className="num">{cur0(p.amountCur, p.currency)}</td>
                   <td className={!p.paid && p.due < TODAY ? 'red bold' : ''}>{fdate(p.due)}</td>
                   <td>{p.paid ? <Pill color="green">Payé</Pill> : p.due < TODAY ? <Pill color="red">En retard</Pill> : <Pill color="orange">À payer</Pill>}</td>
                 </tr>
@@ -372,7 +373,7 @@ function PfTable({ ids }: { ids: string[] }) {
                   {pf.lines.length > 1 ? ` + ${pf.lines.length - 1}` : ''}
                 </td>
                 <td className="num">{num(t.qty)}</td>
-                <td className="num">{eur(t.amount)}</td>
+                <td className="num">{cur0(t.amountCur, t.currency)}</td>
                 <td>
                   <ProformaStatusPill status={pf.status} />
                 </td>

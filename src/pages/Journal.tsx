@@ -10,9 +10,17 @@ import { initials } from '../lib/format';
 
 const FAMILIES: { id: string; label: string; types: string[] }[] = [
   { id: 'pf', label: 'Proformas', types: ['signProforma', 'setProformaStatus', 'setProformaCurrency'] },
-  { id: 'pack', label: 'Packs', types: ['validatePack', 'rejectPack', 'requestDieCut', 'receiveDieCut', 'uploadArtwork', 'forwardPack', 'startPack', 'planPack', 'addPackFiles', 'removePackFile', 'reassignPack', 'toggleUrgent'] },
+  {
+    id: 'pack',
+    label: 'Packs',
+    types: ['validatePack', 'rejectPack', 'requestDieCut', 'receiveDieCut', 'uploadArtwork', 'forwardPack', 'startPack', 'planPack', 'addPackFiles', 'removePackFile', 'reassignPack', 'toggleUrgent'],
+  },
   { id: 'dev', label: 'Développement', types: ['advanceDev', 'markDeveloped'] },
-  { id: 'log', label: 'Logistique', types: ['allocate', 'deallocate', 'createContainer', 'validatePlan', 'requestPlan', 'proposePlan', 'addContainerDoc', 'requestBooking', 'confirmBooking', 'ship', 'receive', 'reviseEta'] },
+  {
+    id: 'log',
+    label: 'Logistique',
+    types: ['allocate', 'deallocate', 'createContainer', 'validatePlan', 'requestPlan', 'proposePlan', 'addContainerDoc', 'requestBooking', 'confirmBooking', 'ship', 'receive', 'reviseEta'],
+  },
   { id: 'fin', label: 'Finance', types: ['payDeposit', 'payBalance', 'setFx'] },
   { id: 'adm', label: 'Administration', types: ['setUserRole', 'toggleUser', 'setCapacity', 'setDefaultCapacity'] },
 ];
@@ -105,7 +113,14 @@ export default function Journal() {
                   <small>{ROLE_DEFS[e.role as Role]?.label ?? e.role}</small>
                 </span>
                 <span className="jr-text">{e.text}</span>
-                {e.target && (to ? <Link to={to} className="jr-target">{e.target}</Link> : <span className="jr-target plain">{e.target}</span>)}
+                {e.target &&
+                  (to ? (
+                    <Link to={to} className="jr-target">
+                      {e.target}
+                    </Link>
+                  ) : (
+                    <span className="jr-target plain">{e.target}</span>
+                  ))}
               </div>
             );
           })}

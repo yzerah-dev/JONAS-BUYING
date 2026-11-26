@@ -1,13 +1,14 @@
 import { Link } from 'react-router-dom';
 import { AlertTriangle, Box, Calendar, Container as Ctn, Euro, FileText, PenLine, Ship, Truck } from 'lucide-react';
-import { byId, containerCbm, containerEta, containerValue, packDone, packLate, payments, proformaTotals, currentValidator, useAuth, useStore, currentUser, hasDeposit } from '../data/store';
+import { byId, containerCbm, containerEta, containerValueCur, packDone, packLate, payments, proformaTotals, currentValidator, useAuth, useStore, currentUser, hasDeposit } from '../data/store';
 import { PROFORMA_STATUSES } from '../data/types';
 import { Kpi, Pill, ProductThumb } from '../components/ui';
 import { PROFORMA_COLOR } from '../components/ui-shared';
 import DirectionKpis from '../components/DirectionKpis';
 import type { Module } from '../data/permissions';
 import { PROFORMA_STATUS_LABEL } from '../data/store';
-import { TODAY, addDays, diffDays, eur, fdate, fshort, num, weekLabel } from '../lib/format';
+import { TODAY, addDays, diffDays, fdate, fshort, num, weekLabel } from '../lib/format';
+import { curSumLabel, mergeCur, sumCur, type CurSum } from '../lib/curr';
 
 export default function Home() {
   const { state } = useStore();
@@ -27,13 +28,20 @@ export default function Home() {
   const urgentBooking = state.containers.filter((c) => c.status === 'a_booker' && diffDays(c.etdPlanned, TODAY) < 21);
   const delayed = state.containers.filter((c) => c.etaRevised && c.status !== 'arrive');
   const transit = state.containers.filter((c) => c.status === 'en_transit');
-  const engaged = state.proformas.filter((p) => p.status !== 'arrive').reduce((s, p) => s + proformaTotals(state, p).amount, 0);
+  const pfCur = (l: typeof state.proformas) =>
+    sumCur(
+      l.map((p) => {
+        const t = proformaTotals(state, p);
+        return { currency: t.currency, v: t.amountCur };
+      }),
+    );
+  const engaged = pfCur(state.proformas.filter((p) => p.status !== 'arrive'));
   const packsOk = state.products.filter(packDone).length;
   const arrivals = state.containers.filter((c) => c.status !== 'arrive' && containerEta(c) <= addDays(TODAY, 42)).sort((a, b) => containerEta(a).localeCompare(containerEta(b)));
 
   const statusTotals = PROFORMA_STATUSES.map((s) => {
     const l = state.proformas.filter((p) => p.status === s);
-    return { s, n: l.length, amount: l.reduce((x, p) => x + proformaTotals(state, p).amount, 0) };
+    return { s, n: l.length, amount: l.reduce((x, p) => x + proformaTotals(state, p).amount, 0), cur: pfCur(l) };
   });
   const maxAmount = Math.max(...statusTotals.map((x) => x.amount), 1);
 
@@ -80,11 +88,11 @@ export default function Home() {
       )}
 
       <div className="kpis mb">
-        {money && <Kpi icon={<Euro size={18} />} value={eur(engaged)} label="Achats engagés (non arrivés)" />}
+        {money && <Kpi icon={<Euro size={18} />} value={curSumLabel(engaged)} label="Achats engagés (non arrivés)" />}
         <Kpi
           icon={<Truck size={18} />}
           value={transit.length}
-          label={money ? `Conteneurs en transit · ${eur(transit.reduce((s, c) => s + containerValue(state, c), 0))}` : 'Conteneurs en transit'}
+          label={money ? `Conteneurs en transit · ${curSumLabel(transit.reduce((m, c) => mergeCur(m, containerValueCur(state, c)), {} as CurSum))}` : 'Conteneurs en transit'}
           color="blue"
         />
         <Kpi icon={<Box size={18} />} value={`${packsOk}/${state.products.length}`} label="Packs validés (4/4)" />
@@ -102,7 +110,13 @@ export default function Home() {
           <Alert m="design" to="/design" icon={<Box size={16} className="red" />} n={latePacks.length} text="pack(s) en retard sur la date limite artwork" />
           <Alert m="conteneurs" to="/conteneurs" icon={<Calendar size={16} className="orange" />} n={urgentBooking.length} text="conteneur(s) à booker avec départ < 3 semaines" />
           <Alert m="conteneurs" to="/conteneurs" icon={<Ship size={16} className="orange" />} n={delayed.length} text="conteneur(s) avec ETA révisée (retard)" />
-          <Alert m="finance" to="/finance" icon={<Euro size={16} className="red" />} n={latePays.length} text={`échéance(s) en retard · ${eur(latePays.reduce((s, p) => s + p.amount, 0))}`} />
+          <Alert
+            m="finance"
+            to="/finance"
+            icon={<Euro size={16} className="red" />}
+            n={latePays.length}
+            text={`échéance(s) en retard · ${curSumLabel(sumCur(latePays.map((p) => ({ currency: p.currency, v: p.amountCur }))))}`}
+          />
           <Alert m="finance" to="/finance" icon={<FileText size={16} className="orange" />} n={state.proformas.filter((p) => hasDeposit(p) && !p.depositPaid).length} text="acompte(s) à faire" />
         </div>
         {auth.canSee('proformas') && (
@@ -110,7 +124,7 @@ export default function Home() {
             <div className="card-title">
               <FileText size={18} className="green" /> Proformas par statut
             </div>
-            {statusTotals.map(({ s, n, amount }) => (
+            {statusTotals.map(({ s, n, amount, cur }) => (
               <Link key={s} to={`/proformas?statut=${s}`} className="row" style={{ padding: '6px 0' }}>
                 <span style={{ width: 120 }}>
                   <Pill color={PROFORMA_COLOR[s]}>{PROFORMA_STATUS_LABEL[s]}</Pill>
@@ -122,7 +136,7 @@ export default function Home() {
                   <div style={{ width: `${(amount / maxAmount) * 100}%` }} />
                 </div>
                 <span className="small bold right" style={{ width: 100 }}>
-                  {money ? eur(amount) : ''}
+                  {money ? curSumLabel(cur) : ''}
                 </span>
               </Link>
             ))}
