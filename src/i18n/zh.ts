@@ -699,6 +699,10 @@ export const zh: Record<Key, string> = {
   'pay.noProof': '汇款凭证尚未上传',
   'pay.chip': '定金 {pct}%：{state}',
   'pay.notFound': '未找到文件',
+  'pay.noDeposit': '无定金',
+  'pay.balanceRule': '到期：{kind}出运 {date} + {n} 天',
+  'pay.real': '实际',
+  'pay.planned': '计划',
 };
 
 /** Valeurs issues des données (français) traduites en chinois */

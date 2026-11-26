@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Ban, Calendar, Check, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, Landmark, Layers, List, PenLine, Search, SlidersHorizontal, Split } from 'lucide-react';
-import { byId, isReliquat, openReliquats, shipmentLabel, pendingRevision, pendingVersion, proformaTotals, useAuth, useStore, PROFORMA_STATUS_LABEL, type State } from '../data/store';
+import { byId, isReliquat, openReliquats, shipmentLabel, pendingRevision, pendingVersion, proformaTotals, useAuth, useStore, PROFORMA_STATUS_LABEL, type State, hasDeposit } from '../data/store';
 import { PROFORMA_STATUSES, type Proforma, type ProformaStatus } from '../data/types';
 import { ContainerGlyph, ProformaStatusPill, SupplierMark } from '../components/ui';
 import { PROFORMA_ICON, toast } from '../components/ui-shared';
@@ -408,13 +408,19 @@ function AmountCell({ p, amount, deposit, amountCur, currency }: { p: Proforma; 
       {currency && currency !== 'EUR' && amountCur !== undefined && (
         <small className="pf-cur">{new Intl.NumberFormat('fr-FR', { style: 'currency', currency, maximumFractionDigits: 0 }).format(amountCur)}</small>
       )}
-      <small>Acompte : {eur(deposit)}</small>
-      {p.depositPaid ? (
-        <span className="ok">
-          <Check size={15} strokeWidth={3} />
-        </span>
+      {hasDeposit(p) ? (
+        <>
+          <small>Acompte : {eur(deposit)}</small>
+          {p.depositPaid ? (
+            <span className="ok">
+              <Check size={15} strokeWidth={3} />
+            </span>
+          ) : (
+            <span className="todo">À faire</span>
+          )}
+        </>
       ) : (
-        <span className="todo">À faire</span>
+        <small>Sans acompte</small>
       )}
     </div>
   );

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, Calendar, Check, Euro, Wallet } from 'lucide-react';
-import { byId, payments, useAuth, useStore } from '../data/store';
+import { byId, payments, useAuth, useStore, hasDeposit } from '../data/store';
 import { Kpi, Pill, Seg, SupplierLogo } from '../components/ui';
 import { toast } from '../components/ui-shared';
 import { TODAY, addDays, eur, fdate, weekLabel } from '../lib/format';
@@ -60,7 +60,7 @@ export default function Finance() {
               const sup = byId(state.suppliers, p.supplierId);
               const isLate = !p.paid && p.due < TODAY;
               const pf = byId(state.proformas, p.proformaId);
-              const blocked = p.kind === 'Solde' && !pf.depositPaid;
+              const blocked = p.kind === 'Solde' && hasDeposit(pf) && !pf.depositPaid;
               return (
                 <tr key={p.proformaId + p.kind}>
                   <td className={isLate ? 'red bold' : ''}>

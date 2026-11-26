@@ -19,6 +19,9 @@ import {
   payments,
   proformaTotals,
   brandOf,
+  hasDeposit,
+  balanceDaysOf,
+  realDeparture,
 } from '../data/store';
 import SupplierPackRounds from './SupplierPackRounds';
 import { BrandLogo, ContainerStatusPill, Kpi, PackPill, Pill, ProductPic, ProductThumb, Seg, ValidationCircuit } from '../components/ui';
@@ -148,18 +151,37 @@ function PortalPayments({ pf }: { pf: Proforma }) {
   const { t, fmt } = useT();
   const tot = proformaTotals(state, pf);
   const cur = (eur: number) => (tot.amount ? (eur / tot.amount) * tot.amountCur : 0);
-  const rows: { kind: 'deposit' | 'balance'; label: string; amount: number; due: string; paid: boolean; proof?: Proforma['depositProof'] }[] = [
+  const real = realDeparture(state, pf);
+  type Row = { kind: 'deposit' | 'balance'; label: string; amount: number; due: string; paid: boolean; proof?: Proforma['depositProof']; hint?: string };
+  const all: Row[] = [
     { kind: 'deposit', label: t('pay.deposit', { pct: pf.depositPct }), amount: cur(tot.deposit), due: addDays(pf.date, 7), paid: pf.depositPaid, proof: pf.depositProof },
-    { kind: 'balance', label: t('pay.balance'), amount: cur(tot.balance), due: pf.balanceDue, paid: pf.balancePaid, proof: pf.balanceProof },
+    {
+      kind: 'balance',
+      label: t('pay.balance'),
+      amount: cur(tot.balance),
+      due: pf.balanceDue,
+      paid: pf.balancePaid,
+      proof: pf.balanceProof,
+      hint: t('pay.balanceRule', { kind: real ? t('pay.real') : t('pay.planned'), date: fmt.fdate(real ?? pf.etd), n: balanceDaysOf(state, pf) }),
+    },
   ];
+  const rows = all.filter((r) => r.kind !== 'deposit' || hasDeposit(pf));
   return (
     <section className="card pad mb pay-card" aria-label={t('pay.title')}>
       <div className="card-title">
         <Euro size={18} className="green" /> {t('pay.title')}
       </div>
+      {!hasDeposit(pf) && <div className="pay-row xs muted">{t('pay.noDeposit')}</div>}
       {rows.map((r) => (
         <div key={r.kind} className={`pay-row ${r.paid ? 'paid' : ''}`}>
-          <b className="pay-label">{r.label}</b>
+          <b className="pay-label">
+            {r.label}
+            {r.hint && (
+              <div className="xs muted" style={{ fontWeight: 400 }}>
+                {r.hint}
+              </div>
+            )}
+          </b>
           <span className="pay-amount">{money(r.amount, tot.currency)}</span>
           {r.paid ? (
             <Pill color="green" icon={<Check size={12} />}>
@@ -322,7 +344,7 @@ export function PortalProformas() {
                     </div>
                   </div>
                   <StageBadge pf={pf} />
-                  {pf.status !== 'a_signer' && (
+                  {pf.status !== 'a_signer' && hasDeposit(pf) && (
                     <Pill color={pf.depositPaid ? 'green' : 'orange'}>{tr('pay.chip', { pct: pf.depositPct, state: pf.depositPaid ? tr('finance.paid') : tr('finance.upcoming') })}</Pill>
                   )}
                   {shipmentsOf(state, pf).length > 1 && <Pill color="violet">{tr('sp.part', { n: pf.split?.part ?? 1, total: shipmentsOf(state, pf).length })}</Pill>}

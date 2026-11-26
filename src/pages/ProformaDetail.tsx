@@ -35,6 +35,9 @@ import {
 import {
   allocatedQty,
   maxAllocQty,
+  hasDeposit,
+  balanceDaysOf,
+  realDeparture,
   byId,
   containerCapacity,
   containerCbm,
@@ -420,15 +423,19 @@ function DetailsTab({ pf, state }: { pf: Proforma; state: State }) {
             </dd>
             <dt>Acompte ({pf.depositPct} %)</dt>
             <dd>
-              <PayLine
-                pf={pf}
-                kind="deposit"
-                amountCur={t.amountCur ? (t.deposit / t.amount) * t.amountCur : 0}
-                amountEur={t.deposit}
-                currency={t.currency}
-                paid={pf.depositPaid}
-                due={addDays(pf.date, 7)}
-              />
+              {hasDeposit(pf) ? (
+                <PayLine
+                  pf={pf}
+                  kind="deposit"
+                  amountCur={t.amountCur ? (t.deposit / t.amount) * t.amountCur : 0}
+                  amountEur={t.deposit}
+                  currency={t.currency}
+                  paid={pf.depositPaid}
+                  due={addDays(pf.date, 7)}
+                />
+              ) : (
+                <span className="muted">Pas d’acompte : rien à payer à la commande</span>
+              )}
             </dd>
             <dt>Solde</dt>
             <dd>
@@ -441,15 +448,20 @@ function DetailsTab({ pf, state }: { pf: Proforma; state: State }) {
                 paid={pf.balancePaid}
                 due={pf.balanceDue}
               />
+              <div className="xs muted">
+                {realDeparture(state, pf)
+                  ? `Échéance : départ réel du ${fdate(realDeparture(state, pf))} + ${balanceDaysOf(state, pf)} j`
+                  : `Échéance : départ prévu du ${fdate(pf.etd)} + ${balanceDaysOf(state, pf)} j (recalculée au départ réel)`}
+              </div>
             </dd>
           </dl>
           <div className="row mt wrap">
-            {!pf.depositPaid && auth.can('finance.pay') && (
+            {hasDeposit(pf) && !pf.depositPaid && auth.can('finance.pay') && (
               <button className="btn" onClick={() => dispatch({ type: 'payDeposit', id: pf.id })}>
                 <Check size={16} /> Marquer l’acompte payé
               </button>
             )}
-            {pf.depositPaid && !pf.balancePaid && auth.can('finance.pay') && (
+            {(pf.depositPaid || !hasDeposit(pf)) && !pf.balancePaid && auth.can('finance.pay') && (
               <button className="btn" onClick={() => dispatch({ type: 'payBalance', id: pf.id })}>
                 <Check size={16} /> Marquer le solde payé
               </button>

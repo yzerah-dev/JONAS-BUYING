@@ -221,3 +221,29 @@ test('acompte : JONAS dépose la copie du virement, le fournisseur la voit et la
   expect(dl.suggestedFilename()).toBe('swift-acompte.pdf');
   await expect(page.locator('.week-head', { hasText: 'PF-2026-0152' })).toContainText('Acompte');
 });
+
+test('acompte à 0 % : pas d’échéance d’acompte (JONAS et portail), seul le solde reste', async ({ page }) => {
+  await resetApp(page);
+  await page.evaluate(() => {
+    const k = Object.keys(localStorage).find((x) => x.startsWith('jonas-buying-state'))!;
+    const st = JSON.parse(localStorage.getItem(k)!);
+    const pf = st.proformas.find((x: { id: string }) => x.id === 'PF-2026-0152');
+    pf.depositPct = 0;
+    pf.depositPaid = false;
+    localStorage.setItem(k, JSON.stringify(st));
+  });
+  await page.reload();
+  await loginAs(page, 'Mr. Chen');
+  await go(page, 'portail/proformas?pf=PF-2026-0152');
+  const pay = page.getByRole('region', { name: 'Paiements de JONAS' });
+  await expect(pay).toContainText('Pas d’acompte');
+  await expect(pay).not.toContainText('Acompte 0');
+  await expect(pay).toContainText('Échéance : départ prévu');
+  await expect(page.locator('.week-head', { hasText: 'PF-2026-0152' })).not.toContainText('Acompte');
+  await go(page, 'portail/finance');
+  await expect(page.locator('main tbody')).not.toContainText(/PF-2026-0152\s*Acompte/);
+  await loginAs(page, 'Rudy Zerah');
+  await go(page, 'proformas/PF-2026-0152');
+  await page.getByRole('button', { name: /Détails/ }).click();
+  await expect(page.locator('main')).toContainText('Pas d’acompte : rien à payer à la commande');
+});

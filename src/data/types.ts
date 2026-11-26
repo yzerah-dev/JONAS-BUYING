@@ -241,6 +241,8 @@ export interface Proforma {
   /** Demande d'expédition partielle, à accepter par l'autre partie (fournisseur ou JONAS) */
   splitRequest?: SplitRequest;
   history: HistoryEntry[];
+  /** Solde dû N jours après le départ (conditions du fournisseur à la création) : recalculé sur le départ réel */
+  balanceDays?: number;
   /** Copies des virements (acompte, solde) déposées par JONAS : visibles et téléchargeables par le fournisseur */
   depositProof?: StoredFile;
   balanceProof?: StoredFile;

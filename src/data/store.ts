@@ -579,6 +579,18 @@ export function shipmentsOf(s: State, pf: Proforma): Proforma[] {
   return s.proformas.filter((p) => p.id === root || p.split?.root === root).sort((a, b) => (a.split?.part ?? 1) - (b.split?.part ?? 1));
 }
 /** Devise et conditions de paiement d'un fournisseur (par défaut : EUR, 30 % d'acompte, solde à J+7 du départ) */
+/** Proforma avec acompte (0 % : pas d'acompte, donc pas d'échéance d'acompte) */
+export const hasDeposit = (pf: Pick<Proforma, 'depositPct'>) => (pf.depositPct ?? 0) > 0;
+/** Jours entre le départ et le paiement du solde */
+export const balanceDaysOf = (s: State, pf: Proforma) => pf.balanceDays ?? supplierTerms(s, pf.supplierId).balanceDays;
+/** Départ réel de la marchandise (dernier conteneur parti), s'il y en a un */
+export const realDeparture = (s: State, pf: Proforma) =>
+  s.containers
+    .filter((c) => c.etdReal && c.allocations.some((x) => x.proformaId === pf.id))
+    .map((c) => c.etdReal!)
+    .sort()
+    .pop();
+
 export const DEFAULT_TERMS: SupplierTerms = { currency: 'EUR', depositPct: 30, balanceDays: 7 };
 export const supplierTerms = (s: State, supplierId: string): SupplierTerms => s.suppliers.find((x) => x.id === supplierId)?.terms ?? DEFAULT_TERMS;
 /** « 30 % d'acompte · solde à J+7 du départ » */
@@ -1083,6 +1095,7 @@ function applyAction(s: State, a: Action): State {
         depositPaid: false,
         balancePaid: false,
         balanceDue: addDays(a.etd, terms.balanceDays),
+        balanceDays: terms.balanceDays,
         documents: ['Conditions d’achat.pdf'],
         order: bySupplier ? undefined : { at: nowStamp(), by: me, source: a.order?.source ?? 'saisie', file: a.order?.file },
         versions: a.file
@@ -1198,6 +1211,7 @@ function applyAction(s: State, a: Action): State {
           status: pf.status === 'a_signer' ? 'en_dev' : pf.status,
           etd: a.etdWanted,
           eta: addDays(pf.eta, shift),
+          balanceDue: pf.balancePaid || realDeparture(s, pf) ? pf.balanceDue : addDays(a.etdWanted, balanceDaysOf(s, pf)),
           versions: pf.versions!.map((v) =>
             v.version === doc.version
               ? { ...v, status: 'signee', signature: { at, by: me, role: ROLE_DEFS[u.role].label, date: TODAY, etdWanted: a.etdWanted, replaces: prev?.version } }
@@ -1597,16 +1611,26 @@ function applyAction(s: State, a: Action): State {
           ],
         })),
       );
-    case 'ship':
-      return syncProformaStatuses(
-        mapC(s, a.containerId, (c) => ({
-          ...c,
-          status: 'en_transit',
-          etdReal: TODAY,
-          // BL, Invoice et Packing List ne sont plus notés d'office : ils doivent être déposés (fournisseur ou transitaire)
-          dateHistory: [...c.dateHistory, hist(me, `Départ réel ${TODAY}`)],
-        })),
-      );
+    case 'ship': {
+      const shipped = mapC(s, a.containerId, (c) => ({
+        ...c,
+        status: 'en_transit',
+        etdReal: TODAY,
+        // BL, Invoice et Packing List ne sont plus notés d'office : ils doivent être déposés (fournisseur ou transitaire)
+        dateHistory: [...c.dateHistory, hist(me, `Départ réel ${TODAY}`)],
+      }));
+      // Échéance du solde : départ réel + délai du fournisseur
+      const ids = new Set(shipped.containers.find((c) => c.id === a.containerId)?.allocations.map((x) => x.proformaId) ?? []);
+      const withDue = {
+        ...shipped,
+        proformas: shipped.proformas.map((pf) => {
+          if (!ids.has(pf.id) || pf.balancePaid) return pf;
+          const due = addDays(realDeparture(shipped, pf) ?? TODAY, balanceDaysOf(shipped, pf));
+          return due === pf.balanceDue ? pf : { ...pf, balanceDue: due, history: [...pf.history, hist('Système', `Échéance du solde recalculée sur le départ réel : ${due}`)] };
+        }),
+      };
+      return syncProformaStatuses(withDue);
+    }
     case 'receive': {
       const c = s.containers.find((x) => x.id === a.containerId)!;
       // Quantités reçues : saisies au contrôle, sinon conformes à l'attendu
@@ -2484,7 +2508,7 @@ export function payments(s: State): Payment[] {
   const out: Payment[] = [];
   for (const pf of s.proformas) {
     const t = proformaTotals(s, pf);
-    out.push({ proformaId: pf.id, supplierId: pf.supplierId, kind: 'Acompte', amount: t.deposit, due: addDays(pf.date, 7), paid: pf.depositPaid });
+    if (hasDeposit(pf)) out.push({ proformaId: pf.id, supplierId: pf.supplierId, kind: 'Acompte', amount: t.deposit, due: addDays(pf.date, 7), paid: pf.depositPaid });
     out.push({ proformaId: pf.id, supplierId: pf.supplierId, kind: 'Solde', amount: t.balance, due: pf.balanceDue, paid: pf.balancePaid });
   }
   return out.sort((a, b) => a.due.localeCompare(b.due));

@@ -47,6 +47,22 @@ test.describe('Portail transitaire', () => {
     await expect(toast(page)).toContainText('CMAU7654321');
     const row = page.locator('.bk-row', { hasText: 'CMAU7654321' });
     await row.getByRole('button', { name: 'Départ effectué' }).click();
+    // Échéance du solde recalculée sur le départ réel (départ + délai du fournisseur)
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const k = Object.keys(localStorage).find((x) => x.startsWith('jonas-buying-state'))!;
+          const st = JSON.parse(localStorage.getItem(k)!);
+          const c = st.containers.find((x: { number?: string }) => x.number === 'CMAU7654321');
+          const pf = st.proformas.find((x: { id: string }) => x.id === 'PF-2026-0145');
+          const sup = st.suppliers.find((x: { id: string }) => x.id === pf.supplierId);
+          const days = pf.balanceDays ?? sup.terms?.balanceDays ?? 7;
+          const d = new Date(`${c.etdReal}T00:00:00Z`);
+          d.setUTCDate(d.getUTCDate() + days);
+          return pf.balanceDue === d.toISOString().slice(0, 10);
+        }),
+      )
+      .toBe(true);
     // 3. En mer
     await nav.getByRole('link', { name: /En mer/ }).click();
     await row.getByRole('button', { name: 'Nouvelle ETA' }).click();

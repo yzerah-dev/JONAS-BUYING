@@ -732,6 +732,10 @@ export const fr = {
   'pay.noProof': 'Copie du virement pas encore déposée',
   'pay.chip': 'Acompte {pct} % : {state}',
   'pay.notFound': 'Fichier introuvable',
+  'pay.noDeposit': 'Pas d’acompte',
+  'pay.balanceRule': 'Échéance : départ {kind} du {date} + {n} j',
+  'pay.real': 'réel',
+  'pay.planned': 'prévu',
 };
 
 export type Key = keyof typeof fr;
@@ -1445,6 +1449,10 @@ export const en: Record<Key, string> = {
   'pay.noProof': 'Transfer copy not uploaded yet',
   'pay.chip': 'Deposit {pct} %: {state}',
   'pay.notFound': 'File not found',
+  'pay.noDeposit': 'No deposit',
+  'pay.balanceRule': 'Due: {kind} departure {date} + {n} days',
+  'pay.real': 'actual',
+  'pay.planned': 'planned',
 };
 
 /**
