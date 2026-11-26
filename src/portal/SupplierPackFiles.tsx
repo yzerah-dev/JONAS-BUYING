@@ -5,16 +5,7 @@ import type { PackFile, PackFileKind, Product } from '../data/types';
 import { deleteBlob, fromInput, fsize, getBlob, newFileId, putBlob, saveBlob, supplierScope } from '../lib/files';
 import { toast } from '../components/ui-shared';
 import { useT } from '../i18n';
-
-/** Types de fiches qualité : valeur enregistrée (française, lue par JONAS) et libellé traduit */
-const QUALITY: { value: string; key: 'pd.q.msds' | 'pd.q.compo' | 'pd.q.cert' | 'pd.q.test' | 'pd.q.tech' | 'pd.q.other' }[] = [
-  { value: 'MSDS (fiche de sécurité)', key: 'pd.q.msds' },
-  { value: 'Fiche composition', key: 'pd.q.compo' },
-  { value: 'Certificat de conformité', key: 'pd.q.cert' },
-  { value: 'Rapport de test', key: 'pd.q.test' },
-  { value: 'Fiche technique', key: 'pd.q.tech' },
-  { value: 'Autre', key: 'pd.q.other' },
-];
+import { QUALITY } from './quality';
 
 /**
  * Portail fournisseur : fichiers du pack d'un produit (traduits FR / EN / 中文).

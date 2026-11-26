@@ -31,5 +31,24 @@ export function usePortal() {
   const REQUIRED_DOCS = ['BL.pdf', 'Invoice.pdf', 'Packing List.xlsx'];
   const docsMissing = containers.filter((c) => ['booke', 'en_transit'].includes(c.status) && REQUIRED_DOCS.some((d) => !c.documents.includes(d)));
 
-  return { state, dispatch, user, supplier, products, proformas, containers, packsToValidate, dieCutsRequested, plansRequested, bookingsToDo, bookingsAtForwarder, bookingsInValidation, bookingsToAccept, proformasToUpload, splitsToAccept, docsMissing, REQUIRED_DOCS };
+  return {
+    state,
+    dispatch,
+    user,
+    supplier,
+    products,
+    proformas,
+    containers,
+    packsToValidate,
+    dieCutsRequested,
+    plansRequested,
+    bookingsToDo,
+    bookingsAtForwarder,
+    bookingsInValidation,
+    bookingsToAccept,
+    proformasToUpload,
+    splitsToAccept,
+    docsMissing,
+    REQUIRED_DOCS,
+  };
 }

@@ -20,7 +20,7 @@ import {
   proformaTotals,
   brandOf,
 } from '../data/store';
-import SupplierPackFiles from './SupplierPackFiles';
+import SupplierPackRounds from './SupplierPackRounds';
 import { BrandLogo, ContainerStatusPill, Kpi, PackPill, Pill, ProductThumb, ProformaStatusPill, Seg, ValidationCircuit } from '../components/ui';
 import { toast } from '../components/ui-shared';
 import type { Proforma } from '../data/types';
@@ -299,7 +299,7 @@ export function PortalPacks() {
         />
       </div>
       {list.length === 0 && <div className="card empty">{t('packs.empty')}</div>}
-      <div className="gallery" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))' }}>
+      <div className="gallery" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(400px, 100%), 1fr))' }}>
         {list.slice(0, limit).map((p) => {
           return (
             <div key={p.id} className="card pad col" style={{ gap: 10 }}>
@@ -314,25 +314,13 @@ export function PortalPacks() {
                 </div>
                 <BrandLogo brand={brandOf(state.brands, p.brandId)} size={10} />
               </div>
-              <ValidationCircuit product={p} />
-              <LastPackRejection product={p} />
-              <div className="row wrap">
-                <span className="small">{t('packs.dieCut')}</span>
-                {p.pack.dieCut === 'received' ? (
-                  <Pill color="green">{t('packs.dieCut.sent')}</Pill>
-                ) : p.pack.dieCut === 'requested' ? (
-                  <Pill color="orange">{t('packs.dieCut.requested')}</Pill>
-                ) : (
-                  <Pill color="grey">{t('packs.dieCut.none')}</Pill>
-                )}
-                <span className="small">{t('packs.pack')}</span>
-                {p.pack.sentToSupplier ? <Pill color="blue">{t('packs.received', { v: p.pack.artworkVersions })}</Pill> : <Pill color="grey">{t('packs.preparing')}</Pill>}
-              </div>
-              <div className="row wrap">
-                {/* Fichiers : télécharger le pack JONAS ; déposer die cut, ancien pack, fiches qualité */}
-                <SupplierPackFiles product={p} label={p.pack.dieCut === 'requested' ? t('packs.sendDieCut') : undefined} />
-                <div className="grow" />
-                <PackDecision product={p} />
+              <SupplierPackRounds product={p} compact />
+              <div className="sr-valid">
+                <ValidationCircuit product={p} />
+                <LastPackRejection product={p} />
+                <div className="row" style={{ justifyContent: 'flex-end' }}>
+                  <PackDecision product={p} />
+                </div>
               </div>
             </div>
           );

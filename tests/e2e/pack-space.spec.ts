@@ -100,7 +100,7 @@ test('portail fournisseur : dépôt du die cut et des fiches qualité, télécha
   await go(page, 'portail/packs');
   const card = page.locator('.gallery > .card').first();
   const ref = (await card.locator('.ref-tag').first().innerText()).trim();
-  await card.getByRole('button', { name: /Fichiers|Envoyer le die cut/ }).click();
+  await card.getByRole('button', { name: 'Tous les fichiers' }).click();
   const dlg = page.getByRole('dialog', { name: `Fichiers du pack — ${ref}` });
   await dlg.getByLabel('Déposer : Die cut').setInputFiles(file(`diecut-${ref}.pdf`, 'application/pdf'));
   await expect(toast(page)).toContainText('1 fichier(s) ajouté(s)');
@@ -110,10 +110,7 @@ test('portail fournisseur : dépôt du die cut et des fiches qualité, télécha
   // En anglais
   await page.getByRole('dialog').getByLabel('Fermer').click();
   await page.getByRole('button', { name: 'EN', exact: true }).click();
-  await page
-    .locator('.gallery > .card', { hasText: ref })
-    .getByRole('button', { name: /Files|Send die cut/ })
-    .click();
+  await page.locator('.gallery > .card', { hasText: ref }).getByRole('button', { name: 'All files' }).click();
   await expect(page.getByRole('dialog', { name: `Pack files — ${ref}` })).toContainText('Quality documents');
   await expect(page.getByRole('dialog')).toContainText('Composition sheet');
 

@@ -9,7 +9,7 @@ import PhotoImport from '../components/PhotoImport';
 import { money } from '../lib/format';
 import { useT } from '../i18n';
 import { awaitsSupplier, usePortal } from './usePortal';
-import SupplierPackFiles from './SupplierPackFiles';
+import SupplierPackRounds from './SupplierPackRounds';
 import PackDecision, { LastPackRejection } from './PackDecision';
 
 type Tab = 'all' | 'order' | 'pack' | 'dev';
@@ -188,12 +188,13 @@ export function PortalProductDetail() {
               <Package size={18} className="green" /> {t('pp.pack')}
             </div>
             <div className="xs muted mb">{t('pp.deadline', { date: fmt.fdate(p.pack.artworkDeadline) })}</div>
-            <ValidationCircuit product={p} />
-            <LastPackRejection product={p} />
-            <div className="row wrap mt" style={{ gap: 8 }}>
-              <SupplierPackFiles product={p} label={p.pack.dieCut === 'requested' ? t('packs.sendDieCut') : undefined} />
-              <div className="grow" />
-              <PackDecision product={p} />
+            <SupplierPackRounds product={p} />
+            <div className="sr-valid">
+              <ValidationCircuit product={p} />
+              <LastPackRejection product={p} />
+              <div className="row" style={{ justifyContent: 'flex-end' }}>
+                <PackDecision product={p} />
+              </div>
             </div>
           </section>
         </div>

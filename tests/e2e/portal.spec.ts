@@ -64,3 +64,22 @@ test('portail fournisseur : commandes en cours, fiche produit, refus du pack ave
   });
   expect(rej).toBe('Le code-barres est trop petit.');
 });
+
+test('portail fournisseur : pack en trois ronds, die cut demandé mis en avant, document typé', async ({ page }) => {
+  await resetApp(page);
+  await loginAs(page, 'Mr. Chen');
+  await go(page, 'portail/packs?vue=diecut');
+  const card = page.locator('.card', { has: page.locator('.sr') }).first();
+  // Die cut demandé : rond orange « à envoyer » et bouton « Déposer le die cut »
+  await expect(card.getByRole('button', { name: 'Die cut : à envoyer' })).toHaveClass(/ask/);
+  await card.getByLabel(/^Déposer : Die cut/).setInputFiles({ name: 'diecut.pdf', mimeType: 'application/pdf', buffer: Buffer.from('dc') });
+  await expect(toast(page)).toContainText('1 fichier(s) ajouté(s)');
+  // Document : on choisit le type après avoir pris le fichier
+  await go(page, 'portail/produits/ORA-N452');
+  const pack = page.getByRole('region', { name: 'Pack & die cut' });
+  await expect(pack.getByRole('button', { name: 'Télécharger le pack' })).toBeVisible();
+  await pack.getByLabel(/^Déposer : Documents/).setInputFiles({ name: 'msds.pdf', mimeType: 'application/pdf', buffer: Buffer.from('m') });
+  await pack.getByLabel('Type de document').selectOption('Fiche composition');
+  await pack.getByRole('button', { name: 'Déposer', exact: true }).click();
+  await expect(pack.getByRole('button', { name: 'Documents : envoyé' })).toContainText('1 fichier(s)');
+});
