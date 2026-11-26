@@ -21,7 +21,7 @@ import {
   brandOf,
 } from '../data/store';
 import SupplierPackRounds from './SupplierPackRounds';
-import { BrandLogo, ContainerStatusPill, Kpi, PackPill, Pill, ProductThumb, ProformaStatusPill, Seg, ValidationCircuit } from '../components/ui';
+import { BrandLogo, ContainerStatusPill, Kpi, PackPill, Pill, ProductPic, ProductThumb, ProformaStatusPill, Seg, ValidationCircuit } from '../components/ui';
 import { toast } from '../components/ui-shared';
 import type { Proforma } from '../data/types';
 import BookingEntry from '../components/BookingEntry';
@@ -302,9 +302,11 @@ export function PortalPacks() {
       <div className="gallery" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(400px, 100%), 1fr))' }}>
         {list.slice(0, limit).map((p) => {
           return (
-            <div key={p.id} className="card pad col" style={{ gap: 10 }}>
+            <div key={p.id} className="card pad col sr-card" style={{ gap: 10 }}>
+              <Link to={`/portail/produits/${p.id}`} className="thumb sr-hero" style={{ background: p.tint }} aria-label={`${p.ref} · ${p.name}`}>
+                <ProductPic product={p} />
+              </Link>
               <div className="row">
-                <ProductThumb product={p} size={56} />
                 <div className="grow">
                   <Link to={`/portail/produits/${p.id}`} className="ref-tag">
                     {p.ref}
