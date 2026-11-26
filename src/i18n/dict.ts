@@ -691,6 +691,13 @@ export const fr = {
   'sr.toUpload': 'à envoyer',
   'sr.toDownload': 'à télécharger',
   'sr.notFound': 'Fichier introuvable : demandez à JONAS de le redéposer.',
+  'cp.pcb': 'Colisage',
+  'cp.pcbUnit': '{n} pcs/ctn',
+  'cp.qtyOf': 'Quantité {ref}',
+  'cp.ctnOf': 'Cartons {ref}',
+  'cp.max': 'Maximum {n} pcs pour {ref} (reste de la proforma)',
+  'cp.partial': 'Carton entamé : {n} pcs ne font pas un carton complet',
+  'cp.qtySet': '{ref} : {n} pcs dans le conteneur',
 };
 
 export type Key = keyof typeof fr;
@@ -1363,6 +1370,13 @@ export const en: Record<Key, string> = {
   'sr.toUpload': 'to send',
   'sr.toDownload': 'to download',
   'sr.notFound': 'File not found: ask JONAS to upload it again.',
+  'cp.pcb': 'Pcs / carton',
+  'cp.pcbUnit': '{n} pcs/ctn',
+  'cp.qtyOf': 'Quantity {ref}',
+  'cp.ctnOf': 'Cartons {ref}',
+  'cp.max': 'Maximum {n} pcs for {ref} (remaining on the proforma)',
+  'cp.partial': 'Partial carton: {n} pcs do not make a full carton',
+  'cp.qtySet': '{ref}: {n} pcs in the container',
 };
 
 /**

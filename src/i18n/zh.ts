@@ -658,6 +658,13 @@ export const zh: Record<Key, string> = {
   'sr.toUpload': '待发送',
   'sr.toDownload': '待下载',
   'sr.notFound': '未找到文件：请联系 JONAS 重新上传。',
+  'cp.pcb': '每箱件数',
+  'cp.pcbUnit': '{n} 件/箱',
+  'cp.qtyOf': '{ref} 数量',
+  'cp.ctnOf': '{ref} 箱数',
+  'cp.max': '{ref} 最多 {n} 件（形式发票剩余数量）',
+  'cp.partial': '零头箱：{n} 件不足整箱',
+  'cp.qtySet': '{ref}：柜内 {n} 件',
 };
 
 /** Valeurs issues des données (français) traduites en chinois */

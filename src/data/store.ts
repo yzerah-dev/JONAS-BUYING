@@ -159,6 +159,7 @@ export type Action =
   | { type: 'forwardPack'; productId: string }
   | { type: 'allocate'; containerId: string; proformaId: string; productId: string; qty: number }
   | { type: 'deallocate'; containerId: string; proformaId: string; productId: string }
+  | { type: 'setAllocationQty'; containerId: string; proformaId: string; productId: string; qty: number }
   | { type: 'createContainer'; supplierId: string; etd: ISODate; eta: ISODate }
   | { type: 'autoLoad'; proformaId: string }
   | { type: 'requestPfBooking'; proformaId: string; containers: number; dateWanted: ISODate; forwarder: Forwarder; note?: string }
@@ -364,6 +365,10 @@ export function isAllowed(s: State, a: Action): boolean {
       if (isSupplier(u)) return !!p && p.supplierId === u.supplierId;
       return can(u, 'pack.design');
     }
+    case 'setAllocationQty':
+      if (!Number.isInteger(a.qty) || a.qty <= 0 || a.qty > maxAllocQty(s, a.containerId, a.proformaId, a.productId)) return false;
+      if (isSupplier(u)) return supplierOwnsOpenContainer(s, u, a.containerId);
+      return can(u, 'logistics.plan');
     case 'allocate':
     case 'deallocate':
       if (isSupplier(u)) return supplierOwnsOpenContainer(s, u, a.containerId);
@@ -1197,6 +1202,15 @@ function applyAction(s: State, a: Action): State {
       });
       return syncProformaStatuses(next);
     }
+    case 'setAllocationQty':
+      return syncProformaStatuses(
+        mapC(s, a.containerId, (c) => ({
+          ...c,
+          planValidated: false,
+          planEdited: c.planEdited || isSupplier(currentUser(s)),
+          allocations: c.allocations.map((x) => (x.proformaId === a.proformaId && x.productId === a.productId ? { ...x, qty: a.qty } : x)),
+        })),
+      );
     case 'deallocate':
       return mapC(s, a.containerId, (c) => ({
         ...c,
@@ -1838,6 +1852,8 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
       return { target: ctn(a.containerId), text: `${a.qty} pcs ${ref(a.productId)} affectées (${a.proformaId})` };
     case 'deallocate':
       return { target: ctn(a.containerId), text: `${ref(a.productId)} retiré du conteneur` };
+    case 'setAllocationQty':
+      return { target: ctn(a.containerId), text: `${ref(a.productId)} : ${a.qty} pcs dans le conteneur (${a.proformaId})` };
     case 'createContainer':
       return { text: 'Conteneur créé' };
     case 'autoLoad':
@@ -2273,6 +2289,14 @@ export function proformaTotals(s: State, pf: Proforma) {
     packsOk,
     packsTotal: pf.lines.length,
   };
+}
+
+/** Quantité maximale d'une ligne dans ce conteneur : quantité de la proforma moins ce qui est déjà dans les autres conteneurs */
+export function maxAllocQty(s: State, containerId: string, proformaId: string, productId: string) {
+  const line = s.proformas.find((p) => p.id === proformaId)?.lines.find((l) => l.productId === productId);
+  if (!line) return 0;
+  const elsewhere = s.containers.filter((c) => c.id !== containerId).reduce((t, c) => t + c.allocations.filter((x) => x.proformaId === proformaId && x.productId === productId).reduce((u, x) => u + x.qty, 0), 0);
+  return Math.max(0, line.qty - elsewhere);
 }
 
 export function allocatedQty(s: State, proformaId: string, productId: string) {

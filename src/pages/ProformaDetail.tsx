@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import {
   allocatedQty,
+  maxAllocQty,
   byId,
   containerCapacity,
   containerCbm,
@@ -739,6 +740,47 @@ export function LogisticsTab({ pf, portal }: { pf: Proforma; portal?: boolean })
   );
 }
 
+/** Champ modifiable du plan : quantité ou nombre de cartons d'une ligne du conteneur (validé à la sortie du champ ou par Entrée) */
+function AllocInput({ c, a, value, label, toQty }: { c: Container; a: Container['allocations'][number]; value: number; step: number; label: string; toQty: (v: number) => number }) {
+  const { state, dispatch } = useStore();
+  const { t, fmt } = useT();
+  const shown = Number.isInteger(value) ? String(value) : value.toFixed(1);
+  const [v, setV] = useState(shown);
+  const [prev, setPrev] = useState(shown);
+  if (prev !== shown) {
+    setPrev(shown);
+    setV(shown);
+  }
+  const commit = () => {
+    const n = Number(v.replace(',', '.'));
+    if (!Number.isFinite(n) || n <= 0) return setV(shown);
+    const qty = Math.round(toQty(n));
+    if (qty === a.qty) return setV(shown);
+    const max = maxAllocQty(state, c.id, a.proformaId, a.productId);
+    const ref = byId(state.products, a.productId).ref;
+    if (qty > max) {
+      toast(t('cp.max', { n: fmt.num(max), ref }));
+      return setV(shown);
+    }
+    dispatch({ type: 'setAllocationQty', containerId: c.id, proformaId: a.proformaId, productId: a.productId, qty });
+    toast(t('cp.qtySet', { ref, n: fmt.num(qty) }));
+  };
+  return (
+    <input
+      className="input alloc-input"
+      inputMode="decimal"
+      aria-label={label}
+      value={v}
+      onChange={(e) => setV(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+        if (e.key === 'Escape') setV(shown);
+      }}
+    />
+  );
+}
+
 function ContainerPanel({ c, index, portal }: { c: Container; index: number; portal?: boolean }) {
   const { state, dispatch } = useStore();
   const auth = useAuth();
@@ -768,6 +810,7 @@ function ContainerPanel({ c, index, portal }: { c: Container; index: number; por
         <thead>
           <tr>
             <th>{t('col.refShort')}</th>
+            <th className="num">{t('cp.pcb')}</th>
             <th className="num">{t('col.qty')}</th>
             <th className="num">{t('col.cartons')}</th>
             <th className="num">{t('col.cbm')}</th>
@@ -788,8 +831,16 @@ function ContainerPanel({ c, index, portal }: { c: Container; index: number; por
                     </div>
                   </div>
                 </td>
-                <td className="num">{num(a.qty)}</td>
-                <td className="num">{num(a.qty / p.pcb)}</td>
+                <td className="num small muted">{t('cp.pcbUnit', { n: num(p.pcb) })}</td>
+                <td className="num">{editable ? <AllocInput c={c} a={a} value={a.qty} step={1} label={t('cp.qtyOf', { ref: p.ref })} toQty={(v) => v} /> : num(a.qty)}</td>
+                <td className="num">
+                  {editable && p.pcb > 0 ? <AllocInput c={c} a={a} value={a.qty / p.pcb} step={1} label={t('cp.ctnOf', { ref: p.ref })} toQty={(v) => v * p.pcb} /> : num(a.qty / p.pcb)}
+                  {p.pcb > 1 && a.qty % p.pcb !== 0 && (
+                    <div className="xs" style={{ color: '#b45309' }}>
+                      {t('cp.partial', { n: num(a.qty % p.pcb) })}
+                    </div>
+                  )}
+                </td>
                 <td className="num">{dec(lineCbm(p, a.qty), 2)}</td>
                 <td>
                   {editable && (
@@ -807,7 +858,7 @@ function ContainerPanel({ c, index, portal }: { c: Container; index: number; por
           })}
           {c.allocations.length === 0 && (
             <tr>
-              <td colSpan={5} className="empty">
+              <td colSpan={6} className="empty">
                 {t('cp.dropHere')}
               </td>
             </tr>
