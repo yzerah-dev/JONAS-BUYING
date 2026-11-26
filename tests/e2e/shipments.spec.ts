@@ -115,9 +115,12 @@ test.describe('Suivi des reliquats', () => {
     await expect(row).toContainText('Problème de séchage');
 
     await go(page, 'proformas');
-    await page.getByLabel('Statut').selectOption('reliquats');
+    await page
+      .getByRole('group', { name: 'Statut' })
+      .getByRole('button', { name: /^Reliquats/ })
+      .click();
     await expect(page).toHaveURL(/reliquats=1/);
-    await page.getByLabel('Affichage').selectOption('liste');
+    await page.getByRole('group', { name: 'Affichage' }).getByRole('button', { name: 'Toutes' }).click();
     const main = page.locator('main');
     for (const id of ['PF-2026-0136-2', 'PF-2026-0139-2', 'PF-2026-0145-2']) await expect(main).toContainText(id);
     await expect(main).not.toContainText('PF-2026-0148');

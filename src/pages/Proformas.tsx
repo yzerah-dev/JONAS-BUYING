@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowUpDown, Calendar, Check, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, LayoutGrid, List, PenLine, Search } from 'lucide-react';
+import { ArrowUpDown, Calendar, Check, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, Factory, LayoutGrid, List, PenLine, Rows3, Search } from 'lucide-react';
 import { byId, isReliquat, openReliquats, shipmentLabel, pendingRevision, pendingVersion, proformaTotals, useAuth, useStore, PROFORMA_STATUS_LABEL, type State, hasDeposit } from '../data/store';
 import { PROFORMA_STATUSES, type Proforma, type ProformaStatus } from '../data/types';
 import { ProductPic, ProformaStatusPill, SupplierMark } from '../components/ui';
@@ -147,38 +147,47 @@ export default function Proformas() {
           <Search size={20} />
           <input placeholder="Rechercher une commande, un fournisseur, une référence…" aria-label="Rechercher une proforma" value={q} onChange={(e) => setQ(e.target.value)} />
         </label>
-        <label className="pfx-select">
-          <select aria-label="Statut" value={statusValue} onChange={(e) => pickStatus(e.target.value)}>
-            <option value="all">Tous les statuts ({state.proformas.length})</option>
-            {PROFORMA_STATUSES.map((st) => (
-              <option key={st} value={st}>
-                {STATUS_TEXT[st]} ({state.proformas.filter((p) => p.status === st).length})
-              </option>
-            ))}
-            <option value="reliquats">Reliquats ({reliquatsOpen})</option>
-            {cancelled.length > 0 && <option value="annulees">Annulées ({cancelled.length})</option>}
-          </select>
-          <ChevronDown size={20} />
-        </label>
-        <label className="pfx-select">
-          <Calendar size={20} />
-          <select aria-label="Affichage" value={view} onChange={(e) => setView(e.target.value as View)} disabled={showCancelled}>
-            <option value="semaine">Par semaine</option>
-            <option value="fournisseur">Par fournisseur</option>
-            <option value="liste">Liste</option>
-          </select>
-          <ChevronDown size={20} />
-        </label>
+        <span className="pfx-seg" role="group" aria-label="Affichage">
+          {(
+            [
+              ['semaine', 'Par semaine', Calendar],
+              ['fournisseur', 'Par fournisseur', Factory],
+              ['liste', 'Toutes', Rows3],
+            ] as const
+          ).map(([v, label, Icon]) => (
+            <button key={v} type="button" aria-pressed={view === v} className={view === v ? 'on' : ''} disabled={showCancelled} onClick={() => setView(v)}>
+              <Icon size={16} /> {label}
+            </button>
+          ))}
+        </span>
         {!showCancelled && (
-          <span className="pk-layout pfx-layout" role="group" aria-label="Présentation">
+          <span className="pfx-seg" role="group" aria-label="Présentation">
             <button type="button" aria-pressed={!gallery} className={!gallery ? 'on' : ''} onClick={() => setGallery(false)} title="Liste">
-              <List size={18} /> <span>Liste</span>
+              <List size={16} /> Liste
             </button>
             <button type="button" aria-pressed={gallery} className={gallery ? 'on' : ''} onClick={() => setGallery(true)} title="Galerie">
-              <LayoutGrid size={18} /> <span>Galerie</span>
+              <LayoutGrid size={16} /> Galerie
             </button>
           </span>
         )}
+      </div>
+
+      <div className="pfx-chips" role="group" aria-label="Statut">
+        {(
+          [
+            ['all', 'Tous', state.proformas.length],
+            ...PROFORMA_STATUSES.map((st) => [st, STATUS_TEXT[st], state.proformas.filter((p) => p.status === st).length] as const),
+            ['reliquats', 'Reliquats', reliquatsOpen],
+            ['annulees', 'Annulées', cancelled.length],
+          ] as const
+        )
+          .filter(([v, , n]) => n > 0 || v === statusValue || v === 'all')
+          .map(([v, label, n]) => (
+            <button key={v} type="button" aria-pressed={statusValue === v} className={`pfx-chip ${v} ${statusValue === v ? 'on' : ''}`} onClick={() => pickStatus(v)}>
+              {v !== 'all' && v !== 'reliquats' && v !== 'annulees' && <i />}
+              {label} <b>{n}</b>
+            </button>
+          ))}
       </div>
 
       {showCancelled ? (

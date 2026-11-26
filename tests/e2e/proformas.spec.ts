@@ -29,7 +29,7 @@ test.describe('Proformas et logistique', () => {
   test('demande de booking depuis la liste des proformas et depuis l’onglet Suivi & Logistique', async ({ page }) => {
     await loginAs(page, 'Logistique');
     await go(page, 'proformas');
-    await page.getByLabel('Affichage').selectOption('liste');
+    await page.getByRole('group', { name: 'Affichage' }).getByRole('button', { name: 'Toutes' }).click();
     await page.getByLabel('Rechercher une proforma').fill('PF-2026-0151');
     await page.locator('tr', { hasText: 'PF-2026-0151' }).getByRole('button', { name: 'Booking' }).click();
     await page.getByRole('button', { name: 'Envoyer au fournisseur' }).click();
@@ -62,14 +62,17 @@ test.describe('Proformas et logistique', () => {
   test('signature des proformas à signer : la proforma déposée par le fournisseur', async ({ page }) => {
     await go(page, 'proformas');
     const count = async (label: string) => {
-      const txt = (await page.getByLabel('Statut').locator('option').allInnerTexts()).join(' ');
-      const m = txt.match(new RegExp(label + ' \\((\\d+)\\)'));
+      const txt = (await page.getByRole('group', { name: 'Statut' }).innerText()).replace(/\s+/g, ' ');
+      const m = txt.match(new RegExp(label + ' (\\d+)'));
       return m ? Number(m[1]) : 0;
     };
     await expect.poll(() => count('À signer')).toBeGreaterThan(0);
     const toSign = await count('À signer');
 
-    await page.getByLabel('Statut').selectOption('a_signer');
+    await page
+      .getByRole('group', { name: 'Statut' })
+      .getByRole('button', { name: /^À signer/ })
+      .click();
     await page.locator('.pfx').getByRole('button', { name: 'Signer', exact: true }).first().click();
     await page.locator('#sg-etd').fill('2026-12-09');
     await page.getByRole('button', { name: 'Signer et tamponner' }).click();

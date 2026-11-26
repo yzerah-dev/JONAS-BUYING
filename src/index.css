@@ -2294,3 +2294,38 @@ tr.pf-moving td, .pf-line.pf-moving { background: #fff6e8 !important; outline: 2
 .pk-planrow .input { min-width: 0; }
 .pk-planbox .red { display: flex; align-items: center; gap: 6px; }
 @media (max-width: 820px) { .pk-planrow { grid-template-columns: 1fr; } }
+
+/* Proformas : vues et filtres en cartouches (pills) */
+.pfx-seg { display: inline-flex; gap: 4px; padding: 4px; border-radius: 999px; background: #eef3f1; flex-shrink: 0; }
+.pfx-seg button { display: inline-flex; align-items: center; gap: 7px; border: 0; background: transparent; padding: 0 16px; height: 40px; border-radius: 999px; font-size: 15px; font-weight: 600; color: var(--ink-2); cursor: pointer; white-space: nowrap; transition: background 0.12s, color 0.12s, box-shadow 0.12s; }
+.pfx-seg button:hover:not(.on):not(:disabled) { color: var(--ink); background: rgba(255, 255, 255, 0.6); }
+.pfx-seg button.on { background: #fff; color: var(--green-dark); box-shadow: 0 1px 4px rgba(16, 40, 32, 0.14); }
+.pfx-seg button:disabled { opacity: 0.45; cursor: default; }
+.pfx-toolbar { flex-wrap: wrap; }
+.pfx-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.pfx-chip { display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--line); background: #fff; font-size: 14.5px; font-weight: 600; color: var(--ink); cursor: pointer; transition: all 0.12s; }
+.pfx-chip b { font-weight: 800; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.pfx-chip i { width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
+.pfx-chip:hover:not(.on) { border-color: #bfd0ca; background: #fafcfb; }
+.pfx-chip.on { background: var(--green-dark); border-color: var(--green-dark); color: #fff; }
+.pfx-chip.on b { color: #fff; }
+.pfx-chip.a_signer i { background: #d92d20; }
+.pfx-chip.en_dev i { background: #6d28d9; }
+.pfx-chip.en_production i { background: #f97316; }
+.pfx-chip.booke i { background: #16a34a; }
+.pfx-chip.en_transit i { background: #c9a400; }
+.pfx-chip.arrive i { background: #64748b; }
+.pfx-chip.on i { box-shadow: 0 0 0 2px #fff; }
+@media (max-width: 820px) {
+  .pfx-seg { flex: 1 1 100%; overflow-x: auto; }
+  .pfx-seg button { flex: 1; justify-content: center; height: 36px; padding: 0 10px; font-size: 13.5px; }
+  .pfx-chips { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; }
+  .pfx-chip { flex-shrink: 0; height: 34px; padding: 0 12px; font-size: 13px; }
+}
+.pfx-page .pf-week-title { width: auto; min-width: 230px; max-width: 460px; }
+.pfx-page .pf-week-title h2 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 820px) {
+  .pfx-seg button { padding: 0 8px; gap: 4px; }
+  .pfx-seg button svg { display: none; }
+  .pfx-page .pf-week-title { min-width: 0; }
+}
