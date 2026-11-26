@@ -6,6 +6,22 @@ import { authMessage, cleanAuthUrl, LINK_FAILED, readAuthReturn } from '../lib/a
 
 // Lu au chargement, avant que le client Supabase n'échange le code et ne nettoie l'adresse
 const authReturn = readAuthReturn(typeof location === 'undefined' ? '' : location.href);
+/** Demande « mot de passe oublié » faite depuis ce navigateur : au retour du lien, choisir un nouveau mot de passe */
+const RESET_KEY = 'jonas-buying-reset';
+const resetPending = () => {
+  try {
+    return !!localStorage.getItem(RESET_KEY);
+  } catch {
+    return false;
+  }
+};
+const clearReset = () => {
+  try {
+    localStorage.removeItem(RESET_KEY);
+  } catch {
+    /* rien */
+  }
+};
 
 /**
  * Fournit l'état de l'application.
@@ -53,7 +69,7 @@ function remoteReducer(s: State, a: Internal): State {
 
 function RemoteStoreProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(remoteReducer, undefined, load);
-  const [phase, setPhase] = useState<'checking' | 'auth' | 'loading' | 'ready' | 'nomember' | 'error'>('checking');
+  const [phase, setPhase] = useState<'checking' | 'auth' | 'loading' | 'ready' | 'nomember' | 'error' | 'newpw'>('checking');
   const [error, setError] = useState('');
   const synced = useRef<State | null>(null);
   const queue = useRef<Promise<void>>(Promise.resolve());
@@ -87,11 +103,13 @@ function RemoteStoreProvider({ children }: { children: ReactNode }) {
       .auth.getSession()
       .then(({ data }) => {
         if (authReturn.hadCode || authReturn.error) history.replaceState(history.state, '', cleanAuthUrl(location.href));
+        if (data.session && authReturn.hadCode && resetPending()) return setPhase('newpw');
         if (data.session) return start();
         if (authReturn.hadCode || authReturn.error) setError(LINK_FAILED);
         setPhase('auth');
       });
     const { data: sub } = supabase().auth.onAuthStateChange((ev) => {
+      if (ev === 'PASSWORD_RECOVERY' || (ev === 'SIGNED_IN' && authReturn.hadCode && resetPending())) return setPhase('newpw');
       if (ev === 'SIGNED_IN') start();
       if (ev === 'SIGNED_OUT') {
         started.current = false;
@@ -121,6 +139,15 @@ function RemoteStoreProvider({ children }: { children: ReactNode }) {
     queue.current = queue.current.then(() => pushDocs(upserts, deletes)).catch((e) => setError(`Enregistrement refusé : ${(e as Error).message}`));
   }, [state, phase]);
 
+  if (phase === 'newpw')
+    return (
+      <NewPasswordScreen
+        onDone={() => {
+          clearReset();
+          start();
+        }}
+      />
+    );
   if (phase !== 'ready') return <AuthScreen phase={phase} error={error} />;
   return (
     <StoreContext.Provider value={{ state, dispatch: dispatch as (a: Action) => void }}>
@@ -145,13 +172,19 @@ function AuthScreen({ phase, error }: { phase: string; error: string }) {
     const { error: err } = password
       ? await supabase().auth.signInWithPassword({ email, password })
       : await supabase().auth.signInWithOtp({ email, options: { shouldCreateUser: false, emailRedirectTo: location.origin + '/' } });
-    setMsg(
-      err
-        ? authMessage(err, !!password)
-        : password
-          ? ''
-          : 'Lien de connexion envoyé : ouvrez votre e-mail, dans ce même navigateur.',
-    );
+    setMsg(err ? authMessage(err, !!password) : password ? '' : 'Lien de connexion envoyé : ouvrez votre e-mail, dans ce même navigateur.');
+  };
+  /** Mot de passe oublié : e-mail avec un lien pour en choisir un nouveau */
+  const forgot = async () => {
+    setMsg('');
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return setMsg('Saisissez d’abord votre e-mail, puis cliquez sur « Mot de passe oublié ? ».');
+    try {
+      localStorage.setItem(RESET_KEY, email);
+    } catch {
+      /* le lien connectera quand même ; le mot de passe pourra être choisi depuis le menu */
+    }
+    const { error: err } = await supabase().auth.resetPasswordForEmail(email, { redirectTo: location.origin + '/' });
+    setMsg(err ? authMessage(err, false) : 'E-mail envoyé : ouvrez le lien dans ce même navigateur pour choisir un nouveau mot de passe.');
   };
   return (
     <div className="auth-screen">
@@ -183,9 +216,52 @@ function AuthScreen({ phase, error }: { phase: string; error: string }) {
             <button type="submit" className="btn primary">
               Se connecter
             </button>
+            <button type="button" className="btn ghost sm auth-forgot" onClick={forgot}>
+              Mot de passe oublié ?
+            </button>
             {msg && <p className="small">{msg}</p>}
           </>
         )}
+      </form>
+    </div>
+  );
+}
+
+/** Retour du lien « mot de passe oublié » : choisir le nouveau mot de passe avant d'entrer */
+function NewPasswordScreen({ onDone }: { onDone: () => void }) {
+  const [pw, setPw] = useState('');
+  const [pw2, setPw2] = useState('');
+  const [msg, setMsg] = useState('');
+  const [busy, setBusy] = useState(false);
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (pw.length < 8) return setMsg('8 caractères minimum.');
+    if (pw !== pw2) return setMsg('Les deux mots de passe ne sont pas identiques.');
+    setBusy(true);
+    const { error } = await supabase().auth.updateUser({ password: pw });
+    setBusy(false);
+    if (error) return setMsg(`Mot de passe non enregistré : ${error.message}`);
+    onDone();
+  };
+  return (
+    <div className="auth-screen">
+      <form className="card pad auth-card" onSubmit={submit} aria-label="Nouveau mot de passe">
+        <div className="logo">
+          <span className="logo-mark">J</span> JONAS BUYING
+        </div>
+        <p className="bold">Choisissez votre nouveau mot de passe</p>
+        <label htmlFor="np-pw1">
+          Nouveau mot de passe <span className="muted small">(8 caractères minimum)</span>
+          <input id="np-pw1" className="input" type="password" autoComplete="new-password" required value={pw} onChange={(e) => setPw(e.target.value)} />
+        </label>
+        <label htmlFor="np-pw2">
+          Confirmer le mot de passe
+          <input id="np-pw2" className="input" type="password" autoComplete="new-password" required value={pw2} onChange={(e) => setPw2(e.target.value)} />
+        </label>
+        <button type="submit" className="btn primary" disabled={busy}>
+          Enregistrer et entrer
+        </button>
+        {msg && <p className="red small">{msg}</p>}
       </form>
     </div>
   );

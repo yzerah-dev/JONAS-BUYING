@@ -2040,3 +2040,4 @@ select.pi-input { cursor: pointer; }
 .lb-nav.next { right: 16px; }
 .lb-nav:hover, .lb-close:hover { background: rgba(255, 255, 255, 0.28); }
 .lb-count { position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); color: #fff; font-weight: 700; background: rgba(0, 0, 0, 0.35); padding: 4px 12px; border-radius: 999px; }
+.auth-forgot { justify-self: center; color: var(--muted); }
