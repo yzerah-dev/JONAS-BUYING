@@ -345,7 +345,7 @@ function ZoomCard() {
     <div className="card pad mb">
       <div className="card-title">Taille d’affichage</div>
       <p className="small muted" style={{ marginTop: 0 }}>
-        Automatique : réduite sur les grands écrans (60 % à partir de 1800 px de large, 70 % puis 80 % sur les écrans plus petits, 100 % sur téléphone). Réglage propre à ce navigateur.
+        Automatique : légèrement réduite sur les grands écrans (80 % à partir de 1800 px de large, 85 % puis 90 % sur les écrans plus petits, 100 % sur téléphone). Réglage propre à ce navigateur.
       </p>
       <Seg
         value={z}
