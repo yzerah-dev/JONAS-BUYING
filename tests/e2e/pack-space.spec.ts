@@ -266,24 +266,28 @@ test('Espace Designer (ABIR) : suivi pack visible sur chaque ligne, filtre et tr
   await expect(page.locator('.pk-row').first()).toContainText('Pack validé');
   // Tri par statut du pack
   await bar.getByRole('button', { name: /^Tous/ }).click();
-  await page.locator('#pk-sort').selectOption('pack');
-  await expect(page.locator('#pk-sort')).toHaveValue('pack');
+  await page.getByRole('button', { name: 'Trier', exact: true }).click();
+  await page.getByRole('option', { name: 'Tri : statut du pack' }).click();
+  await expect(page.getByRole('button', { name: 'Trier', exact: true })).toContainText('Tri : statut du pack');
 });
 
 test('Total – Produits : filtrer et trier par statut du pack', async ({ page }) => {
   await resetApp(page);
   await loginAs(page, 'David');
   await go(page, 'produits');
-  await page.getByLabel('Statut du pack').selectOption('valide');
+  await page.getByRole('button', { name: 'Statut du pack', exact: true }).click();
+  await page.getByRole('option', { name: 'Pack validé' }).click();
   const cards = page.locator('.pcard');
   await expect(cards.first()).toBeVisible();
   const n = await cards.count();
   await expect(page.locator('.pcard .trk[data-k="valide"]')).toHaveCount(n);
-  await page.getByLabel('Statut du pack').selectOption('diecut');
+  await page.getByRole('button', { name: 'Statut du pack', exact: true }).click();
+  await page.getByRole('option', { name: 'Die cut manquant' }).click();
   await expect(page.locator('.pcard').first().locator('.trk[data-k="diecut"]')).toBeVisible();
   // Tri : les packs à refaire / en attente d'abord, les validés à la fin
-  await page.getByLabel('Statut du pack').selectOption('all');
-  await page.getByLabel('Trier').selectOption('pack');
+  await page.getByRole('button', { name: 'Retirer le filtre Statut du pack' }).click();
+  await page.getByRole('button', { name: 'Trier', exact: true }).click();
+  await page.getByRole('option', { name: 'Tri : statut du pack' }).click();
   await expect(page.locator('.pcard').first().locator('.trk[data-k="valide"]')).toHaveCount(0);
 });
 

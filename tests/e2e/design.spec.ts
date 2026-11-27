@@ -95,8 +95,10 @@ test.describe('Espace Designer – réaffectation (administrateur)', () => {
 
   test('tri et regroupement par marque', async ({ page }) => {
     await (await planCell(page, 'ABIR', 'S47')).click();
-    await page.locator('#pk-sort').selectOption('marque');
-    await page.locator('#pk-group').selectOption('marque');
+    await page.getByRole('button', { name: 'Trier', exact: true }).click();
+    await page.getByRole('option', { name: 'Tri : marque' }).click();
+    await page.getByRole('button', { name: 'Grouper', exact: true }).click();
+    await page.getByRole('option', { name: 'Par marque' }).click();
     const groups = (await page.locator('.pk-group-head').allInnerTexts()).map((t) => t.split('\n')[0].trim());
     expect(groups.length).toBeGreaterThan(1);
     expect(groups).toEqual([...groups].sort((a, b) => a.localeCompare(b, 'fr')));
@@ -107,7 +109,9 @@ test.describe('Espace Designer – réaffectation (administrateur)', () => {
     await go(page, 'design');
     await page.getByRole('button', { name: 'Planning de charge' }).click();
     await expect(page.locator('.pk-plan')).toBeVisible({ timeout: 15000 });
-    await expect(page.locator('#pk-sort option')).toContainText(['Priorité', 'Marque', 'Collection', 'Type de pack', 'Échéance']);
+    await page.getByRole('button', { name: 'Trier', exact: true }).click();
+    await expect(page.getByRole('option')).toContainText(['Tri : priorité', 'Tri : marque', 'Tri : collection', 'Tri : type de pack', 'Tri : échéance']);
+    await page.keyboard.press('Escape');
     await expect(page.locator('.pk-row').first()).toBeVisible();
     await expect(page.locator('.pk-row.draggable')).toHaveCount(0);
     await expect(page.locator('.pk-urgent')).toHaveCount(0);

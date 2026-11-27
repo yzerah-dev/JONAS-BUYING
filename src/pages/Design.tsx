@@ -25,6 +25,7 @@ import {
   X,
 } from 'lucide-react';
 import PackFiles from '../components/PackFiles';
+import FilterChip from '../components/FilterChip';
 import { pressable } from '../lib/a11y';
 import { brandOf, byId, capacityOf, matchTrack, packDone, packLate, packTrack, TRACK_CHIPS, TRACK_ORDER, useAuth, useStore, type State, type TrackFilter } from '../data/store';
 import PackTrackDots, { TrackRound } from '../components/PackTrack';
@@ -434,31 +435,27 @@ function DesignPage() {
           </div>
 
           <div className="pk-toolbar">
-            <label className="pf-search pk-search">
+            <label className="pr-search pk-search">
               <Search size={18} />
               <input placeholder="Réf., produit, fournisseur, marque…" value={q} onChange={(e) => setQ(e.target.value)} />
             </label>
-            <label className="pk-group" htmlFor="pk-sort">
-              <span className="xs muted">Trier</span>
-              <select id="pk-sort" className="input" value={sortBy} onChange={(e) => setSortBy(e.target.value as SortBy)}>
-                {(Object.keys(SORT_LABELS) as SortBy[]).map((k) => (
-                  <option key={k} value={k}>
-                    {SORT_LABELS[k]}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <FilterChip
+              label="Trier"
+              clearable={false}
+              allId="__"
+              value={sortBy}
+              onChange={(v) => setSortBy(v as SortBy)}
+              options={(Object.keys(SORT_LABELS) as SortBy[]).map((k) => ({ id: k, label: `Tri : ${SORT_LABELS[k].toLowerCase()}` }))}
+            />
             {view === 'case' && (
-              <label className="pk-group" htmlFor="pk-group">
-                <span className="xs muted">Grouper</span>
-                <select id="pk-group" className="input" value={groupBy} onChange={(e) => setGroupBy(e.target.value as GroupBy)}>
-                  {(Object.keys(GROUP_LABELS) as GroupBy[]).map((k) => (
-                    <option key={k} value={k}>
-                      {GROUP_LABELS[k]}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <FilterChip
+                label="Grouper"
+                allId="none"
+                allLabel="Sans regroupement"
+                value={groupBy}
+                onChange={(v) => setGroupBy(v as GroupBy)}
+                options={(Object.keys(GROUP_LABELS) as GroupBy[]).filter((k) => k !== 'none').map((k) => ({ id: k, label: GROUP_LABELS[k] }))}
+              />
             )}
           </div>
 

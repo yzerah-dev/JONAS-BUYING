@@ -3,14 +3,16 @@ import { CartButton, CartQty } from '../components/Cart';
 import { useCanOrder } from '../lib/cart';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LayoutGrid, List, Search } from 'lucide-react';
+import { LayoutGrid, List, Search, X } from 'lucide-react';
 import { brandOf, byId, matchTrack, packTrack, productQuantities, TRACK_ORDER, useStore, type TrackFilter } from '../data/store';
 import PackTrackDots from '../components/PackTrack';
-import { BrandLogo, ProductPic, Pill, ProductThumb, Seg, PA } from '../components/ui';
+import { BrandLogo, ProductPic, Pill, ProductThumb, PA } from '../components/ui';
 import { num, weekLabel } from '../lib/format';
-import Combobox from '../components/Combobox';
+import FilterChip from '../components/FilterChip';
 import PhotoImport from '../components/PhotoImport';
 import ProductSheetImport from '../components/ProductSheetImport';
+
+const NO_FILTER = { brand: 'all', rayon: 'all', supplier: 'all', collection: 'all', pack: 'all', dev: 'all', flow: 'all' };
 
 export default function Products() {
   const canOrder = useCanOrder();
@@ -19,9 +21,10 @@ export default function Products() {
   const [mode, setMode] = useState<'galerie' | 'liste'>('galerie');
   const [q, setQ] = useState('');
   const [limit, setLimit] = useState(60);
-  const [f, setF] = useState({ brand: 'all', rayon: 'all', supplier: 'all', collection: 'all', pack: 'all', dev: 'all', flow: 'all' });
+  const [f, setF] = useState(NO_FILTER);
   const [sortBy, setSortBy] = useState<'ref' | 'pack'>('ref');
-  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLSelectElement>) => setF({ ...f, [k]: e.target.value });
+  const pickF = (k: keyof typeof f) => (v: string) => setF({ ...f, [k]: v });
+  const activeFilters = Object.values(f).filter((v) => v !== 'all').length;
 
   const rows = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -52,73 +55,92 @@ export default function Products() {
         <span className="pill green">{state.products.length} références</span>
         <div className="grow" />
         {canOrder && <CartButton />}
-        <ProductSheetImport products={state.products} />
-        <PhotoImport products={state.products} />
-        <Seg
-          value={mode}
-          onChange={setMode}
-          options={[
-            { id: 'galerie', label: 'Galerie', icon: <LayoutGrid size={16} /> },
-            { id: 'liste', label: 'Liste', icon: <List size={16} /> },
-          ]}
-        />
+        <span className="pr-tools">
+          <ProductSheetImport products={state.products} />
+          <PhotoImport products={state.products} />
+        </span>
+        <span className="pfx-seg" role="group" aria-label="Présentation">
+          <button type="button" aria-pressed={mode === 'galerie'} className={mode === 'galerie' ? 'on' : ''} onClick={() => setMode('galerie')}>
+            <LayoutGrid size={16} /> Galerie
+          </button>
+          <button type="button" aria-pressed={mode === 'liste'} className={mode === 'liste' ? 'on' : ''} onClick={() => setMode('liste')}>
+            <List size={16} /> Liste
+          </button>
+        </span>
       </div>
-      <div className="row wrap mb">
-        <div className="search">
-          <Search size={16} className="muted" />
+      <div className="pr-filters mb">
+        <label className="pr-search">
+          <Search size={18} />
           <input placeholder="Réf., désignation, EAN…" value={q} onChange={(e) => setQ(e.target.value)} />
-        </div>
-        <select className="input" value={f.brand} onChange={set('brand')}>
-          <option value="all">Marque</option>
-          {state.brands.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.name}
-            </option>
-          ))}
-        </select>
-        <select className="input" value={f.collection} onChange={set('collection')}>
-          <option value="all">Collection</option>
-          {collections.map((c) => (
-            <option key={c}>{c}</option>
-          ))}
-        </select>
-        <select className="input" value={f.rayon} onChange={set('rayon')}>
-          <option value="all">Rayon</option>
-          {rayons.map((r) => (
-            <option key={r}>{r}</option>
-          ))}
-        </select>
-        <div className="combo-filter">
-          <Combobox
+          {q && (
+            <button type="button" className="fchip-x" aria-label="Effacer la recherche" onClick={() => setQ('')}>
+              <X size={14} />
+            </button>
+          )}
+        </label>
+        <div className="pr-chips">
+          <FilterChip
+            label="Fournisseur"
+            allLabel="Tous les fournisseurs"
             value={f.supplier}
-            onChange={(v) => setF({ ...f, supplier: v })}
-            placeholder="Fournisseur…"
-            options={[{ id: 'all', label: 'Tous les fournisseurs' }, ...state.suppliers.map((s) => ({ id: s.id, label: s.shortName, sub: `${s.flag} ${s.city}`, keywords: s.name }))]}
+            onChange={pickF('supplier')}
+            options={state.suppliers.map((x) => ({ id: x.id, label: x.shortName, sub: `${x.flag} ${x.city}` }))}
+          />
+          <FilterChip label="Marque" allLabel="Toutes les marques" value={f.brand} onChange={pickF('brand')} options={state.brands.map((b) => ({ id: b.id, label: b.name }))} />
+          <FilterChip label="Collection" allLabel="Toutes" value={f.collection} onChange={pickF('collection')} options={collections.map((c) => ({ id: c, label: c }))} />
+          <FilterChip label="Rayon" allLabel="Tous les rayons" value={f.rayon} onChange={pickF('rayon')} options={rayons.map((r) => ({ id: r, label: r }))} />
+          <FilterChip
+            label="Statut du pack"
+            allLabel="Tous"
+            value={f.pack}
+            onChange={pickF('pack')}
+            options={[
+              { id: 'diecut', label: 'Die cut manquant' },
+              { id: 'a_faire', label: 'Pack à faire' },
+              { id: 'attente', label: 'Pack en attente de validation' },
+              { id: 'a_refaire', label: 'Pack à refaire' },
+              { id: 'valide', label: 'Pack validé' },
+            ]}
+          />
+          <FilterChip
+            label="Développement"
+            allLabel="Tous"
+            value={f.dev}
+            onChange={pickF('dev')}
+            options={[
+              { id: 'dev', label: 'Développé' },
+              { id: 'todo', label: 'En développement' },
+            ]}
+          />
+          <FilterChip
+            label="Commande / stock"
+            allLabel="Tous"
+            value={f.flow}
+            onChange={pickF('flow')}
+            options={[
+              { id: 'commande', label: 'En commande' },
+              { id: 'transit', label: 'En transit' },
+              { id: 'stock', label: 'En stock' },
+            ]}
+          />
+          {activeFilters > 0 && (
+            <button type="button" className="pr-clear" onClick={() => setF(NO_FILTER)}>
+              Effacer ({activeFilters})
+            </button>
+          )}
+          <span className="grow" />
+          <FilterChip
+            label="Trier"
+            clearable={false}
+            allId="__"
+            value={sortBy}
+            onChange={(v) => setSortBy(v as 'ref' | 'pack')}
+            options={[
+              { id: 'ref', label: 'Tri : référence' },
+              { id: 'pack', label: 'Tri : statut du pack' },
+            ]}
           />
         </div>
-        <select className="input" aria-label="Statut du pack" value={f.pack} onChange={set('pack')}>
-          <option value="all">Statut du pack</option>
-          <option value="diecut">Die cut manquant</option>
-          <option value="a_faire">Pack à faire</option>
-          <option value="attente">Pack en attente de validation</option>
-          <option value="a_refaire">Pack à refaire</option>
-          <option value="valide">Pack validé</option>
-        </select>
-        <select className="input" aria-label="Trier" value={sortBy} onChange={(e) => setSortBy(e.target.value as 'ref' | 'pack')}>
-          <option value="ref">Trier : par défaut</option>
-          <option value="pack">Trier : statut du pack</option>
-        </select>
-        <select className="input" value={f.dev} onChange={set('dev')}>
-          <option value="all">Développé / en dév.</option>
-          <option value="dev">Développé</option>
-          <option value="todo">En développement</option>
-        </select>
-        <select className="input" value={f.flow} onChange={set('flow')}>
-          <option value="all">Commande / transit / stock</option>
-          <option value="commande">En commande</option>
-          <option value="transit">En transit</option>
-          <option value="stock">En stock</option>
-        </select>
       </div>
 
       {rows.length === 0 && <div className="card empty">Aucun produit.</div>}
