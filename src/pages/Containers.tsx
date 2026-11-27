@@ -1,4 +1,4 @@
-import { ContainerDocLink } from '../components/ContainerDoc';
+import { ContainerDocLink, ContainerPapers } from '../components/ContainerDoc';
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Calendar, CalendarClock, Check, ChevronLeft, ChevronRight, FileText, Home, Mail, Phone, Search, Ship, SlidersHorizontal, Truck, User, X } from 'lucide-react';
@@ -349,6 +349,7 @@ function ContainerDetail({ c, onClose }: { c: Container; onClose: () => void }) 
           </span>
         </div>
       </div>
+      <ContainerPapers c={c} key={c.id} />
       <div className="stepper mt mb">
         {steps.map((s, i) => (
           <div key={s.l} className={`step ${reached[i] ? 'done' : ''}`}>

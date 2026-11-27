@@ -1,6 +1,6 @@
 import { useRef, useState, type ReactNode } from 'react';
-import { Download } from 'lucide-react';
-import { useStore } from '../data/store';
+import { Check, Download, FileText, Upload } from 'lucide-react';
+import { useAuth, useStore } from '../data/store';
 import type { Container } from '../data/types';
 import { forwarderScope, newFileId, putBlob, supplierScope } from '../lib/files';
 import { downloadContainerDoc } from '../lib/containerDocs';
@@ -69,5 +69,85 @@ export function ContainerDocLink({ c, doc, className = 'icon-btn' }: { c: Contai
     >
       <Download size={13} />
     </button>
+  );
+}
+
+/** Les 3 documents du conteneur, chacun avec son rond : BL, Packing List, Facture */
+const ROUNDS: { doc: string; label: string; hint: string }[] = [
+  { doc: 'BL.pdf', label: 'BL', hint: 'Connaissement (Bill of Lading)' },
+  { doc: 'Packing List.xlsx', label: 'Packing List', hint: 'Liste de colisage' },
+  { doc: 'Invoice.pdf', label: 'Facture', hint: 'Facture commerciale (Invoice)' },
+];
+
+/** N° de conteneur et plomb, puis 3 ronds à uploader (BL, Packing List, Facture) */
+export function ContainerPapers({ c }: { c: Container }) {
+  const { dispatch } = useStore();
+  const auth = useAuth();
+  const [num, setNum] = useState(c.number ?? '');
+  const [seal, setSeal] = useState(c.seal ?? '');
+  const clean = num.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const valid = /^[A-Z]{4}\d{7}$/.test(clean);
+  const canNumber = auth.allowed({ type: 'setContainerNumber', containerId: c.id, number: 'ABCD1234567' });
+  const canUpload = auth.allowed({ type: 'addContainerDoc', containerId: c.id, doc: 'BL.pdf' });
+  const changed = clean !== (c.number ?? '') || seal.trim().toUpperCase() !== (c.seal ?? '');
+  return (
+    <div className="ctp">
+      <div className="ctp-num">
+        <label htmlFor={`ctn-num-${c.id}`}>
+          <span>N° de conteneur</span>
+          <input
+            id={`ctn-num-${c.id}`}
+            className={`input ${num && !valid ? 'bad' : ''}`}
+            placeholder="Ex. MSKU1234567"
+            value={num}
+            disabled={!canNumber}
+            maxLength={13}
+            onChange={(e) => setNum(e.target.value.toUpperCase())}
+          />
+        </label>
+        <label htmlFor={`ctn-seal-${c.id}`}>
+          <span>Plomb (scellé)</span>
+          <input id={`ctn-seal-${c.id}`} className="input" placeholder="Ex. SL400123" value={seal} disabled={!canNumber} onChange={(e) => setSeal(e.target.value.toUpperCase())} />
+        </label>
+        {canNumber && (
+          <button
+            type="button"
+            className="btn primary"
+            disabled={!valid || !changed}
+            onClick={() => {
+              dispatch({ type: 'setContainerNumber', containerId: c.id, number: clean, seal });
+              toast(`Conteneur ${clean} enregistré`);
+            }}
+          >
+            Enregistrer
+          </button>
+        )}
+        {num && !valid && <span className="small red ctp-err">4 lettres + 7 chiffres (ex. MSKU1234567)</span>}
+      </div>
+      <div className="ctp-rounds">
+        {ROUNDS.map((r) => {
+          const f = c.docFiles?.[r.doc];
+          const noted = c.documents.includes(r.doc);
+          return (
+            <div key={r.doc} className={`ctp-round ${f ? 'done' : ''}`}>
+              {canUpload ? (
+                <ContainerDocUpload c={c} doc={r.doc} className="ctp-ring" title={`${f ? 'Remplacer' : 'Déposer'} : ${r.label}`} done={`${r.label} déposé`}>
+                  {f ? <Check size={30} strokeWidth={3} /> : <Upload size={26} />}
+                </ContainerDocUpload>
+              ) : (
+                <span className="ctp-ring">{f ? <Check size={30} strokeWidth={3} /> : <FileText size={26} />}</span>
+              )}
+              <b>{r.label}</b>
+              <small title={r.hint}>{f ? f.name : noted ? 'Noté sans fichier' : 'À uploader'}</small>
+              {f && (
+                <button type="button" className="btn sm" onClick={() => downloadContainerDoc(c, r.doc)} aria-label={`Télécharger ${r.label}`}>
+                  <Download size={13} /> Télécharger
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }

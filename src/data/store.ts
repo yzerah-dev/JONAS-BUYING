@@ -128,6 +128,7 @@ export type Action =
   | { type: 'requestPlan'; containerId: string }
   | { type: 'proposePlan'; containerId: string }
   | { type: 'addContainerDoc'; containerId: string; doc: string; file?: { fileId: string; name: string; size: number; type: string } }
+  | { type: 'setContainerNumber'; containerId: string; number: string; seal?: string }
   | { type: 'signProforma'; id: string; etdWanted: ISODate }
   | {
       type: 'createProforma';
@@ -569,6 +570,14 @@ export function isAllowed(s: State, a: Action): boolean {
       const c = s.containers.find((x) => x.id === a.containerId);
       return can(u, 'logistics.plan') && !!c && OPEN_STATUSES.includes(c.status) && !c.planValidated;
     }
+    case 'setContainerNumber': {
+      // N° de conteneur (4 lettres + 7 chiffres, ex. MSKU1234567) : JONAS, le fournisseur ou le transitaire du conteneur
+      const c = s.containers.find((x) => x.id === a.containerId);
+      if (!c || !/^[A-Z]{4}\d{7}$/.test(a.number)) return false;
+      if (isSupplier(u)) return c.supplierId === u.supplierId;
+      if (isForwarder(u)) return forwarderOwns(u, c);
+      return can(u, 'logistics.booking') || can(u, 'logistics.plan');
+    }
     case 'addContainerDoc': {
       const c = s.containers.find((x) => x.id === a.containerId);
       if (isSupplier(u)) return !!c && c.supplierId === u.supplierId;
@@ -903,13 +912,7 @@ export const canCancelProforma = (s: State, u: User, pf: Proforma) => (can(u, 'p
 export const canDeleteProforma = (s: State, u: User, pf: Proforma) => can(u, 'proforma.sign') && !shipped(pf) && !inSplit(s, pf);
 /** Annuler un produit : proforma pas encore signée par JONAS (aucune version signée, quel que soit son statut), pas bookée ni partie, équipe achats */
 export const canCancelLines = (u: User | undefined, pf: Proforma) =>
-  !!u &&
-  (can(u, 'proforma.edit') || can(u, 'proforma.sign')) &&
-  !pf.cancelled &&
-  !signedVersion(pf) &&
-  ['a_signer', 'en_dev', 'en_production'].includes(pf.status) &&
-  !pf.split &&
-  !pf.booking;
+  !!u && (can(u, 'proforma.edit') || can(u, 'proforma.sign')) && !pf.cancelled && !signedVersion(pf) && ['a_signer', 'en_dev', 'en_production'].includes(pf.status) && !pf.split && !pf.booking;
 /** Pourquoi on ne peut pas annuler / supprimer (message affiché) */
 export const cancelBlock = (s: State, pf: Proforma) =>
   shipped(pf) ? 'Marchandise partie : la proforma ne peut plus être annulée.' : inSplit(s, pf) ? 'Expédition partielle en cours : gérez-la depuis l’onglet Expéditions.' : '';
@@ -1139,6 +1142,13 @@ function applyAction(s: State, a: Action): State {
           ],
         };
       });
+    case 'setContainerNumber':
+      return mapC(s, a.containerId, (c) => ({
+        ...c,
+        number: a.number,
+        seal: a.seal?.trim() ? a.seal.trim().toUpperCase() : c.seal,
+        dateHistory: [...c.dateHistory, hist(me, `N° de conteneur : ${a.number}${a.seal?.trim() ? ` · plomb ${a.seal.trim().toUpperCase()}` : ''}`)],
+      }));
     case 'addContainerDoc':
       return mapC(s, a.containerId, (c) => ({
         ...c,
@@ -2158,6 +2168,8 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
       const prev = s.containers.find((c) => c.id === a.containerId)?.loading?.date;
       return { target: ctn(a.containerId), text: prev && prev !== a.date ? `Date de chargement changée par le fournisseur : ${a.date}` : `Date de chargement validée : ${a.date}` };
     }
+    case 'setContainerNumber':
+      return { target: a.containerId, text: `N° de conteneur ${a.number}${a.seal ? ` · plomb ${a.seal}` : ''}` };
     case 'addContainerDoc':
       return { target: ctn(a.containerId), text: `Document déposé : ${a.doc}` };
     case 'requestBooking':
