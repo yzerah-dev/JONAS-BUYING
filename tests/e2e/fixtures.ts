@@ -39,10 +39,15 @@ export async function go(page: Page, route = '') {
   if (!r) return;
   // Une redirection encore en cours (connexion, page d'accueil du rôle) peut écraser la navigation : on vérifie la route
   const want = '#/' + r.split('?')[0];
-  await expect(async () => {
-    if (!page.url().includes(want)) await page.goto('/#/' + r);
-    expect(page.url()).toContain(want);
-  }).toPass({ timeout: 10_000 });
+  // … y compris juste après : on revérifie que la page reste sur la route demandée
+  for (let i = 0; i < 4; i++) {
+    await expect(async () => {
+      if (!page.url().includes(want)) await page.goto('/#/' + r);
+      expect(page.url()).toContain(want);
+    }).toPass({ timeout: 10_000 });
+    await page.waitForTimeout(150);
+    if (page.url().includes(want)) return;
+  }
 }
 
 /** État propre : vide le localStorage (sauf langue FR) puis recharge (données réinitialisées depuis le seed). */
