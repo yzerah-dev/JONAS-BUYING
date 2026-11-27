@@ -254,7 +254,7 @@ export default function SupplierDetail() {
                 {(devTab === 'dev' ? developed : todo).map((p) => {
                   const pf = state.proformas.filter((x) => x.lines.some((l) => l.productId === p.id)).at(-1);
                   return (
-                    <tr key={p.id} className="clickable" onClick={() => navigate(`/produits/${p.id}`)}>
+                    <tr key={p.id} className="clickable" onClick={() => navigate(`/produits/${p.id}`, { state: { back: `/fournisseurs/${sup.id}`, backLabel: sup.shortName } })}>
                       <td className="bold">{p.ref}</td>
                       <td>
                         <ProductThumb product={p} size={40} />

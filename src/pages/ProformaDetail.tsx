@@ -77,7 +77,22 @@ export default function ProformaDetail() {
   const navigate = useNavigate();
   const pf = state.proformas.find((p) => p.id === id);
   const [tab, setTab] = useState<Tab>('produits');
-  const [mode, setMode] = useState<'galerie' | 'liste'>('galerie');
+  // Galerie / liste des produits : choix gardé (retour depuis une fiche produit)
+  const [mode, setModeState] = useState<'galerie' | 'liste'>(() => {
+    try {
+      return localStorage.getItem('jonas-buying-pfp-mode') === 'liste' ? 'liste' : 'galerie';
+    } catch {
+      return 'galerie';
+    }
+  });
+  const setMode = (m: 'galerie' | 'liste') => {
+    setModeState(m);
+    try {
+      localStorage.setItem('jonas-buying-pfp-mode', m);
+    } catch {
+      /* choix gardé le temps de la page */
+    }
+  };
   const cancelled = state.archived?.find((p) => p.id === id);
   if (!pf && cancelled) return <CancelledProforma pf={cancelled} />;
   if (!pf) return <div className="card empty">Proforma introuvable (supprimée ?).</div>;
@@ -397,7 +412,11 @@ function ProductsTab({ pf, state, mode }: { pf: Proforma; state: State; mode: 'g
               {lines.map((l) => {
                 const p = byId(state.products, l.productId);
                 return (
-                  <tr key={p.id} className={`clickable ${packTone(p)}`} onClick={() => navigate(`/produits/${p.id}`)}>
+                  <tr
+                    key={p.id}
+                    className={`clickable ${packTone(p)}`}
+                    onClick={() => navigate(`/produits/${p.id}`, { state: { back: `/proformas/${pf.id}`, backLabel: pf.id, list: rows.map((r) => r.p.id) } })}
+                  >
                     {canAssign && (
                       <td onClick={(e) => e.stopPropagation()}>
                         <input type="checkbox" checked={sel.has(p.id)} onChange={() => toggle(p.id)} aria-label={`Sélectionner ${p.ref}`} />
@@ -444,7 +463,11 @@ function ProductsTab({ pf, state, mode }: { pf: Proforma; state: State; mode: 'g
         {lines.map((l) => {
           const p = byId(state.products, l.productId);
           return (
-            <div key={p.id} className={`pcard pfp-card ${packTone(p)} ${sel.has(p.id) ? 'checked' : ''}`} onClick={() => navigate(`/produits/${p.id}`)}>
+            <div
+              key={p.id}
+              className={`pcard pfp-card ${packTone(p)} ${sel.has(p.id) ? 'checked' : ''}`}
+              onClick={() => navigate(`/produits/${p.id}`, { state: { back: `/proformas/${pf.id}`, backLabel: pf.id, list: rows.map((r) => r.p.id) } })}
+            >
               {canAssign && (
                 <input type="checkbox" className="pfp-check" checked={sel.has(p.id)} onClick={(e) => e.stopPropagation()} onChange={() => toggle(p.id)} aria-label={`Sélectionner ${p.ref}`} />
               )}

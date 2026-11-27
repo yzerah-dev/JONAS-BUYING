@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
   BarChart3,
   Boxes,
@@ -38,6 +38,7 @@ export default function ProductDetail() {
   const { id } = useParams();
   const { state } = useStore();
   const navigate = useNavigate();
+  const location = useLocation();
   const [tab, setTab] = useState<Tab>('info');
   // Par identifiant, ou par réf. JONAS (produit créé depuis le portail : identifiant provisoire, réf. attribuée à la signature)
   const byIdIdx = state.products.findIndex((p) => p.id === id);
@@ -46,13 +47,21 @@ export default function ProductDetail() {
   if (!p) return <div className="card empty">Produit introuvable.</div>;
   const q = productQuantities(state, p.id);
   const brand = brandOf(state.brands, p.brandId);
-  const go = (d: number) => navigate(`/produits/${state.products[(idx + d + state.products.length) % state.products.length].id}`);
+  // Ouvert depuis une proforma (ou une fiche fournisseur) : « Retour » y revient, et ‹ › parcourent ses produits
+  const from = (location.state ?? null) as { back?: string; backLabel?: string; list?: string[] } | null;
+  const list = from?.list?.length ? from.list : null;
+  const pos = list ? Math.max(0, list.indexOf(p.id)) : idx;
+  const count = list ? list.length : state.products.length;
+  const go = (d: number) => {
+    const next = list ? list[(pos + d + count) % count] : state.products[(idx + d + count) % count].id;
+    navigate(`/produits/${next}`, { state: from });
+  };
 
   return (
     <>
       <div className="page-head">
-        <button className="btn" onClick={() => navigate('/produits')}>
-          <ChevronLeft size={16} /> Retour
+        <button className="btn" onClick={() => navigate(from?.back ?? '/produits')}>
+          <ChevronLeft size={16} /> {from?.backLabel ? `Retour à ${from.backLabel}` : 'Retour'}
         </button>
         <h1>Fiche produit</h1>
         <div className="grow" />
@@ -60,7 +69,7 @@ export default function ProductDetail() {
           <ChevronLeft />
         </button>
         <span className="bold">
-          {idx + 1} / {state.products.length}
+          {pos + 1} / {count}
         </span>
         <button className="btn ghost" onClick={() => go(1)}>
           <ChevronRight />

@@ -37,3 +37,16 @@ test('proforma, onglet Produits : tout sélectionner puis affecter à ALEX PANDA
   await expect(toast(page)).toContainText('affecté');
   await expect(page.locator('.pfp-who').first()).toContainText('ALEX PANDA');
 });
+
+test('proforma → fiche produit → « Retour à PF-… » revient sur la proforma ; ‹ › parcourent ses produits', async ({ page }) => {
+  await resetApp(page);
+  await go(page, 'proformas/PF-2026-0148');
+  await page.locator('.pfp-card').first().click();
+  await expect(page).toHaveURL(/#\/produits\//);
+  await expect(page.locator('.page-head')).toContainText('1 / 2');
+  await page.locator('.page-head .btn.ghost').nth(1).click();
+  await expect(page.locator('.page-head')).toContainText('2 / 2');
+  await page.getByRole('button', { name: 'Retour à PF-2026-0148' }).click();
+  await expect(page).toHaveURL(/#\/proformas\/PF-2026-0148$/);
+  await expect(page.locator('.pfp-card')).toHaveCount(2);
+});
