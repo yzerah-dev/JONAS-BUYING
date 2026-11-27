@@ -584,7 +584,7 @@ export function isAllowed(s: State, a: Action): boolean {
       // Discussion produit : l'équipe JONAS et le fournisseur du produit (pas les transitaires)
       const p = s.products.find((x) => x.id === a.productId);
       if (!p || isForwarder(u)) return false;
-      if (a.type === 'sendProductMessage' && !a.message.text.trim() && !a.message.file) return false;
+      if (a.type === 'sendProductMessage' && !a.message.text.trim() && !a.message.file && !a.message.files?.length) return false;
       return isSupplier(u) ? p.supplierId === u.supplierId : true;
     }
     case 'setPackCheck':
@@ -2215,7 +2215,17 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
       return { target: ctn(a.containerId), text: prev && prev !== a.date ? `Date de chargement changée par le fournisseur : ${a.date}` : `Date de chargement validée : ${a.date}` };
     }
     case 'sendProductMessage':
-      return { target: ref(a.productId), text: `Message : ${a.message.text.slice(0, 80)}${a.message.file ? ` (📎 ${a.message.file.name})` : ''}` };
+      return {
+        target: ref(a.productId),
+        text: `Message : ${a.message.text.slice(0, 80)}${
+          [a.message.file, ...(a.message.files ?? [])].filter(Boolean).length
+            ? ` (📎 ${[a.message.file, ...(a.message.files ?? [])]
+                .filter(Boolean)
+                .map((f) => f!.name)
+                .join(', ')})`
+            : ''
+        }`,
+      };
     case 'readProductChat':
     case 'translateChat':
       return null;

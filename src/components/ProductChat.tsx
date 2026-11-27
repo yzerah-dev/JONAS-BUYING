@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { CheckCheck, Check, FileText, Languages, Loader2, MessageCircle, Paperclip, Send } from 'lucide-react';
+import { CheckCheck, Check, Download, FileText, Image as ImageIcon, Languages, Loader2, MessageCircle, Paperclip, Send, Upload, X } from 'lucide-react';
 import { byId, currentUser, useAuth, useStore } from '../data/store';
 import type { ChatMessage, Product } from '../data/types';
 import { getBlob, newFileId, putBlob, saveBlob, supplierScope } from '../lib/files';
 import { useBlobUrl } from '../lib/blobUrl';
-import { chatSideOf } from '../lib/chat';
+import { chatSideOf, filesOf } from '../lib/chat';
+import { fsize } from '../lib/files';
 import { supplierLang } from '../lib/mail/outbox';
 import { translateTexts, type ChatLang } from '../lib/translate';
 import { useT } from '../i18n/context';
@@ -16,8 +17,9 @@ const hhmm = (iso: string) => {
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 };
 
-function Attachment({ m }: { m: ChatMessage }) {
-  const f = m.file!;
+type ChatFile = NonNullable<ChatMessage['file']>;
+
+function Attachment({ f }: { f: ChatFile }) {
   const isImg = /^image\//.test(f.type);
   const url = useBlobUrl(isImg ? f.fileId : undefined);
   const open = async () => {
@@ -38,6 +40,29 @@ function Attachment({ m }: { m: ChatMessage }) {
   );
 }
 
+/** Onglet « Pièces jointes » : un fichier échangé, avec qui l'a envoyé et quand */
+function FileCard({ f, by, at }: { f: ChatFile; by: string; at: string }) {
+  const isImg = /^image\//.test(f.type);
+  const url = useBlobUrl(isImg ? f.fileId : undefined);
+  const open = async () => {
+    const b = await getBlob(f.fileId).catch(() => undefined);
+    if (b) await saveBlob(b, f.name);
+    else toast('Fichier introuvable');
+  };
+  return (
+    <button type="button" className="ch-fcard" onClick={open} title={f.name}>
+      <span className="ch-fthumb">{isImg && url ? <img src={url} alt={f.name} /> : <FileText size={28} />}</span>
+      <b>{f.name}</b>
+      <small>
+        {by} · {hhmm(at)} · {fsize(f.size)}
+      </small>
+      <span className="ch-fdl">
+        <Download size={13} />
+      </span>
+    </button>
+  );
+}
+
 /** Discussion JONAS ↔ fournisseur sur un produit, comme une conversation WhatsApp */
 export default function ProductChat({ p }: { p: Product }) {
   const { state, dispatch } = useStore();
@@ -47,6 +72,15 @@ export default function ProductChat({ p }: { p: Product }) {
   const side = chatSideOf(me.role);
   const other = side === 'jonas' ? (byId(state.suppliers, p.supplierId)?.shortName ?? '') : t('chat.jonas');
   const [text, setText] = useState('');
+  // Fichiers prêts à partir avec le prochain message (glisser-déposer, trombone, coller)
+  const [pending, setPending] = useState<File[]>([]);
+  const [over, setOver] = useState(false);
+  const [view, setView] = useState<'messages' | 'files'>('messages');
+  const addFiles = (fs: File[]) => {
+    const ok = fs.filter((f) => f.size <= MAX);
+    if (ok.length < fs.length) toast(t('chat.tooBig'));
+    if (ok.length) setPending((x) => [...x, ...ok].slice(0, 10));
+  };
   const [busy, setBusy] = useState(false);
   const file = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLDivElement>(null);
@@ -77,23 +111,23 @@ export default function ProductChat({ p }: { p: Product }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [last?.id]);
 
-  const send = async (attach?: File) => {
+  const send = async () => {
     if (!canWrite || busy) return;
-    if (!text.trim() && !attach) return;
-    if (attach && attach.size > MAX) return toast(t('chat.tooBig'));
+    if (!text.trim() && !pending.length) return;
     setBusy(true);
     try {
-      let f: ChatMessage['file'];
-      if (attach) {
-        const fileId = newFileId(supplierScope(p.supplierId), `chat-${p.id}`, chat.length);
-        await putBlob(fileId, attach);
-        f = { fileId, name: attach.name, size: attach.size, type: attach.type || 'application/octet-stream' };
+      const files: ChatFile[] = [];
+      for (const [i, f] of pending.entries()) {
+        const fileId = newFileId(supplierScope(p.supplierId), `chat-${p.id}`, chat.length * 10 + i);
+        await putBlob(fileId, f);
+        files.push({ fileId, name: f.name || `capture-${i + 1}.png`, size: f.size, type: f.type || 'application/octet-stream' });
       }
       const at = new Date().toISOString();
       const id = `${at}-${Math.random().toString(36).slice(2, 7)}`;
       const msg = text.trim();
-      dispatch({ type: 'sendProductMessage', productId: p.id, message: { id, at, by: me.name, side, text: msg, file: f } });
+      dispatch({ type: 'sendProductMessage', productId: p.id, message: { id, at, by: me.name, side, text: msg, ...(files.length ? { files } : {}) } });
       setText('');
+      setPending([]);
       // JONAS écrit en français ou en anglais : le message arrive traduit dans la langue du fournisseur
       const to = side === 'jonas' && sup ? supplierLang(sup) : null;
       if (msg && to && to !== 'fr') {
@@ -107,6 +141,7 @@ export default function ProductChat({ p }: { p: Product }) {
       setBusy(false);
     }
   };
+  const allFiles = chat.flatMap((m) => filesOf(m).map((f) => ({ f, m }))).reverse();
   const readByOther = (m: ChatMessage) => m.side === side && (p.chatRead?.[side === 'jonas' ? 'fournisseur' : 'jonas'] ?? '') >= m.at;
 
   return (
@@ -117,8 +152,48 @@ export default function ProductChat({ p }: { p: Product }) {
         <span className="muted small">
           · {p.ref} {p.name}
         </span>
+        <span className="grow" />
+        <span className="ch-tabs" role="group" aria-label="Vue">
+          <button type="button" className={view === 'messages' ? 'on' : ''} aria-pressed={view === 'messages'} onClick={() => setView('messages')}>
+            <MessageCircle size={14} /> {t('chat.messages')}
+          </button>
+          <button type="button" className={view === 'files' ? 'on' : ''} aria-pressed={view === 'files'} onClick={() => setView('files')}>
+            <Paperclip size={14} /> {t('chat.files')} ({allFiles.length})
+          </button>
+        </span>
       </div>
-      <div className="ch-list" ref={list} role="log" aria-label={t('chat.title', { who: other })}>
+      {view === 'files' && (
+        <div className="ch-files">
+          {!allFiles.length && <div className="ch-empty small muted">{t('chat.noFiles')}</div>}
+          {allFiles.map(({ f, m }) => (
+            <FileCard key={f.fileId} f={f} by={m.by} at={m.at} />
+          ))}
+        </div>
+      )}
+      <div
+        className={`ch-list ${over ? 'drop' : ''}`}
+        ref={list}
+        role="log"
+        aria-label={t('chat.title', { who: other })}
+        hidden={view !== 'messages'}
+        onDragOver={(e) => {
+          if (!canWrite) return;
+          e.preventDefault();
+          setOver(true);
+        }}
+        onDragLeave={() => setOver(false)}
+        onDrop={(e) => {
+          if (!canWrite) return;
+          e.preventDefault();
+          setOver(false);
+          addFiles([...e.dataTransfer.files]);
+        }}
+      >
+        {over && (
+          <div className="ch-dropzone">
+            <Upload size={26} /> {t('chat.drop')}
+          </div>
+        )}
         {!chat.length && <div className="ch-empty small muted">{t('chat.empty')}</div>}
         {chat.map((m, i) => {
           const mine = m.side === side;
@@ -130,7 +205,9 @@ export default function ProductChat({ p }: { p: Product }) {
               <div className={`ch-row ${mine ? 'mine' : ''}`}>
                 <div className={`ch-bubble ${mine ? 'mine' : ''}`}>
                   {!mine && <div className="ch-by">{m.by}</div>}
-                  {m.file && <Attachment m={m} />}
+                  {filesOf(m).map((f) => (
+                    <Attachment key={f.fileId} f={f} />
+                  ))}
                   {m.text &&
                     (() => {
                       const tr = m.tr?.[readLang];
@@ -166,7 +243,21 @@ export default function ProductChat({ p }: { p: Product }) {
           );
         })}
       </div>
-      {canWrite && (
+      {canWrite && view === 'messages' && pending.length > 0 && (
+        <div className="ch-pending" aria-label={t('chat.pending')}>
+          {pending.map((f, i) => (
+            <span key={i} className="ch-chip">
+              {/^image\//.test(f.type) ? <ImageIcon size={14} /> : <FileText size={14} />}
+              <span>{f.name || 'capture.png'}</span>
+              <small>{fsize(f.size)}</small>
+              <button type="button" aria-label={`${t('chat.remove')} ${f.name}`} onClick={() => setPending((x) => x.filter((_, j) => j !== i))}>
+                <X size={13} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      {canWrite && view === 'messages' && (
         <form
           className="ch-input"
           onSubmit={(e) => {
@@ -178,11 +269,11 @@ export default function ProductChat({ p }: { p: Product }) {
             ref={file}
             type="file"
             hidden
+            multiple
             aria-label={t('chat.attach')}
             onChange={(e) => {
-              const f = e.target.files?.[0];
+              addFiles([...(e.target.files ?? [])]);
               e.target.value = '';
-              if (f) void send(f);
             }}
           />
           <button type="button" className="icon-btn" title={t('chat.attach')} aria-label={t('chat.attach')} onClick={() => file.current?.click()} disabled={busy}>
@@ -194,6 +285,14 @@ export default function ProductChat({ p }: { p: Product }) {
             placeholder={t('chat.placeholder')}
             aria-label={t('chat.placeholder')}
             onChange={(e) => setText(e.target.value)}
+            onPaste={(e) => {
+              // Capture d'écran collée (Ctrl+V) : ajoutée en pièce jointe
+              const imgs = [...e.clipboardData.files].filter((f) => /^image\//.test(f.type));
+              if (imgs.length) {
+                e.preventDefault();
+                addFiles(imgs);
+              }
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -201,12 +300,12 @@ export default function ProductChat({ p }: { p: Product }) {
               }
             }}
           />
-          <button type="submit" className="ch-send" disabled={busy || !text.trim()} aria-label={t('chat.send')}>
+          <button type="submit" className="ch-send" disabled={busy || (!text.trim() && !pending.length)} aria-label={t('chat.send')}>
             {busy ? <Loader2 size={18} className="spin" /> : <Send size={18} />}
           </button>
         </form>
       )}
-      {canWrite && side === 'jonas' && sup && supplierLang(sup) !== 'fr' && (
+      {canWrite && view === 'messages' && side === 'jonas' && sup && supplierLang(sup) !== 'fr' && (
         <div className="ch-hint">
           <Languages size={11} /> Écrivez en français ou en anglais : {sup.shortName} reçoit le message traduit en {supplierLang(sup) === 'zh' ? 'chinois' : 'anglais'}.
         </div>

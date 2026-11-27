@@ -410,8 +410,10 @@ export interface ChatMessage {
   by: string;
   side: 'jonas' | 'fournisseur';
   text: string;
-  /** Pièce jointe (photo, PDF…) dans le stockage de fichiers */
+  /** Pièce jointe (photo, PDF…) dans le stockage de fichiers (anciens messages : une seule) */
   file?: { fileId: string; name: string; size: number; type: string };
+  /** Pièces jointes (plusieurs par message, avec ou sans texte) */
+  files?: { fileId: string; name: string; size: number; type: string }[];
   /** Traductions par Claude (fr, en, zh) : un message de JONAS arrive dans la langue du fournisseur */
   tr?: Partial<Record<'fr' | 'en' | 'zh', string>>;
 }

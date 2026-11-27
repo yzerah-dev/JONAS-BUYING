@@ -2566,3 +2566,28 @@ tr.pf-moving td, .pf-line.pf-moving { background: #fff6e8 !important; outline: 2
 .ch-tr-sent { display: flex; gap: 5px; align-items: flex-start; font-size: 12.5px; color: #4b6358; border-top: 1px dashed rgba(0, 0, 0, 0.12); padding-top: 4px; }
 .ch-tr-sent svg { flex-shrink: 0; margin-top: 2px; }
 .ch-hint { font-size: 11.5px; color: var(--muted); padding: 0 12px 6px; background: #f7faf9; }
+
+/* Discussion : pièces jointes (dépôt, plateau avant envoi, onglet) */
+.ch-tabs { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: #e8efec; }
+.ch-tabs button { display: inline-flex; align-items: center; gap: 5px; border: 0; background: none; padding: 5px 11px; border-radius: 999px; font-size: 12.5px; font-weight: 700; color: var(--ink-2); cursor: pointer; }
+.ch-tabs button.on { background: #fff; color: var(--green-dark); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); }
+.ch-list { position: relative; }
+.ch-list.drop { outline: 3px dashed var(--green); outline-offset: -8px; }
+.ch-dropzone { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 8px; background: rgba(233, 246, 240, 0.92); color: var(--green-dark); font-weight: 800; z-index: 2; pointer-events: none; }
+.ch-pending { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 10px 0; background: #f7faf9; border-top: 1px solid var(--line); }
+.ch-chip { display: inline-flex; align-items: center; gap: 6px; max-width: 260px; padding: 4px 6px 4px 10px; border: 1px solid var(--line); border-radius: 999px; background: #fff; font-size: 12.5px; }
+.ch-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ch-chip small { color: var(--muted); flex-shrink: 0; }
+.ch-chip button { border: 0; background: #eef1f0; border-radius: 50%; width: 20px; height: 20px; display: grid; place-items: center; cursor: pointer; flex-shrink: 0; }
+.ch-pending + .ch-input { border-top: 0; }
+.ch-files { flex: 1; overflow-y: auto; padding: 14px; display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; align-content: start; background: #f7faf9; }
+.ch-files .ch-empty { grid-column: 1 / -1; }
+.ch-fcard { position: relative; display: grid; gap: 4px; text-align: left; border: 1px solid var(--line); border-radius: 12px; background: #fff; padding: 8px; cursor: pointer; min-width: 0; }
+.ch-fcard:hover { border-color: var(--green); }
+.ch-fthumb { height: 110px; border-radius: 8px; background: #f2f5f4; display: grid; place-items: center; overflow: hidden; color: var(--ink-2); }
+.ch-fthumb img { width: 100%; height: 100%; object-fit: contain; background: #fff; }
+.ch-fcard b { font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ch-fcard small { font-size: 11px; color: var(--muted); }
+.ch-fdl { position: absolute; top: 12px; right: 12px; width: 24px; height: 24px; border-radius: 50%; background: rgba(255, 255, 255, 0.9); display: grid; place-items: center; color: var(--green-dark); }
+.ch-bubble .ch-img + .ch-img, .ch-bubble .ch-file + .ch-file { margin-top: 2px; }
+.ch-list[hidden] { display: none !important; }

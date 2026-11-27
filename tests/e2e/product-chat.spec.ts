@@ -23,6 +23,8 @@ test('JONAS écrit sur un produit, le fournisseur le voit dans son portail, rép
   await ch.locator('textarea').fill('Yes, gold glitter. See photo.');
   await ch.locator('textarea').press('Enter');
   await ch.locator('input[type=file]').setInputFiles({ name: 'gold.png', mimeType: 'image/png', buffer: PNG });
+  await expect(ch.locator('.ch-chip')).toHaveCount(1);
+  await ch.getByRole('button', { name: 'Envoyer' }).click();
   await expect(ch.locator('.ch-bubble.mine')).toHaveCount(2);
   await expect(ch.locator('.ch-bubble.mine img')).toHaveCount(1);
 
@@ -68,4 +70,35 @@ test('traduction : un message de JONAS déjà traduit s’affiche en chinois che
   await go(page, 'portail/produits/CP-T001');
   await page.reload();
   await expect(page.locator('.ch-bubble:not(.mine) .ch-text')).toHaveText('请确认金色。');
+});
+
+test('pièces jointes : plusieurs fichiers avec un commentaire dans le même message, onglet « Pièces jointes »', async ({ page }) => {
+  await resetApp(page);
+  await loginAs(page, 'David');
+  await go(page, 'produits/CP-T001');
+  await page.getByRole('button', { name: /^Discussion fournisseur/ }).click();
+  const ch = page.locator('.ch');
+  await ch.locator('input[type=file]').setInputFiles([
+    { name: 'pack-v2.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4') },
+    { name: 'photo.png', mimeType: 'image/png', buffer: PNG },
+  ]);
+  await expect(ch.locator('.ch-chip')).toHaveCount(2);
+  await ch.getByRole('button', { name: 'Retirer photo.png' }).click();
+  await expect(ch.locator('.ch-chip')).toHaveCount(1);
+  await ch.locator('input[type=file]').setInputFiles({ name: 'photo.png', mimeType: 'image/png', buffer: PNG });
+  await ch.locator('textarea').fill('Voici le pack v2 et la photo de référence.');
+  await ch.locator('textarea').press('Enter');
+  const bubble = ch.locator('.ch-bubble.mine');
+  await expect(bubble).toHaveCount(1);
+  await expect(bubble).toContainText('Voici le pack v2');
+  await expect(bubble.locator('.ch-file')).toContainText('pack-v2.pdf');
+  await expect(bubble.locator('.ch-img img')).toHaveCount(1);
+  await expect(ch.locator('.ch-chip')).toHaveCount(0);
+  // Onglet des pièces jointes
+  await ch.getByRole('button', { name: /^Pièces jointes \(2\)/ }).click();
+  await expect(ch.locator('.ch-fcard')).toHaveCount(2);
+  await expect(ch.locator('.ch-fcard').first()).toContainText('David');
+  const dl = page.waitForEvent('download');
+  await ch.locator('.ch-fcard', { hasText: 'pack-v2.pdf' }).click();
+  expect((await dl).suggestedFilename()).toBe('pack-v2.pdf');
 });
