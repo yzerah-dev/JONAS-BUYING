@@ -104,6 +104,23 @@ export default function ProductChat({ p }: { p: Product }) {
     }
   };
 
+  // Côté fournisseur, comme WeChat : les messages de JONAS pas encore traduits dans sa langue de lecture
+  // (traduction pas encore arrivée, ou portail passé dans une autre langue) sont traduits automatiquement
+  const autoTried = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (side !== 'fournisseur' || readLang === 'fr') return;
+    const todo = chat.filter((m) => m.side === 'jonas' && m.text.trim() && !m.tr?.[readLang] && !autoTried.current.has(`${m.id}:${readLang}`)).slice(-20);
+    if (!todo.length) return;
+    todo.forEach((m) => autoTried.current.add(`${m.id}:${readLang}`));
+    void translateTexts(
+      todo.map((m) => m.text),
+      readLang,
+    ).then((r) => {
+      if (Array.isArray(r)) dispatch({ type: 'translateChat', productId: p.id, items: todo.map((m, i) => ({ id: m.id, lang: readLang, text: r[i] })).filter((x) => x.text?.trim()) });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [side, readLang, chat.length]);
+
   // Ouvert = lu ; défilement vers le dernier message
   useEffect(() => {
     list.current?.scrollTo({ top: list.current.scrollHeight });
