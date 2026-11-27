@@ -1071,7 +1071,7 @@ function PackPanel({ p }: { p: Product }) {
   return (
     <div className="card pad">
       <div className="row" style={{ alignItems: 'flex-start' }}>
-        <div className="thumb" style={{ width: 140, height: 110, background: p.tint, fontSize: 70 }}>
+        <div className="thumb pk-panel-pic" style={{ width: 190, height: 150, background: p.tint, fontSize: 80 }}>
           <ProductPic product={p} />
         </div>
         <div className="col grow" style={{ alignItems: 'flex-end' }}>

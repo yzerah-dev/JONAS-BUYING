@@ -2463,3 +2463,13 @@ tr.pf-moving td, .pf-line.pf-moving { background: #fff6e8 !important; outline: 2
 .pcard.pfl-cancelled .photo { position: relative; filter: grayscale(1); }
 .pfl-stamp { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-18deg); font-size: 26px; font-weight: 900; letter-spacing: 0.08em; color: #d92d20; border: 3px solid #d92d20; border-radius: 8px; padding: 2px 12px; background: rgba(255, 255, 255, 0.85); }
 .pfl-portal { display: grid; gap: 6px; padding: 10px 12px; border: 1px dashed #f2a8a8; border-radius: 10px; background: #fff7f7; }
+
+/* Développement : photos entières (jamais rognées), cadre adapté aux photos en largeur */
+.pk-card-pic .product-pic { object-fit: contain; background: #fff; padding: 8px; box-sizing: border-box; }
+.pk-card-pic:has(.product-pic) { background: #fff !important; border-bottom: 1px solid var(--line); }
+.pk-thumb .thumb { width: 96px !important; height: 72px !important; }
+.pk-thumb .thumb:has(.product-pic) { background: #fff !important; border: 1px solid var(--line); }
+.pk-thumb .product-pic { padding: 3px; box-sizing: border-box; }
+@media (max-width: 820px) { .pk-thumb .thumb { width: 64px !important; height: 52px !important; } }
+.pk-panel-pic:has(.product-pic) { background: #fff !important; border: 1px solid var(--line); }
+.pk-panel-pic .product-pic { padding: 6px; box-sizing: border-box; }
