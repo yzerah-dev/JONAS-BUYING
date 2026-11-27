@@ -20,12 +20,16 @@ const TOTAL = /\b(total|amount|montant|sum)\b/;
 function colOf(h: string): Col | null {
   if (!h) return null;
   if (/(ean|gencod|code ?barre|bar ?code|upc)/.test(h)) return 'ean';
-  if (/(pcb|colisage|pcs ?\/ ?ctn|pcs per|par carton|per carton|carton qty|outer)/.test(h)) return 'pcb';
+  if (/(pcb|colisage|pcs ?\/ ?ctn|pcs ?\/ ?carton|qty ?\/ ?ctn|pcs per|par carton|per carton|carton qty|outer|case ?pack|pack ?qty|master ?pack)/.test(h)) return 'pcb';
   if (/\binner\b/.test(h)) return null;
   if (/(cbm|m3|m³|volume)/.test(h)) return TOTAL.test(h) ? null : 'cbm';
-  if (/^(ctn|ctns|cartons?|colis)\b/.test(h)) return 'ctn';
-  if (/(prix|pu\b|p\.u|unit ?price|price|pa\b|cout|cost)/.test(h)) return TOTAL.test(h) ? null : 'price';
-  if (/^(qte|quantite|qty|quantity|pcs|pieces|nb|nombre|quant)/.test(h)) return TOTAL.test(h) && !/pcs/.test(h) ? null : 'qty';
+  // Dimensions du carton (« Ctn size », « Carton meas. ») : pas un nombre de cartons
+  if (/(size|dim|meas|taille|l ?x ?w|lxwxh)/.test(h)) return null;
+  if (/^(total ?)?(ctn|ctns|cartons?|colis)\b/.test(h)) return 'ctn';
+  // Prix unitaire : « Price », « Prix », « FOB Ningbo », « EXW », « Unit cost »… (pas les montants totaux)
+  if (/(prix|pu\b|p\.u|unit ?price|price|pa\b|cout|cost|\bfob\b|\bexw\b|\bfca\b|\bcif\b|\bcnf\b)/.test(h)) return TOTAL.test(h) ? null : 'price';
+  // Quantité en pièces : « Qty », « Quantity PCS », et aussi « Total Quantity » / « Total pcs » (moins prioritaire)
+  if (/^(total ?)?(qte|quantite|qty|quantity|pcs|pieces|nb|nombre|quant)/.test(h)) return 'qty';
   if (/(packing|packaging|emballage|conditionnement)/.test(h)) return null;
   if (REF.test(h) || /^code\b/.test(h)) return BUYER.test(h) ? 'jonasRef' : 'ref';
   if (/(designation|libelle|description|desc|produit|product|nom|name)/.test(h)) return 'name';
@@ -61,8 +65,13 @@ function headerMap(labels: string[]): Partial<Record<Col, number>> | null {
     const c = colOf(h);
     if (!c) return;
     if (c === 'ref') return refs.push(i);
-    // Quantité : la colonne en pièces l'emporte (« Quantity PCS » plutôt qu'un sous-total)
-    if (c === 'qty' && map.qty !== undefined && !/pcs|pieces/.test(h)) return;
+    // Quantité : la colonne en pièces l'emporte (« Quantity PCS »), puis une quantité simple, puis « Total quantity »
+    if (c === 'qty' && map.qty !== undefined) {
+      const rank = (l: string) => (/pcs|pieces/.test(l) ? 0 : TOTAL.test(l) ? 2 : 1);
+      if (rank(h) >= rank(labels[map.qty])) return;
+      map.qty = i;
+      return;
+    }
     if (c !== 'qty' && map[c] !== undefined) return;
     map[c] = i;
   });
@@ -77,12 +86,17 @@ function headerMap(labels: string[]): Partial<Record<Col, number>> | null {
 
 const toNumber = (v: unknown) => {
   if (typeof v === 'number') return v;
-  const s = String(v ?? '').replace(/[\s  ]/g, '').replace(/[^\d.,-]/g, '');
+  const s = String(v ?? '')
+    .replace(/[\s  ]/g, '')
+    .replace(/[^\d.,-]/g, '');
   if (!s) return NaN;
   const last = Math.max(s.lastIndexOf(','), s.lastIndexOf('.'));
   return last < 0 ? Number(s) : Number(s.slice(0, last).replace(/[.,]/g, '') + '.' + s.slice(last + 1));
 };
-const text = (v: unknown) => String(v ?? '').replace(/\s+/g, ' ').trim();
+const text = (v: unknown) =>
+  String(v ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
 const refText = (v: unknown) => (typeof v === 'number' ? String(v) : text(v)).toUpperCase();
 
 /** Lignes d'un tableau (une feuille d'un Excel, ou CSV) */
@@ -139,13 +153,15 @@ export async function sheetTables(file: Blob | Uint8Array, raw = false): Promise
   const XLSX = await import('xlsx');
   const data = file instanceof Uint8Array ? file : new Uint8Array(await file.arrayBuffer());
   const wb = XLSX.read(data, { type: 'array', cellDates: true });
-  return wb.SheetNames.filter((name) => wb.Sheets[name]).map((name) => {
-    const ws = wb.Sheets[name];
-    const first = ws['!ref'] ? XLSX.utils.decode_range(ws['!ref']).s.r : 0;
-    const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, raw, defval: '', blankrows: true });
-    rows.forEach((r, i) => ROW.set(r, first + i));
-    return { name, rows: rows.filter((r) => r.some((c) => String(c ?? '').trim() !== '')) };
-  }).filter((s) => s.rows.length);
+  return wb.SheetNames.filter((name) => wb.Sheets[name])
+    .map((name) => {
+      const ws = wb.Sheets[name];
+      const first = ws['!ref'] ? XLSX.utils.decode_range(ws['!ref']).s.r : 0;
+      const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, raw, defval: '', blankrows: true });
+      rows.forEach((r, i) => ROW.set(r, first + i));
+      return { name, rows: rows.filter((r) => r.some((c) => String(c ?? '').trim() !== '')) };
+    })
+    .filter((s) => s.rows.length);
 }
 
 /** Numéro de ligne dans la feuille (0 = première), pour placer les photos incrustées */
@@ -163,8 +179,10 @@ export async function readSheet(file: Blob): Promise<ExtractedLine[]> {
       const { sheetImages } = await import('./sheetImages');
       const images = await sheetImages(data).catch(() => []);
       lines.forEach((l, k) => {
-        const next = lines[k + 1]?.row ?? Infinity;
-        const img = l.row !== undefined ? images.find((im) => im.row >= l.row! && im.row < next) : undefined;
+        // Image posée sur la ligne (ou juste en dessous, avant la ligne suivante) ; la plus proche d'abord.
+        // Après la dernière ligne : 2 lignes au plus (plus bas, c'est le cachet ou le logo de la société)
+        const next = lines[k + 1]?.row ?? l.row! + 3;
+        const img = l.row !== undefined ? images.filter((im) => im.row >= l.row! && im.row < next).sort((a, b) => a.row - b.row)[0] : undefined;
         l.photo = img?.blob ?? (images.length === lines.length && images.every((im) => im.row < 0) ? images[k].blob : undefined);
       });
     }
@@ -183,15 +201,9 @@ export async function sheetText(file: Blob, max = 30000): Promise<string> {
   return out.join('\n').slice(0, max);
 }
 
-export const SHEET_TYPES = [
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'application/vnd.ms-excel',
-  'text/csv',
-];
+export const SHEET_TYPES = ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel', 'text/csv'];
 export const SHEET_ACCEPT = '.xlsx,.xls,.csv';
 /** Fichier Excel ou CSV (d'après le type, ou l'extension quand le navigateur ne donne pas de type) */
 export const isSheet = (f: { type?: string; name?: string }) => SHEET_TYPES.includes(f.type ?? '') || /\.(xlsx|xls|csv)$/i.test(f.name ?? '');
 /** Type d'un fichier Excel/CSV, même quand le navigateur n'en donne pas */
-export const sheetMime = (f: { type?: string; name?: string }) =>
-  f.type || (/\.csv$/i.test(f.name ?? '') ? 'text/csv' : /\.xls$/i.test(f.name ?? '') ? 'application/vnd.ms-excel' : SHEET_TYPES[0]);
-
+export const sheetMime = (f: { type?: string; name?: string }) => f.type || (/\.csv$/i.test(f.name ?? '') ? 'text/csv' : /\.xls$/i.test(f.name ?? '') ? 'application/vnd.ms-excel' : SHEET_TYPES[0]);

@@ -254,3 +254,45 @@ test('proforma Excel .xls (en-tête sur deux lignes) : produits créés avec la 
   await page.getByPlaceholder(/Réf\., désignation/).fill('CP-T001');
   await expect(page.locator('.pcard', { hasText: 'CP-T001' })).toContainText('€');
 });
+
+/** Proforma Excel « à la chinoise » sans colonne référence : Desc, Case pack, Ctn size, Total Quantity, Fob ningbo */
+function fobXlsx() {
+  const ws = XLSX.utils.aoa_to_sheet([
+    ['NINGBO ATB IMPORT & EXPORT CO.,LTD E-mail: sales@example.com'],
+    [],
+    ['BUYER:', 'Jonas-france', '', '', '', '', '', '', '', 'Customer order NO:'],
+    ['ADD:', '34 rue camile pelletan', '', '', '', '', '', '', '', 'Contract NO:261120'],
+    ['Tel', '33 1 48343390', '', '', '', '', '', '', '', '2026.11.23'],
+    ['Pic', 'Desc', 'Package', 'Case pack', 'Ctn size', 'CBM', 'Total CTN', 'Total Quantity', '40HQ', 'Total CMB', 'Fob ningbo', 'Total Amount'],
+    ['', 'GIFI stock , dia:22cm, thickness:1.0mm, textilene fabric, weight 6.6kg, 3 color', 'tag', 2, '86×24×66 cm', 0.136, 4998, 9996, 984, 680, 10.45, '$104,458.20'],
+    ['5.period of validity：'],
+    ['Payment term: 30% deposit, balance payable before shipment'],
+  ]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '定单');
+  return Buffer.from(XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
+}
+
+test('proforma Excel sans colonne référence (« Total Quantity », « Fob ningbo », « Case pack ») : la ligne est lue', async ({ page }) => {
+  await resetApp(page);
+  await loginAs(page, 'David');
+  await go(page, 'proformas');
+  await page.getByRole('button', { name: 'Nouvelle commande' }).click();
+  const dlg = page.getByRole('dialog');
+  await page.locator('#np-sup').fill('sourcing');
+  await page
+    .getByRole('option', { name: /NINGBO HOME SOURCING/ })
+    .first()
+    .click();
+  await page.locator('#np-title').fill('GIFI Folding Recliner Chair');
+  await dlg
+    .getByLabel(/Proforma du fournisseur/)
+    .setInputFiles({ name: '261120 GIFI Folding Recliner Chair.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: fobXlsx() });
+  await expect(toast(page)).toContainText('1 ligne(s) lue(s)');
+  await expect(dlg.locator('.np-line-wrap').nth(0)).toContainText('Nouveau produit');
+  await expect(dlg.getByLabel('Quantité 1')).toHaveValue('9996');
+  await expect(dlg.getByLabel('Prix unitaire 1')).toHaveValue('10.45');
+  await expect(dlg.getByLabel('Pcs/carton 1')).toHaveValue('2');
+  await expect(dlg.getByLabel('m³/carton 1')).toHaveValue('0.136');
+  await expect(dlg.getByLabel('Désignation 1')).toHaveValue(/GIFI stock/);
+});
