@@ -136,6 +136,7 @@ export type Action =
   | { type: 'setPackCheck'; productId: string; check: PackCheck }
   | { type: 'sendProductMessage'; productId: string; message: ChatMessage }
   | { type: 'readProductChat'; productId: string; at: string }
+  | { type: 'translateChat'; productId: string; items: { id: string; lang: 'fr' | 'en' | 'zh'; text: string }[] }
   | { type: 'signProforma'; id: string; etdWanted: ISODate }
   | {
       type: 'createProforma';
@@ -578,6 +579,7 @@ export function isAllowed(s: State, a: Action): boolean {
       return can(u, 'logistics.plan') && !!c && OPEN_STATUSES.includes(c.status) && !c.planValidated;
     }
     case 'sendProductMessage':
+    case 'translateChat':
     case 'readProductChat': {
       // Discussion produit : l'équipe JONAS et le fournisseur du produit (pas les transitaires)
       const p = s.products.find((x) => x.id === a.productId);
@@ -1174,6 +1176,14 @@ function applyAction(s: State, a: Action): State {
         chatRead: { ...(p.chatRead ?? {}), [side]: a.message.at },
       }));
     }
+    case 'translateChat':
+      return mapP(s, a.productId, (p) => ({
+        ...p,
+        chat: (p.chat ?? []).map((m) => {
+          const its = a.items.filter((i) => i.id === m.id && i.text.trim());
+          return its.length ? { ...m, tr: { ...(m.tr ?? {}), ...Object.fromEntries(its.map((i) => [i.lang, i.text.trim().slice(0, 6000)])) } } : m;
+        }),
+      }));
     case 'readProductChat': {
       const side = isSupplier(currentUser(s)) ? 'fournisseur' : 'jonas';
       return mapP(s, a.productId, (p) => ((p.chatRead?.[side] ?? '') >= a.at ? p : { ...p, chatRead: { ...(p.chatRead ?? {}), [side]: a.at } }));
@@ -2207,6 +2217,7 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
     case 'sendProductMessage':
       return { target: ref(a.productId), text: `Message : ${a.message.text.slice(0, 80)}${a.message.file ? ` (📎 ${a.message.file.name})` : ''}` };
     case 'readProductChat':
+    case 'translateChat':
       return null;
     case 'setPackCheck':
       return {

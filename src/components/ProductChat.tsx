@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { CheckCheck, Check, FileText, Loader2, MessageCircle, Paperclip, Send } from 'lucide-react';
+import { CheckCheck, Check, FileText, Languages, Loader2, MessageCircle, Paperclip, Send } from 'lucide-react';
 import { byId, currentUser, useAuth, useStore } from '../data/store';
 import type { ChatMessage, Product } from '../data/types';
 import { getBlob, newFileId, putBlob, saveBlob, supplierScope } from '../lib/files';
 import { useBlobUrl } from '../lib/blobUrl';
 import { chatSideOf } from '../lib/chat';
+import { supplierLang } from '../lib/mail/outbox';
+import { translateTexts, type ChatLang } from '../lib/translate';
 import { useT } from '../i18n/context';
 import { toast } from './ui-shared';
 
@@ -40,7 +42,7 @@ function Attachment({ m }: { m: ChatMessage }) {
 export default function ProductChat({ p }: { p: Product }) {
   const { state, dispatch } = useStore();
   const auth = useAuth();
-  const { t } = useT();
+  const { t, lang: uiLang } = useT();
   const me = currentUser(state);
   const side = chatSideOf(me.role);
   const other = side === 'jonas' ? (byId(state.suppliers, p.supplierId)?.shortName ?? '') : t('chat.jonas');
@@ -51,6 +53,22 @@ export default function ProductChat({ p }: { p: Product }) {
   const chat = p.chat ?? [];
   const canWrite = auth.allowed({ type: 'sendProductMessage', productId: p.id, message: { id: 'x', at: '', by: '', side, text: 'x' } });
   const last = chat[chat.length - 1];
+  const sup = byId(state.suppliers, p.supplierId);
+  // Langue de lecture : JONAS lit en français ; le fournisseur dans la langue de son portail
+  const readLang: ChatLang = side === 'jonas' ? 'fr' : uiLang === 'zh' ? 'zh' : uiLang === 'fr' ? 'fr' : 'en';
+  const [showOrig, setShowOrig] = useState<Set<string>>(new Set());
+  const [busyTr, setBusyTr] = useState<string | null>(null);
+  const translate = async (m: ChatMessage) => {
+    setBusyTr(m.id);
+    try {
+      const r = await translateTexts([m.text], readLang);
+      if (r === 'not_configured') return toast('Traduction pas encore activée : la clé Claude (ANTHROPIC_API_KEY) doit être ajoutée dans Vercel.');
+      if (typeof r === 'string') return toast('Traduction impossible pour le moment.');
+      dispatch({ type: 'translateChat', productId: p.id, items: [{ id: m.id, lang: readLang, text: r[0] }] });
+    } finally {
+      setBusyTr(null);
+    }
+  };
 
   // Ouvert = lu ; défilement vers le dernier message
   useEffect(() => {
@@ -72,8 +90,17 @@ export default function ProductChat({ p }: { p: Product }) {
         f = { fileId, name: attach.name, size: attach.size, type: attach.type || 'application/octet-stream' };
       }
       const at = new Date().toISOString();
-      dispatch({ type: 'sendProductMessage', productId: p.id, message: { id: `${at}-${Math.random().toString(36).slice(2, 7)}`, at, by: me.name, side, text: attach ? text : text, file: f } });
+      const id = `${at}-${Math.random().toString(36).slice(2, 7)}`;
+      const msg = text.trim();
+      dispatch({ type: 'sendProductMessage', productId: p.id, message: { id, at, by: me.name, side, text: msg, file: f } });
       setText('');
+      // JONAS écrit en français ou en anglais : le message arrive traduit dans la langue du fournisseur
+      const to = side === 'jonas' && sup ? supplierLang(sup) : null;
+      if (msg && to && to !== 'fr') {
+        void translateTexts([msg], to).then((r) => {
+          if (Array.isArray(r) && r[0] && r[0].trim() !== msg) dispatch({ type: 'translateChat', productId: p.id, items: [{ id, lang: to, text: r[0] }] });
+        });
+      }
     } catch {
       toast('Envoi impossible : réessayez.');
     } finally {
@@ -104,7 +131,31 @@ export default function ProductChat({ p }: { p: Product }) {
                 <div className={`ch-bubble ${mine ? 'mine' : ''}`}>
                   {!mine && <div className="ch-by">{m.by}</div>}
                   {m.file && <Attachment m={m} />}
-                  {m.text && <div className="ch-text">{m.text}</div>}
+                  {m.text &&
+                    (() => {
+                      const tr = m.tr?.[readLang];
+                      const orig = showOrig.has(m.id);
+                      return (
+                        <>
+                          <div className="ch-text">{tr && !orig ? tr : m.text}</div>
+                          {mine && m.side === 'jonas' && sup && m.tr?.[supplierLang(sup)] && (
+                            <div className="ch-tr-sent">
+                              <Languages size={12} /> {m.tr[supplierLang(sup)]}
+                            </div>
+                          )}
+                          {!mine &&
+                            (tr ? (
+                              <button type="button" className="ch-tr-btn" onClick={() => setShowOrig((x) => (x.has(m.id) ? new Set([...x].filter((y) => y !== m.id)) : new Set([...x, m.id])))}>
+                                <Languages size={12} /> {orig ? t('chat.showTr') : t('chat.showOrig')}
+                              </button>
+                            ) : (
+                              <button type="button" className="ch-tr-btn" disabled={busyTr === m.id} onClick={() => translate(m)}>
+                                {busyTr === m.id ? <Loader2 size={12} className="spin" /> : <Languages size={12} />} {t('chat.translate')}
+                              </button>
+                            ))}
+                        </>
+                      );
+                    })()}
                   <div className="ch-meta">
                     {hhmm(m.at)}
                     {mine && (readByOther(m) ? <CheckCheck size={14} className="ch-read" aria-label={t('chat.read')} /> : <Check size={14} aria-label={t('chat.sent')} />)}
@@ -154,6 +205,11 @@ export default function ProductChat({ p }: { p: Product }) {
             {busy ? <Loader2 size={18} className="spin" /> : <Send size={18} />}
           </button>
         </form>
+      )}
+      {canWrite && side === 'jonas' && sup && supplierLang(sup) !== 'fr' && (
+        <div className="ch-hint">
+          <Languages size={11} /> Écrivez en français ou en anglais : {sup.shortName} reçoit le message traduit en {supplierLang(sup) === 'zh' ? 'chinois' : 'anglais'}.
+        </div>
       )}
     </div>
   );

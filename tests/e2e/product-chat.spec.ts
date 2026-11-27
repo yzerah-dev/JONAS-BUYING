@@ -34,3 +34,38 @@ test('JONAS écrit sur un produit, le fournisseur le voit dans son portail, rép
   await expect(page.locator('.ch')).toContainText('Yes, gold glitter.');
   await expect(page.locator('.ch-bubble.mine .ch-read')).toHaveCount(1);
 });
+
+test('traduction : un message de JONAS déjà traduit s’affiche en chinois chez le fournisseur ; « Traduire » côté JONAS', async ({ page }) => {
+  await resetApp(page);
+  // Message JONAS avec sa traduction chinoise, réponse du fournisseur traduite en français
+  await page.evaluate(() => {
+    const k = Object.keys(localStorage).find((x) => x.startsWith('jonas-buying-state'))!;
+    const s = JSON.parse(localStorage.getItem(k)!);
+    const p = s.products.find((x: { id: string }) => x.id === 'CP-T001');
+    p.chat = [
+      { id: 'm1', at: '2026-11-27T09:00:00.000Z', by: 'David', side: 'jonas', text: 'Merci de confirmer le coloris doré.', tr: { zh: '请确认金色。' } },
+      { id: 'm2', at: '2026-11-27T09:05:00.000Z', by: 'Mr. Chen', side: 'fournisseur', text: '确认，金色亮片。', tr: { fr: 'Confirmé, paillettes dorées.' } },
+    ];
+    localStorage.setItem(k, JSON.stringify(s));
+  });
+  await page.reload();
+  await loginAs(page, 'David');
+  await go(page, 'produits/CP-T001');
+  await page.getByRole('button', { name: /^Discussion fournisseur/ }).click();
+  const ch = page.locator('.ch');
+  // JONAS : sa propre bulle montre aussi ce que le fournisseur a reçu ; la réponse est traduite en français
+  await expect(ch.locator('.ch-bubble.mine .ch-tr-sent')).toContainText('请确认金色。');
+  await expect(ch.locator('.ch-bubble:not(.mine) .ch-text')).toHaveText('Confirmé, paillettes dorées.');
+  await ch.getByRole('button', { name: 'Voir l’original' }).click();
+  await expect(ch.locator('.ch-bubble:not(.mine) .ch-text')).toHaveText('确认，金色亮片。');
+
+  // Fournisseur, portail en chinois : le message de JONAS s'affiche en chinois
+  await loginAs(page, 'Mr. Chen');
+  await page.evaluate(() => {
+    const k = Object.keys(localStorage).find((x) => x.includes('lang'));
+    if (k) localStorage.setItem(k, 'zh');
+  });
+  await go(page, 'portail/produits/CP-T001');
+  await page.reload();
+  await expect(page.locator('.ch-bubble:not(.mine) .ch-text')).toHaveText('请确认金色。');
+});

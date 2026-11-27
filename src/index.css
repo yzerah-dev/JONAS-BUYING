@@ -2562,3 +2562,7 @@ tr.pf-moving td, .pf-line.pf-moving { background: #fff6e8 !important; outline: 2
 .ch-send { width: 42px; height: 42px; border-radius: 50%; border: 0; background: var(--green); color: #fff; display: grid; place-items: center; cursor: pointer; flex-shrink: 0; }
 .ch-send:disabled { opacity: 0.45; cursor: default; }
 .ch-badge { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: #25d366; color: #fff; font-size: 11px; font-weight: 800; margin-left: 4px; }
+.ch-tr-btn { justify-self: start; display: inline-flex; align-items: center; gap: 4px; border: 0; background: none; padding: 0; color: #0b7a5c; font-size: 12px; font-weight: 700; cursor: pointer; }
+.ch-tr-sent { display: flex; gap: 5px; align-items: flex-start; font-size: 12.5px; color: #4b6358; border-top: 1px dashed rgba(0, 0, 0, 0.12); padding-top: 4px; }
+.ch-tr-sent svg { flex-shrink: 0; margin-top: 2px; }
+.ch-hint { font-size: 11.5px; color: var(--muted); padding: 0 12px 6px; background: #f7faf9; }

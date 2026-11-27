@@ -412,6 +412,8 @@ export interface ChatMessage {
   text: string;
   /** Pièce jointe (photo, PDF…) dans le stockage de fichiers */
   file?: { fileId: string; name: string; size: number; type: string };
+  /** Traductions par Claude (fr, en, zh) : un message de JONAS arrive dans la langue du fournisseur */
+  tr?: Partial<Record<'fr' | 'en' | 'zh', string>>;
 }
 
 export interface ImportLine {
