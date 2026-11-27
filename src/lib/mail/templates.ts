@@ -266,19 +266,18 @@ export function mailHtml(d: MailData, lang: MailLang) {
 <body style="margin:0;padding:0;background:#eef3f1;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,'PingFang SC','Microsoft YaHei',sans-serif;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef3f1;"><tr><td align="center" style="padding:28px 12px;">
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 4px 18px rgba(16,40,32,.08);">
-  <tr><td style="background:linear-gradient(135deg,${GREEN},${GREEN_DARK});background-color:${GREEN};padding:22px 32px;">
-    <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-      <td style="width:44px;height:44px;background:#ffffff;border-radius:12px;text-align:center;vertical-align:middle;font-size:26px;font-weight:900;color:${GREEN};font-family:Arial,sans-serif;">J</td>
-      <td style="padding-left:14px;color:#ffffff;">
-        <div style="font-size:19px;font-weight:900;letter-spacing:.6px;font-family:Arial,sans-serif;">JONAS INTERNATIONAL</div>
-        <div style="font-size:12px;opacity:.85;letter-spacing:.4px;">JONAS BUYING · ${esc(d.supplierName)}</div>
-      </td>
-    </tr></table>
+  <tr><td align="center" style="padding:34px 32px 26px 32px;background:#ffffff;">
+    <div style="font-family:'Arial Black',Arial,Helvetica,sans-serif;font-size:46px;line-height:1;font-weight:900;letter-spacing:9px;color:${INK};padding-left:9px;">JONAS</div>
+    <div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1;font-weight:700;letter-spacing:8.5px;color:${GREEN};margin-top:10px;padding-left:8.5px;">INTERNATIONAL</div>
+    <div style="width:64px;height:4px;border-radius:4px;background:${GREEN};margin:18px auto 0 auto;font-size:0;line-height:0;">&nbsp;</div>
+  </td></tr>
+  <tr><td style="background:linear-gradient(135deg,${GREEN},${GREEN_DARK});background-color:${GREEN};padding:11px 32px;text-align:center;color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:12.5px;letter-spacing:.6px;">
+    JONAS BUYING &nbsp;·&nbsp; <b>${esc(d.supplierName)}</b>
   </td></tr>
   ${langs.map((l, i) => section(d, l, i === 0)).join('')}
   <tr><td style="padding:26px 32px 26px 32px;">
     <div style="border-top:1px solid ${LINE};padding-top:14px;font-size:11.5px;color:${MUTED};line-height:1.6;">
-      <b style="color:${INK};">${esc(d.company.name || 'JONAS INTERNATIONAL')}</b>${addr ? ` · ${addr}` : ''}<br>${langs.map((l) => esc(T[l].auto)).join(' · ')}
+      <span style="font-family:'Arial Black',Arial,sans-serif;font-weight:900;letter-spacing:3px;color:${INK};">JONAS</span> <span style="font-weight:700;letter-spacing:3px;color:${GREEN};">INTERNATIONAL</span>${addr ? ` · ${addr}` : ''}<br>${langs.map((l) => esc(T[l].auto)).join(' · ')}
     </div>
   </td></tr>
 </table>
