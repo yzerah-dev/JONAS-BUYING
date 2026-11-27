@@ -139,6 +139,7 @@ export type Action =
     }
   | { type: 'setSupplierTerms'; supplierId: string; terms: SupplierTerms }
   | { type: 'setSupplierLogo'; supplierId: string; logo: ProductPhoto | null }
+  | { type: 'logSupplierMail'; supplierId: string; proformaId?: string; subject: string; to: string[]; ok: boolean; demo?: boolean }
   | { type: 'addSupplier'; supplier: Supplier }
   | { type: 'updateSupplier'; supplier: Supplier }
   | { type: 'cancelOrder'; id: string }
@@ -453,6 +454,8 @@ export function isAllowed(s: State, a: Action): boolean {
       );
     case 'addSupplier':
       return canAddSupplier(u) && !!a.supplier.id && !!a.supplier.name.trim() && !s.suppliers.some((x) => x.id === a.supplier.id);
+    case 'logSupplierMail':
+      return !!u && s.suppliers.some((x) => x.id === a.supplierId);
     case 'setSupplierLogo':
       // Le fournisseur pour sa propre fiche (portail), ou l'équipe achats
       return s.suppliers.some((x) => x.id === a.supplierId) && ((isSupplier(u) && u.supplierId === a.supplierId) || canAddSupplier(u));
@@ -1166,6 +1169,12 @@ function applyAction(s: State, a: Action): State {
     case 'deleteProforma': {
       const next = withoutAllocations(s, a.id);
       return { ...next, proformas: next.proformas.filter((p) => p.id !== a.id) };
+    }
+    case 'logSupplierMail': {
+      // Trace de l'e-mail : historique de la proforma (le journal reçoit la même ligne)
+      if (!a.proformaId) return { ...s };
+      const what = a.demo ? `E-mail préparé (démo, non envoyé) : « ${a.subject} »` : a.ok ? `E-mail envoyé à ${a.to.join(', ')} : « ${a.subject} »` : `E-mail NON envoyé : « ${a.subject} »`;
+      return mapPF(s, a.proformaId, (pf) => ({ ...pf, history: [...pf.history, hist('JONAS BUYING', what)] }));
     }
     case 'setSupplierLogo':
       return {
@@ -1993,6 +2002,11 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
       return { target: a.supplier.id, text: `Fournisseur modifié : ${a.supplier.name}` };
     case 'addSupplier':
       return { target: a.supplier.id, text: `Nouveau fournisseur : ${a.supplier.name} (${a.supplier.city}, ${a.supplier.country})` };
+    case 'logSupplierMail':
+      return {
+        target: a.proformaId ?? a.supplierId,
+        text: a.demo ? `E-mail fournisseur préparé (démo) : ${a.subject}` : a.ok ? `E-mail envoyé à ${a.to.join(', ')} : ${a.subject}` : `Échec de l'envoi : ${a.subject}`,
+      };
     case 'setSupplierLogo':
       return { target: a.supplierId, text: `${s.suppliers.find((x) => x.id === a.supplierId)?.shortName} : logo ${a.logo ? 'mis à jour' : 'retiré'}` };
     case 'setSupplierTerms':

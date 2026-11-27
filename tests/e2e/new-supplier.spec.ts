@@ -12,11 +12,11 @@ test('nouveau fournisseur depuis la page Fournisseurs', async ({ page }) => {
   await expect(dlg).toContainText('Ce fournisseur existe déjà.');
   await expect(dlg.getByRole('button', { name: 'Créer le fournisseur' })).toBeDisabled();
   await dlg.getByLabel('Raison sociale *').fill('Hanoi Bamboo Craft');
-  await dlg.getByLabel('Pays').selectOption('Vietnam');
+  await dlg.locator('#ns-country').selectOption('Vietnam');
   await dlg.getByLabel('Ville').fill('Hanoï');
   await dlg.getByLabel('Port de départ').fill('Haiphong');
-  await dlg.getByLabel('Nom', { exact: true }).fill('Linh');
-  await dlg.getByLabel('E-mail').fill('linh@bamboo.example');
+  await dlg.getByLabel('Nom du contact 1').fill('Linh');
+  await dlg.getByLabel('E-mail du contact 1').fill('linh@bamboo.example');
   await dlg.getByLabel('Devise').selectOption('USD');
   await dlg.getByLabel('Acompte (%)').fill('40');
   await dlg.getByRole('button', { name: 'Créer le fournisseur' }).click();
@@ -39,7 +39,7 @@ test('nouveau fournisseur créé depuis « Nouvelle commande » : il est sélect
   await page.getByRole('button', { name: 'Créer un nouveau fournisseur' }).click();
   const dlg = page.getByRole('dialog', { name: 'Nouveau fournisseur' });
   await dlg.getByLabel('Raison sociale *').fill('Dhaka Knit Ltd');
-  await dlg.getByLabel('Pays').selectOption('Bangladesh');
+  await dlg.locator('#ns-country').selectOption('Bangladesh');
   await dlg.getByRole('button', { name: 'Créer le fournisseur' }).click();
   await expect(dlg).toHaveCount(0);
   // La commande est toujours ouverte, avec le nouveau fournisseur choisi
@@ -64,7 +64,7 @@ test('modifier un fournisseur : nom, contact et conditions', async ({ page }) =>
   await dlg.getByLabel('Raison sociale *').fill('Shenzhen Nova Beauty');
   await expect(dlg).toContainText('Ce fournisseur existe déjà.');
   await dlg.getByLabel('Raison sociale *').fill('XIAMEN TIDE LIVING CO., LTD');
-  await dlg.getByLabel('Nom', { exact: true }).fill('Mr. Chen Wei');
+  await dlg.getByLabel('Nom du contact 1').fill('Mr. Chen Wei');
   await dlg.getByLabel('Acompte (%)').fill('20');
   await dlg.getByRole('button', { name: 'Enregistrer' }).click();
   await expect(toast(page)).toContainText('Fournisseur modifié : XIAMEN TIDE LIVING CO., LTD');

@@ -9,6 +9,8 @@ export interface Contact {
   phone: string;
   email: string;
   wechat?: string;
+  /** Reçoit les e-mails automatiques de JONAS BUYING (par défaut : oui s'il a une adresse) */
+  mail?: boolean;
 }
 
 export interface Supplier {
@@ -28,6 +30,10 @@ export interface Supplier {
   terms?: SupplierTerms;
   /** Logo déposé par le fournisseur (portail) ou par JONAS : affiché à la place du monogramme */
   logo?: ProductPhoto;
+  /** Tous les contacts (le premier = contact principal, repris dans « contact ») */
+  contacts?: Contact[];
+  /** Langue des e-mails (avec l'anglais) : chinois, français ou anglais seul */
+  lang?: 'zh' | 'fr' | 'en';
 }
 
 /** Photo d'un produit : fichier dans le stockage (navigateur + bucket « files ») */

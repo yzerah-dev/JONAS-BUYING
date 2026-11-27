@@ -63,25 +63,38 @@ function NewSupplierDialog({ onClose, onCreated, edit }: { onClose: () => void; 
   const [otherCountry, setOtherCountry] = useState(edit && !known0 ? edit.country : '');
   const [city, setCity] = useState(edit?.city ?? '');
   const [port, setPort] = useState(edit?.port ?? '');
-  const [contact, setContact] = useState({
-    name: edit?.contact.name ?? '',
-    role: edit?.contact.role ?? '',
-    email: edit?.contact.email ?? '',
-    phone: edit?.contact.phone ?? '',
-    wechat: edit?.contact.wechat ?? '',
+  // Contacts (le premier est le contact principal) : chacun peut recevoir les e-mails automatiques
+  type C = { name: string; role: string; email: string; phone: string; wechat: string; mail: boolean };
+  const blank = (): C => ({ name: '', role: '', email: '', phone: '', wechat: '', mail: true });
+  const [contacts, setContacts] = useState<C[]>(() => {
+    const src = edit?.contacts?.length ? edit.contacts : edit ? [edit.contact] : [];
+    const list = src.map((c) => ({ name: c.name ?? '', role: c.role ?? '', email: c.email ?? '', phone: c.phone ?? '', wechat: c.wechat ?? '', mail: c.mail !== false }));
+    return list.length ? list : [blank()];
   });
+  const [lang, setLang] = useState<'auto' | 'zh' | 'fr' | 'en'>(edit?.lang ?? 'auto');
   const [currency, setCurrency] = useState<Currency>(edit?.terms?.currency ?? 'USD');
   const [depositPct, setDepositPct] = useState(edit?.terms?.depositPct ?? DEFAULT_TERMS.depositPct);
   const [balanceDays, setBalanceDays] = useState(edit?.terms?.balanceDays ?? DEFAULT_TERMS.balanceDays);
   const dup = state.suppliers.find((s) => s.id !== edit?.id && name.trim() && s.name.trim().toLowerCase() === name.trim().toLowerCase());
-  const c = (k: keyof typeof contact) => (e: React.ChangeEvent<HTMLInputElement>) => setContact({ ...contact, [k]: e.target.value });
+  const setC = (i: number, patch: Partial<C>) => setContacts(contacts.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+  const badMail = contacts.some((x) => x.email.trim() && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x.email.trim()));
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     e.stopPropagation(); // le formulaire peut être ouvert depuis « Nouvelle commande »
-    if (!name.trim() || dup) return;
+    if (!name.trim() || dup || badMail) return;
     const id = edit?.id ?? newSupplierId(state, shortName || name);
     const known = COUNTRIES.find((x) => x.name === country);
+    const cleanContacts = contacts
+      .map((x) => ({
+        name: x.name.trim(),
+        role: x.role.trim(),
+        email: x.email.trim(),
+        phone: x.phone.trim(),
+        ...(x.wechat.trim() ? { wechat: x.wechat.trim() } : {}),
+        ...(x.mail ? {} : { mail: false }),
+      }))
+      .filter((x) => x.name || x.email || x.phone);
     const supplier: Supplier = {
       ...(edit ?? {}),
       id,
@@ -91,7 +104,9 @@ function NewSupplierDialog({ onClose, onCreated, edit }: { onClose: () => void; 
       flag: known?.flag ?? (edit && country === 'autre' ? edit.flag : '🏳️'),
       city: city.trim(),
       port: port.trim() || city.trim(),
-      contact: { name: contact.name.trim(), role: contact.role.trim(), email: contact.email.trim(), phone: contact.phone.trim(), ...(contact.wechat.trim() ? { wechat: contact.wechat.trim() } : {}) },
+      contact: cleanContacts[0] ?? { name: '', role: '', email: '', phone: '' },
+      contacts: cleanContacts,
+      lang: lang === 'auto' ? undefined : lang,
       color: edit?.color ?? COLORS[state.suppliers.length % COLORS.length],
       active: edit?.active ?? true,
       terms: { currency, depositPct, balanceDays },
@@ -150,27 +165,53 @@ function NewSupplierDialog({ onClose, onCreated, edit }: { onClose: () => void; 
             <input id="ns-port" className="input" value={port} placeholder="Ex. Ningbo" onChange={(e) => setPort(e.target.value)} />
           </label>
 
-          <h3 className="pb-sec bk-wide">Contact</h3>
-          <label htmlFor="ns-cname">
-            Nom
-            <input id="ns-cname" className="input" value={contact.name} placeholder="Ex. PEARL" onChange={c('name')} />
+          <h3 className="pb-sec bk-wide">Contacts · e-mails automatiques</h3>
+          <p className="small muted bk-wide" style={{ margin: 0 }}>
+            Les contacts cochés reçoivent les e-mails de JONAS BUYING (commande, proforma signée, die cut, acompte, pack validé) avec les pièces jointes.
+          </p>
+          {contacts.map((x, i) => (
+            <div key={i} className="ns-contact bk-wide" role="group" aria-label={`Contact ${i + 1}`}>
+              <div className="ns-contact-grid">
+                <input className="input" aria-label={`Nom du contact ${i + 1}`} placeholder="Nom (ex. PEARL)" value={x.name} onChange={(e) => setC(i, { name: e.target.value })} />
+                <input className="input" aria-label={`Fonction du contact ${i + 1}`} placeholder="Fonction" value={x.role} onChange={(e) => setC(i, { role: e.target.value })} />
+                <input
+                  className={`input ${x.email.trim() && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x.email.trim()) ? 'bad' : ''}`}
+                  type="email"
+                  aria-label={`E-mail du contact ${i + 1}`}
+                  placeholder="E-mail"
+                  value={x.email}
+                  onChange={(e) => setC(i, { email: e.target.value })}
+                />
+                <input className="input" aria-label={`Téléphone du contact ${i + 1}`} placeholder="Téléphone" value={x.phone} onChange={(e) => setC(i, { phone: e.target.value })} />
+                <input className="input" aria-label={`WeChat du contact ${i + 1}`} placeholder="WeChat" value={x.wechat} onChange={(e) => setC(i, { wechat: e.target.value })} />
+              </div>
+              <div className="ns-contact-foot">
+                <label className="row small" style={{ gap: 6 }}>
+                  <input type="checkbox" checked={x.mail} onChange={(e) => setC(i, { mail: e.target.checked })} /> Reçoit les e-mails
+                </label>
+                {i === 0 && <span className="pill green">Contact principal</span>}
+                <span className="grow" />
+                {contacts.length > 1 && (
+                  <button type="button" className="btn sm ghost" onClick={() => setContacts(contacts.filter((_, j) => j !== i))} aria-label={`Retirer le contact ${i + 1}`}>
+                    <X size={14} /> Retirer
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+          <button type="button" className="btn sm bk-wide" style={{ justifySelf: 'start' }} onClick={() => setContacts([...contacts, blank()])}>
+            <Plus size={14} /> Ajouter un contact
+          </button>
+          <label htmlFor="ns-lang">
+            Langue des e-mails (+ anglais)
+            <select id="ns-lang" className="input" value={lang} onChange={(e) => setLang(e.target.value as typeof lang)}>
+              <option value="auto">Automatique (d’après le pays)</option>
+              <option value="zh">中文 Chinois + anglais</option>
+              <option value="fr">Français + anglais</option>
+              <option value="en">Anglais seul</option>
+            </select>
           </label>
-          <label htmlFor="ns-crole">
-            Fonction
-            <input id="ns-crole" className="input" value={contact.role} placeholder="Ex. Sales manager" onChange={c('role')} />
-          </label>
-          <label htmlFor="ns-cmail">
-            E-mail
-            <input id="ns-cmail" className="input" type="email" value={contact.email} onChange={c('email')} />
-          </label>
-          <label htmlFor="ns-cphone">
-            Téléphone
-            <input id="ns-cphone" className="input" value={contact.phone} onChange={c('phone')} />
-          </label>
-          <label htmlFor="ns-cwechat">
-            WeChat
-            <input id="ns-cwechat" className="input" value={contact.wechat} onChange={c('wechat')} />
-          </label>
+          {badMail && <span className="small red bk-wide">Une adresse e-mail n’est pas valide.</span>}
 
           <h3 className="pb-sec bk-wide">Conditions (reprises par chaque nouvelle proforma)</h3>
           <label htmlFor="ns-cur">
@@ -194,7 +235,7 @@ function NewSupplierDialog({ onClose, onCreated, edit }: { onClose: () => void; 
           <button type="button" className="btn ghost" onClick={onClose}>
             Annuler
           </button>
-          <button type="submit" className="btn primary" disabled={!name.trim() || !!dup}>
+          <button type="submit" className="btn primary" disabled={!name.trim() || !!dup || badMail}>
             {edit ? <Pencil size={16} /> : <Plus size={16} />} {edit ? 'Enregistrer' : 'Créer le fournisseur'}
           </button>
         </div>

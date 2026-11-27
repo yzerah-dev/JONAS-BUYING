@@ -11,6 +11,7 @@ import UserSwitcher from './UserSwitcher';
 import { Forbidden } from './Guard';
 import Assistant from './Assistant';
 import AutoFrench from './AutoFrench';
+import MailOutbox from './MailOutbox';
 
 // Menu principal (maquette) puis modules complémentaires
 const NAV: { to: string; label: string; icon: typeof Layers; module: Module }[] = [
@@ -116,6 +117,7 @@ export default function Layout() {
       </main>
       <Assistant />
       <Toaster />
+      <MailOutbox />
       {searchOpen && <SearchPalette onClose={() => setSearchOpen(false)} />}
     </div>
   );

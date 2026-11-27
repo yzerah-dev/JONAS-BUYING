@@ -21,6 +21,7 @@ import {
 import { toast } from '../components/ui-shared';
 import { cur0, curSumLabel } from '../lib/curr';
 import { EditSupplierButton } from '../components/NewSupplier';
+import { mailRecipients } from '../lib/mail/outbox';
 import { SupplierLogoEdit } from '../components/SupplierLogoEdit';
 import { CONTAINER_STATUSES, type Currency, type SupplierTerms } from '../data/types';
 import { ContainerStatusPill, Kpi, Pill, ProductThumb, ProformaStatusPill, Ring, Seg, SupplierLogo, Tabs } from '../components/ui';
@@ -72,21 +73,36 @@ export default function SupplierDetail() {
           </div>
         </div>
         <div className="grow" />
-        <div className="col small">
-          <span className="row" style={{ gap: 6 }}>
-            <User size={14} /> <b>{sup.contact.name}</b> ({sup.contact.role})
-          </span>
-          <span className="row" style={{ gap: 6 }}>
-            <Phone size={14} /> {sup.contact.phone}
-          </span>
-          <span className="row" style={{ gap: 6 }}>
-            <Mail size={14} /> {sup.contact.email}
-          </span>
-          {sup.contact.wechat && (
-            <span className="row" style={{ gap: 6 }}>
-              <MessageCircle size={14} className="green" /> {sup.contact.wechat}
-            </span>
-          )}
+        <div className="sd-contacts">
+          {(sup.contacts?.length ? sup.contacts : [sup.contact]).map((c, i) => (
+            <div key={i} className="sd-contact small">
+              <span className="row" style={{ gap: 6 }}>
+                <User size={14} /> <b>{c.name || '—'}</b>
+                {c.role ? ` (${c.role})` : ''}
+                {c.email && c.mail !== false && (
+                  <span className="pill green" title="Reçoit les e-mails automatiques">
+                    <Mail size={11} /> e-mails
+                  </span>
+                )}
+              </span>
+              {c.email && (
+                <a className="row" style={{ gap: 6 }} href={`mailto:${c.email}`}>
+                  <Mail size={14} /> {c.email}
+                </a>
+              )}
+              {c.phone && (
+                <span className="row" style={{ gap: 6 }}>
+                  <Phone size={14} /> {c.phone}
+                </span>
+              )}
+              {c.wechat && (
+                <span className="row" style={{ gap: 6 }}>
+                  <MessageCircle size={14} className="green" /> {c.wechat}
+                </span>
+              )}
+            </div>
+          ))}
+          {!mailRecipients(sup).length && <span className="small red">Aucun contact avec e-mail : les e-mails automatiques ne partent pas.</span>}
         </div>
       </div>
 

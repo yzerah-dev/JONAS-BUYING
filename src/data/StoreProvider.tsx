@@ -1,5 +1,6 @@
-import { useEffect, useReducer, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState, type ReactNode } from 'react';
 import { STORAGE_KEY, StoreContext, load, reducer, type Action, type State } from './store';
+import { processMailEvents } from '../lib/mail/outbox';
 import { applyRemoteChange, diffState, fromDocs, remoteEnabled, type Collection } from './remote';
 import { currentMember, loadDocs, pushDocs, subscribeDocs, supabase } from './supabaseSync';
 import { authMessage, cleanAuthUrl, LINK_FAILED, readAuthReturn } from '../lib/authReturn';
@@ -33,13 +34,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 }
 
 function LocalStoreProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, undefined, load);
+  const [state, rawDispatch] = useReducer(reducer, undefined, load);
+  // E-mails fournisseurs (démo : préparés, non envoyés) ; pas pour un changement d'utilisateur ou une remise à zéro
+  const prev = useRef(state);
+  const skip = useRef(false);
+  const dispatch = useCallback((a: Action) => {
+    if (a.type === 'reset' || a.type === 'login') skip.current = true;
+    rawDispatch(a);
+  }, []);
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch {
       /* stockage indisponible : l'application reste utilisable */
     }
+    if (prev.current !== state && !skip.current) processMailEvents(prev.current, state, { remote: false, log: (m) => rawDispatch({ type: 'logSupplierMail', ...m }) });
+    skip.current = false;
+    prev.current = state;
   }, [state]);
   return <StoreContext.Provider value={{ state, dispatch }}>{children}</StoreContext.Provider>;
 }
@@ -134,6 +145,7 @@ function RemoteStoreProvider({ children }: { children: ReactNode }) {
       return;
     }
     const { upserts, deletes } = diffState(synced.current, state);
+    processMailEvents(synced.current, state, { remote: true, log: (m) => dispatch({ type: 'logSupplierMail', ...m }) });
     synced.current = state;
     if (!upserts.length && !deletes.length) return;
     queue.current = queue.current.then(() => pushDocs(upserts, deletes)).catch((e) => setError(`Enregistrement refusé : ${(e as Error).message}`));
