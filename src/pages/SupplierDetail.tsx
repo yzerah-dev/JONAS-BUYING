@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { BarChart3, Boxes, Calendar, Check, ChevronLeft, Container as Ctn, Euro, FileText, Home, Hourglass, Mail, MessageCircle, Phone, ShoppingCart, Truck, User } from 'lucide-react';
+import { BarChart3, Boxes, Calendar, Check, ChevronLeft, Container as Ctn, Euro, FileText, Home, Hourglass, Mail, MessageCircle, Phone, ShoppingCart, Truck, User, Users } from 'lucide-react';
 import {
   byId,
   canAddSupplier,
@@ -22,12 +22,13 @@ import { toast } from '../components/ui-shared';
 import { cur0, curSumLabel } from '../lib/curr';
 import { EditSupplierButton } from '../components/NewSupplier';
 import { mailRecipients } from '../lib/mail/outbox';
+import SupplierContacts from '../components/SupplierContacts';
 import { SupplierLogoEdit } from '../components/SupplierLogoEdit';
 import { CONTAINER_STATUSES, type Currency, type SupplierTerms } from '../data/types';
 import { ContainerStatusPill, Kpi, Pill, ProductThumb, ProformaStatusPill, Ring, Seg, SupplierLogo, Tabs } from '../components/ui';
 import { TODAY, dec, fdate, fshort, num, weekLabel } from '../lib/format';
 
-type Tab = 'dashboard' | 'produits' | 'proformas' | 'bookings' | 'conteneurs' | 'finance';
+type Tab = 'dashboard' | 'contacts' | 'produits' | 'proformas' | 'bookings' | 'conteneurs' | 'finance';
 
 export default function SupplierDetail() {
   const { id } = useParams();
@@ -73,7 +74,7 @@ export default function SupplierDetail() {
           </div>
         </div>
         <div className="grow" />
-        <div className="sd-contacts">
+        <div className="sd-contacts" role="button" tabIndex={0} title="Voir tous les contacts" onClick={() => setTab('contacts')} onKeyDown={(e) => e.key === 'Enter' && setTab('contacts')}>
           {(sup.contacts?.length ? sup.contacts : [sup.contact]).map((c, i) => (
             <div key={i} className="sd-contact small">
               <span className="row" style={{ gap: 6 }}>
@@ -113,6 +114,7 @@ export default function SupplierDetail() {
         onChange={setTab}
         tabs={[
           { id: 'dashboard', label: 'Tableau de bord', icon: <BarChart3 size={16} /> },
+          { id: 'contacts', label: `Contacts (${sup.contacts?.length ?? (sup.contact?.name || sup.contact?.email ? 1 : 0)})`, icon: <Users size={16} /> },
           { id: 'produits', label: `Mes produits (${st.prods.length})`, icon: <Boxes size={16} /> },
           { id: 'proformas', label: `Mes proformas (${st.pfs.length})`, icon: <FileText size={16} /> },
           { id: 'bookings', label: `Mes bookings (${bookings.length})`, icon: <ShoppingCart size={16} /> },
@@ -120,6 +122,8 @@ export default function SupplierDetail() {
           { id: 'finance', label: 'Mes factures & finance', icon: <Euro size={16} /> },
         ]}
       />
+
+      {tab === 'contacts' && <SupplierContacts supplier={sup} />}
 
       {tab === 'dashboard' && (
         <>

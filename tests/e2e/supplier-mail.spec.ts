@@ -64,3 +64,28 @@ test('plusieurs contacts sur la fiche fournisseur', async ({ page }) => {
   await expect(page.locator('.sd-contact')).toHaveCount(2);
   await expect(page.locator('main')).toContainText('lily@tideliving.example');
 });
+
+test('fiche fournisseur : onglet Contacts, ajouter / modifier / principal / retirer', async ({ page }) => {
+  await resetApp(page);
+  await go(page, 'fournisseurs/tide');
+  await page.getByRole('button', { name: /^Contacts \(1\)/ }).click();
+  await expect(page.locator('.sc-card')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Ajouter un contact' }).click();
+  const form = page.getByRole('form', { name: 'Contact fournisseur' });
+  await form.getByLabel('Nom').fill('Lily Wang');
+  await form.getByLabel('Fonction').fill('Merchandiser');
+  await form.getByLabel('E-mail', { exact: true }).fill('pas-un-mail');
+  await expect(form.getByRole('button', { name: 'Enregistrer' })).toBeDisabled();
+  await form.getByLabel('E-mail', { exact: true }).fill('lily@tideliving.example');
+  await form.getByRole('button', { name: 'Enregistrer' }).click();
+  await expect(toast(page)).toContainText('Contact ajouté : Lily Wang');
+  await expect(page.getByRole('button', { name: /^Contacts \(2\)/ })).toBeVisible();
+  await expect(page.locator('.sc-head')).toContainText('2 destinataires');
+  // Contact principal
+  await page.getByRole('button', { name: 'Contact principal : Lily Wang' }).click();
+  await expect(page.locator('.sc-card').first()).toContainText('Lily Wang');
+  // Retirer
+  page.once('dialog', (d) => d.accept());
+  await page.getByRole('button', { name: 'Retirer Lily Wang' }).click();
+  await expect(page.locator('.sc-card')).toHaveCount(1);
+});

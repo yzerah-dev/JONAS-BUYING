@@ -2397,3 +2397,24 @@ tr.pf-moving td, .pf-line.pf-moving { background: #fff6e8 !important; outline: 2
 .sd-contacts { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-start; }
 .sd-contact { display: grid; gap: 3px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 12px; background: #fafcfb; min-width: 200px; }
 .sd-contact a { color: var(--ink); }
+
+/* Fiche fournisseur : onglet Contacts */
+.sd-contacts { cursor: pointer; }
+.sc-wrap { display: grid; gap: 14px; }
+.sc-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.sc-warn { padding: 10px 14px; border-radius: 12px; background: #fde8e8; color: #b42318; font-weight: 600; }
+.sc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.sc-card { display: grid; gap: 10px; align-content: start; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: #fff; box-shadow: var(--shadow); }
+.sc-card.main { border-color: #b9dccd; }
+.sc-top { display: flex; align-items: center; gap: 10px; }
+.sc-avatar { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; background: var(--green-soft); color: var(--green-dark); font-weight: 800; font-size: 17px; flex-shrink: 0; }
+.sc-id { display: grid; min-width: 0; flex: 1; line-height: 1.25; }
+.sc-id b { font-size: 16px; }
+.sc-id small { color: var(--muted); font-size: 13px; }
+.sc-lines { display: grid; gap: 5px; font-size: 14px; }
+.sc-lines a, .sc-lines span { display: inline-flex; align-items: center; gap: 7px; color: var(--ink); overflow-wrap: anywhere; }
+.sc-foot { display: flex; align-items: center; gap: 4px; padding-top: 8px; border-top: 1px solid var(--line); }
+.sc-mail { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 600; cursor: pointer; }
+.sc-mail input { accent-color: var(--green); width: 16px; height: 16px; }
+.sc-form { border: 2px solid var(--green); }
+.sc-grid { align-items: start; }
