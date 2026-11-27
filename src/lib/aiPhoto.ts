@@ -2,12 +2,12 @@
 import { getBlob } from './files';
 
 /** Photo réduite à 640 px (JPEG) pour Claude : base64 + type, ou null */
-export async function smallPhoto(fileId: string): Promise<{ data: string; type: string } | null> {
+export async function smallPhoto(fileId: string, maxSide = 640): Promise<{ data: string; type: string } | null> {
   try {
     const blob = await getBlob(fileId);
     if (!blob) return null;
     const bmp = await createImageBitmap(blob);
-    const k = Math.min(1, 640 / Math.max(bmp.width, bmp.height));
+    const k = Math.min(1, maxSide / Math.max(bmp.width, bmp.height));
     const c = document.createElement('canvas');
     c.width = Math.max(1, Math.round(bmp.width * k));
     c.height = Math.max(1, Math.round(bmp.height * k));

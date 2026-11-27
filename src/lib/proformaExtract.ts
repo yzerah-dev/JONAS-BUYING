@@ -45,6 +45,28 @@ function loadPdfJs(): Promise<PdfJs> {
   return pdfjs;
 }
 
+/** Pages d'un PDF (ou d'un .ai compatible PDF) en images JPEG pour Claude : base64, côté le plus long ≤ maxSide */
+export async function pdfPageImages(data: ArrayBuffer, maxPages = 3, maxSide = 1600): Promise<{ data: string; type: string }[]> {
+  const lib = await loadPdfJs();
+  const doc = await lib.getDocument({ data: new Uint8Array(data), isEvalSupported: false }).promise;
+  const out: { data: string; type: string }[] = [];
+  for (let p = 1; p <= Math.min(doc.numPages, maxPages); p++) {
+    const page = await doc.getPage(p);
+    const v1 = page.getViewport({ scale: 1 });
+    const viewport = page.getViewport({ scale: Math.min(4, maxSide / Math.max(v1.width, v1.height)) });
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(viewport.width);
+    canvas.height = Math.round(viewport.height);
+    const ctx = canvas.getContext('2d')!;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    await page.render({ canvasContext: ctx, viewport, canvas } as Parameters<typeof page.render>[0]).promise;
+    const url = canvas.toDataURL('image/jpeg', 0.85);
+    out.push({ data: url.slice(url.indexOf(',') + 1), type: 'image/jpeg' });
+  }
+  return out;
+}
+
 /** Lignes de texte d'un PDF, dans l'ordre de lecture (cellules séparées par « | ») */
 export async function pdfLines(data: ArrayBuffer, maxPages = 6): Promise<string[]> {
   const lib = await loadPdfJs();

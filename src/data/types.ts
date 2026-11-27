@@ -184,6 +184,8 @@ export interface Product {
   devForced?: boolean;
   /** Avis d'étiquetage (normes françaises / UE) rédigé par Claude d'après la photo et la fiche */
   labelAdvice?: LabelAdvice;
+  /** Contrôle réglementaire du pack déposé (dernière version) par Claude */
+  packCheck?: PackCheck;
   devStage: number; // index dans DEV_STAGES
   devDeadline: ISODate;
   nextAction: string;
@@ -380,6 +382,20 @@ export interface LabelAdvice {
   warnings: string[];
   /** Points à vérifier auprès du fournisseur ou du laboratoire */
   checks: string[];
+}
+
+/** Contrôle du visuel de pack par rapport aux règles d'étiquetage */
+export interface PackCheck {
+  at: string;
+  by: string;
+  /** Version du pack contrôlée et fichiers lus */
+  version: number;
+  files: string[];
+  verdict: 'conforme' | 'a_corriger' | 'non_conforme';
+  summary: string;
+  checks: { item: string; status: 'ok' | 'manquant' | 'a_corriger' | 'a_verifier'; detail: string }[];
+  /** Fautes ou textes à reprendre : texte vu → correction */
+  texts: { found: string; fix: string }[];
 }
 
 export interface ImportLine {

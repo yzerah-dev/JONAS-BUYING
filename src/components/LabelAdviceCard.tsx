@@ -5,9 +5,19 @@ import type { Product } from '../data/types';
 import { labelAdvice } from '../lib/labelAdvice';
 import { fstamp } from '../lib/format';
 import { toast } from './ui-shared';
+import PackCheckCard from './PackCheckCard';
 
 /** Avis d'étiquetage (normes françaises / UE) : Claude analyse la photo et la fiche du produit */
 export default function LabelAdviceCard({ p }: { p: Product }) {
+  return (
+    <div className="la-wrap">
+      <AdviceBlock p={p} />
+      <PackCheckCard p={p} />
+    </div>
+  );
+}
+
+function AdviceBlock({ p }: { p: Product }) {
   const { state, dispatch } = useStore();
   const auth = useAuth();
   const [busy, setBusy] = useState(false);
