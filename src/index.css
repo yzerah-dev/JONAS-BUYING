@@ -2591,3 +2591,10 @@ tr.pf-moving td, .pf-line.pf-moving { background: #fff6e8 !important; outline: 2
 .ch-fdl { position: absolute; top: 12px; right: 12px; width: 24px; height: 24px; border-radius: 50%; background: rgba(255, 255, 255, 0.9); display: grid; place-items: center; color: var(--green-dark); }
 .ch-bubble .ch-img + .ch-img, .ch-bubble .ch-file + .ch-file { margin-top: 2px; }
 .ch-list[hidden] { display: none !important; }
+
+/* Discussion : le fil grandit avec les messages, la saisie avec le texte */
+.ch { max-height: none; min-height: 0; }
+.ch-list { flex: none; min-height: 160px; max-height: calc(100vh / var(--z, 1) - 220px); }
+.ch-files { flex: none; min-height: 160px; max-height: calc(100vh / var(--z, 1) - 220px); }
+.ch-input textarea { max-height: 280px; min-height: 42px; line-height: 1.4; overflow-y: auto; box-sizing: border-box; }
+.ch { margin-bottom: 72px; }

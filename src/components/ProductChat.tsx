@@ -83,6 +83,7 @@ export default function ProductChat({ p }: { p: Product }) {
   };
   const [busy, setBusy] = useState(false);
   const file = useRef<HTMLInputElement>(null);
+  const box = useRef<HTMLTextAreaElement>(null);
   const list = useRef<HTMLDivElement>(null);
   const chat = p.chat ?? [];
   const canWrite = auth.allowed({ type: 'sendProductMessage', productId: p.id, message: { id: 'x', at: '', by: '', side, text: 'x' } });
@@ -120,6 +121,14 @@ export default function ProductChat({ p }: { p: Product }) {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [side, readLang, chat.length]);
+
+  // Zone de saisie : grandit avec le message (jusqu'à ~12 lignes, ensuite elle défile)
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight + 2, 280)}px`;
+  }, [text]);
 
   // Ouvert = lu ; défilement vers le dernier message
   useEffect(() => {
@@ -297,6 +306,7 @@ export default function ProductChat({ p }: { p: Product }) {
             <Paperclip size={19} />
           </button>
           <textarea
+            ref={box}
             rows={1}
             value={text}
             placeholder={t('chat.placeholder')}
