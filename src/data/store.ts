@@ -150,6 +150,9 @@ export type Action =
   | { type: 'cancelOrder'; id: string }
   | { type: 'cancelProforma'; id: string; reason: string }
   | { type: 'restoreProforma'; id: string }
+  /** Annuler un produit d'une proforma pas encore signée (et le rétablir) */
+  | { type: 'cancelLine'; id: string; productId: string; reason?: string }
+  | { type: 'restoreLine'; id: string; productId: string }
   | { type: 'deleteProforma'; id: string }
   | { type: 'requestSplit'; id: string; lines: { productId: string; qtyNow: number }[]; etdLater: ISODate; reason: string }
   | { type: 'acceptSplit'; id: string }
@@ -440,6 +443,15 @@ export function isAllowed(s: State, a: Action): boolean {
     case 'restoreProforma': {
       const pf = allPfs(s).find((x) => x.id === a.id);
       return !!pf?.cancelled && (can(u, 'proforma.edit') || can(u, 'proforma.sign'));
+    }
+    case 'cancelLine': {
+      // Le dernier produit ne s'annule pas seul : on annule alors la proforma
+      const pf = s.proformas.find((x) => x.id === a.id);
+      return !!pf && canCancelLines(u, pf) && pf.lines.length > 1 && pf.lines.some((l) => l.productId === a.productId);
+    }
+    case 'restoreLine': {
+      const pf = s.proformas.find((x) => x.id === a.id);
+      return !!pf && canCancelLines(u, pf) && !!pf.cancelledLines?.some((l) => l.productId === a.productId) && !pf.lines.some((l) => l.productId === a.productId);
     }
     case 'deleteProforma': {
       const pf = allPfs(s).find((x) => x.id === a.id);
@@ -889,6 +901,9 @@ const shipped = (pf: Proforma) => pf.status === 'en_transit' || pf.status === 'a
 export const canCancelProforma = (s: State, u: User, pf: Proforma) => (can(u, 'proforma.edit') || can(u, 'proforma.sign')) && !shipped(pf) && !inSplit(s, pf);
 /** Supprimer définitivement : pilote et Direction seulement, tant que la marchandise n'est pas partie */
 export const canDeleteProforma = (s: State, u: User, pf: Proforma) => can(u, 'proforma.sign') && !shipped(pf) && !inSplit(s, pf);
+/** Annuler un produit : proforma pas encore signée par JONAS (aucune version signée), équipe achats */
+export const canCancelLines = (u: User | undefined, pf: Proforma) =>
+  !!u && (can(u, 'proforma.edit') || can(u, 'proforma.sign')) && !pf.cancelled && pf.status === 'a_signer' && !signedVersion(pf);
 /** Pourquoi on ne peut pas annuler / supprimer (message affiché) */
 export const cancelBlock = (s: State, pf: Proforma) =>
   shipped(pf) ? 'Marchandise partie : la proforma ne peut plus être annulée.' : inSplit(s, pf) ? 'Expédition partielle en cours : gérez-la depuis l’onglet Expéditions.' : '';
@@ -1172,6 +1187,42 @@ function applyAction(s: State, a: Action): State {
     }
     case 'restoreProforma':
       return mapPF(s, a.id, (pf) => ({ ...pf, cancelled: undefined, history: [...pf.history, hist(me, 'Proforma rétablie')] }));
+    case 'cancelLine': {
+      const ref = s.products.find((p) => p.id === a.productId)?.ref ?? a.productId;
+      const reason = a.reason?.trim() || undefined;
+      // Ses quantités sortent des conteneurs prévisionnels
+      const containers = s.containers.map((c) =>
+        c.allocations.some((x) => x.proformaId === a.id && x.productId === a.productId)
+          ? { ...c, allocations: c.allocations.filter((x) => !(x.proformaId === a.id && x.productId === a.productId)), planValidated: false }
+          : c,
+      );
+      return mapPF({ ...s, containers }, a.id, (pf) => {
+        const line = pf.lines.find((l) => l.productId === a.productId)!;
+        return {
+          ...pf,
+          lines: pf.lines.filter((l) => l.productId !== a.productId),
+          cancelledLines: [...(pf.cancelledLines ?? []).filter((l) => l.productId !== a.productId), { ...line, at: nowStamp(), by: me, reason }],
+          history: [...pf.history, hist(me, `Produit ${ref} annulé (${line.qty} pcs)${reason ? ` : ${reason}` : ''}`)],
+        };
+      });
+    }
+    case 'restoreLine': {
+      const ref = s.products.find((p) => p.id === a.productId)?.ref ?? a.productId;
+      return mapPF(s, a.id, (pf) => {
+        const c = pf.cancelledLines!.find((l) => l.productId === a.productId)!;
+        const { at: _at, by: _by, reason: _r, ...line } = c;
+        void _at;
+        void _by;
+        void _r;
+        const rest = pf.cancelledLines!.filter((l) => l.productId !== a.productId);
+        return {
+          ...pf,
+          lines: [...pf.lines, line],
+          cancelledLines: rest.length ? rest : undefined,
+          history: [...pf.history, hist(me, `Produit ${ref} rétabli`)],
+        };
+      });
+    }
     case 'deleteProforma': {
       const next = withoutAllocations(s, a.id);
       return { ...next, proformas: next.proformas.filter((p) => p.id !== a.id) };
@@ -1243,7 +1294,7 @@ function applyAction(s: State, a: Action): State {
             ...(mat?.created.length ? [hist(me, `${mat.created.length} produit(s) créé(s) depuis la proforma : ${mat.created.map((p) => p.ref).join(', ')}`)] : []),
           ],
           // Première version : les lignes lues remplacent celles de la proforma ; une modification les applique à la signature
-          lines: mat && !signed ? mat.lines : pf.lines,
+          lines: mat && !signed ? mat.lines.filter((l) => !pf.cancelledLines?.some((c) => c.productId === l.productId)) : pf.lines,
         };
       });
       // Demande de modification : le PA de la fiche ne change qu'à la signature de la nouvelle version
@@ -1977,6 +2028,10 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
       return { target: a.id, text: `Proforma annulée : ${a.reason.trim()}` };
     case 'restoreProforma':
       return { target: a.id, text: 'Proforma rétablie' };
+    case 'cancelLine':
+      return { target: a.id, text: `Produit ${ref(a.productId)} annulé sur la proforma${a.reason?.trim() ? ` : ${a.reason.trim()}` : ''}` };
+    case 'restoreLine':
+      return { target: a.id, text: `Produit ${ref(a.productId)} rétabli sur la proforma` };
     case 'deleteProforma':
       return { target: a.id, text: 'Proforma supprimée définitivement' };
     case 'cancelOrder':

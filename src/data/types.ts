@@ -203,6 +203,13 @@ export interface ProformaLine {
   cbm?: number;
 }
 
+/** Produit annulé sur une proforma pas encore signée : retiré des lignes (totaux, conteneurs, packs), gardé pour la trace */
+export interface CancelledLine extends ProformaLine {
+  at: string;
+  by: string;
+  reason?: string;
+}
+
 export interface HistoryEntry {
   date: ISODate;
   user: string;
@@ -259,6 +266,8 @@ export interface Proforma {
   balanceProof?: StoredFile;
   /** Proforma annulée : gardée (onglet « Annulées »), sortie de toutes les listes, rétablissable */
   cancelled?: { at: string; by: string; reason: string };
+  /** Produits annulés avant la signature : affichés « ANNULÉ » sur la proforma, rétablissables tant qu'elle n'est pas signée */
+  cancelledLines?: CancelledLine[];
   /** Demande de booking envoyée au fournisseur, et sa réponse (plan + dates réelles) */
   booking?: BookingRequest;
 }

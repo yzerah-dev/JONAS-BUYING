@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { CancelledProforma, ProformaCancelButtons } from '../components/ProformaCancel';
+import { CancelledLines, CancelledProforma, LineCancelButton, ProformaCancelButtons } from '../components/ProformaCancel';
 import { proformaBestPdf, proformaDocPdf } from '../lib/proformaPdf';
 import { PaymentProofUpload } from '../components/PaymentProof';
 import { downloadPaymentProof } from '../lib/paymentProof';
@@ -54,6 +54,8 @@ import {
   useStore,
   type State,
   brandOf,
+  canCancelLines,
+  currentUser,
 } from '../data/store';
 import type { Container, Product, Proforma, ProformaStatus } from '../data/types';
 import { BrandLogo, ProductPic, ContainerStatusPill, PackPill, Pill, ProductThumb, ProformaStatusPill, Progress, Ring, Seg, SupplierLogo, Tabs } from '../components/ui';
@@ -307,6 +309,8 @@ function ProductsTab({ pf, state, mode }: { pf: Proforma; state: State; mode: 'g
   const match = (f: PackFilter, p: Product) => (f === 'all' ? true : f === 'missing' ? !packDone(p) : f === 'late' ? packLate(p) : packDone(p));
   const rows = all.filter(({ p }) => match(filter, p));
   const lines = rows.map((r) => r.l);
+  // Proforma pas encore signée : chaque produit peut être annulé
+  const cancellable = canCancelLines(currentUser(state), pf);
   const bar = (
     <div className="row wrap mb" style={{ gap: 8 }}>
       <Seg
@@ -326,6 +330,7 @@ function ProductsTab({ pf, state, mode }: { pf: Proforma; state: State; mode: 'g
       <>
         {bar}
         <div className="card empty">Aucun produit dans cette sélection.</div>
+        <CancelledLines pf={pf} />
       </>
     );
   if (mode === 'liste')
@@ -346,6 +351,7 @@ function ProductsTab({ pf, state, mode }: { pf: Proforma; state: State; mode: 'g
                 <th className="num">Montant</th>
                 <th>Date max artwork</th>
                 <th>État pack</th>
+                {cancellable && <th />}
               </tr>
             </thead>
             <tbody>
@@ -375,12 +381,18 @@ function ProductsTab({ pf, state, mode }: { pf: Proforma; state: State; mode: 'g
                     <td>
                       <PackPill product={p} />
                     </td>
+                    {cancellable && (
+                      <td>
+                        <LineCancelButton pf={pf} productId={p.id} compact />
+                      </td>
+                    )}
                   </tr>
                 );
               })}
             </tbody>
           </table>
         </div>
+        <CancelledLines pf={pf} />
       </>
     );
   return (
@@ -427,10 +439,12 @@ function ProductsTab({ pf, state, mode }: { pf: Proforma; state: State; mode: 'g
                     ? `Pack en retard · ${fdate(p.pack.artworkDeadline)}`
                     : `Pack ${packState(p) === 'en_cours' ? 'en cours' : 'à faire'} · avant le ${fdate(p.pack.artworkDeadline)}`}
               </div>
+              {cancellable && <LineCancelButton pf={pf} productId={p.id} />}
             </div>
           );
         })}
       </div>
+      <CancelledLines pf={pf} />
     </>
   );
 }
