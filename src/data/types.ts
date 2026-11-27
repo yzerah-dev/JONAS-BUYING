@@ -182,6 +182,8 @@ export interface Product {
   developed: boolean;
   /** « Marquer développé » à la main (reste développé quoi qu'il arrive) */
   devForced?: boolean;
+  /** Avis d'étiquetage (normes françaises / UE) rédigé par Claude d'après la photo et la fiche */
+  labelAdvice?: LabelAdvice;
   devStage: number; // index dans DEV_STAGES
   devDeadline: ISODate;
   nextAction: string;
@@ -358,6 +360,28 @@ export interface ProformaDoc {
 }
 
 /** Ligne de proforma à enregistrer : un produit existant, ou un produit à créer (lu sur la proforma) */
+/** Avis d'étiquetage d'un produit : mentions, pictogrammes et avertissements attendus en France */
+export interface LabelAdvice {
+  at: string;
+  by: string;
+  /** Avec photo (true) ou d'après la fiche seule */
+  withPhoto: boolean;
+  /** Ce que Claude voit / comprend du produit */
+  product: string;
+  category: string;
+  summary: string;
+  /** Textes applicables (ex. « Règlement (CE) 1935/2004 – contact alimentaire ») */
+  regulations: { name: string; why: string }[];
+  /** Mentions à porter sur le pack ou l'étiquette */
+  mentions: { text: string; detail: string; required: boolean }[];
+  /** Pictogrammes et marquages (CE, Triman, verre-fourchette…) */
+  pictos: { name: string; detail: string; required: boolean }[];
+  /** Avertissements (ex. « Ne convient pas aux enfants de moins de 36 mois ») */
+  warnings: string[];
+  /** Points à vérifier auprès du fournisseur ou du laboratoire */
+  checks: string[];
+}
+
 export interface ImportLine {
   productId?: string;
   /** Nouveau produit : la référence JONAS et l'EAN JONAS sont attribués à la création */

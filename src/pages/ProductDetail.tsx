@@ -29,6 +29,7 @@ import ProductDescription from '../components/ProductDescription';
 import ProductEdit from '../components/ProductEdit';
 import ProductInfoView from '../components/ProductInfoView';
 import { BrandLogo, ContainerStatusPill, PackPill, Pill, ProformaStatusPill, Progress, Tabs, ValidationCircuit, PA } from '../components/ui';
+import LabelAdviceCard from '../components/LabelAdviceCard';
 import { TODAY, dec, fdate, fshort, money, num, weekLabel } from '../lib/format';
 import { cur0, curSumLabel, sumCur } from '../lib/curr';
 
@@ -153,7 +154,14 @@ export default function ProductDetail() {
           </div>
         </div>
       )}
-      {tab === 'design' && <DesignCard p={p} full />}
+      {tab === 'design' && (
+        <>
+          <DesignCard p={p} full />
+          <div className="card pad mt">
+            <LabelAdviceCard p={p} />
+          </div>
+        </>
+      )}
       {tab === 'dev' && <DevCard p={p} />}
       {tab === 'commandes' && <OrdersCard p={p} state={state} />}
       {tab === 'production' && <ProductionCard p={p} state={state} />}

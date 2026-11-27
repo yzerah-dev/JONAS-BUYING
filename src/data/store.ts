@@ -6,6 +6,7 @@ import type {
   BookingProposal,
   Currency,
   ImportLine,
+  LabelAdvice,
   ProformaLine,
   SupplierTerms,
   Company,
@@ -129,6 +130,7 @@ export type Action =
   | { type: 'proposePlan'; containerId: string }
   | { type: 'addContainerDoc'; containerId: string; doc: string; file?: { fileId: string; name: string; size: number; type: string } }
   | { type: 'setContainerNumber'; containerId: string; number: string; seal?: string }
+  | { type: 'setLabelAdvice'; productId: string; advice: LabelAdvice }
   | { type: 'signProforma'; id: string; etdWanted: ISODate }
   | {
       type: 'createProforma';
@@ -570,6 +572,9 @@ export function isAllowed(s: State, a: Action): boolean {
       const c = s.containers.find((x) => x.id === a.containerId);
       return can(u, 'logistics.plan') && !!c && OPEN_STATUSES.includes(c.status) && !c.planValidated;
     }
+    case 'setLabelAdvice':
+      // Avis d'étiquetage : toute l'équipe JONAS (pas les fournisseurs ni les transitaires)
+      return !isSupplier(u) && !isForwarder(u) && s.products.some((p) => p.id === a.productId);
     case 'setContainerNumber': {
       // N° de conteneur (4 lettres + 7 chiffres, ex. MSKU1234567) : JONAS, le fournisseur ou le transitaire du conteneur
       const c = s.containers.find((x) => x.id === a.containerId);
@@ -1142,6 +1147,8 @@ function applyAction(s: State, a: Action): State {
           ],
         };
       });
+    case 'setLabelAdvice':
+      return mapP(s, a.productId, (p) => ({ ...p, labelAdvice: a.advice }));
     case 'setContainerNumber':
       return mapC(s, a.containerId, (c) => ({
         ...c,
@@ -2168,6 +2175,8 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
       const prev = s.containers.find((c) => c.id === a.containerId)?.loading?.date;
       return { target: ctn(a.containerId), text: prev && prev !== a.date ? `Date de chargement changée par le fournisseur : ${a.date}` : `Date de chargement validée : ${a.date}` };
     }
+    case 'setLabelAdvice':
+      return { target: ref(a.productId), text: `Avis d'étiquetage : ${a.advice.category}` };
     case 'setContainerNumber':
       return { target: a.containerId, text: `N° de conteneur ${a.number}${a.seal ? ` · plomb ${a.seal}` : ''}` };
     case 'addContainerDoc':

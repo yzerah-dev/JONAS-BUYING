@@ -16,6 +16,7 @@ import {
   History,
   LayoutGrid,
   Layers,
+  Tag,
   List,
   Paperclip,
   Play,
@@ -27,6 +28,7 @@ import {
 import PackFiles from '../components/PackFiles';
 import FilterChip from '../components/FilterChip';
 import AssignDesigner from '../components/AssignDesigner';
+import LabelAdviceCard from '../components/LabelAdviceCard';
 import { pressable } from '../lib/a11y';
 import { brandOf, byId, capacityOf, matchTrack, packDone, packLate, packTrack, TRACK_CHIPS, TRACK_ORDER, useAuth, useStore, type State, type TrackFilter } from '../data/store';
 import PackTrackDots, { TrackRound } from '../components/PackTrack';
@@ -1062,7 +1064,7 @@ function PackPlanning({ p }: { p: Product }) {
 function PackPanel({ p }: { p: Product }) {
   const { state, dispatch } = useStore();
   const auth = useAuth();
-  const [sub, setSub] = useState<'pack' | 'diecut' | 'brief' | 'fichiers'>('fichiers');
+  const [sub, setSub] = useState<'pack' | 'diecut' | 'brief' | 'fichiers' | 'etiquetage'>('fichiers');
   const sup = byId(state.suppliers, p.supplierId);
   const pf = proformaOf(state, p);
   const done = packDone(p);
@@ -1133,6 +1135,7 @@ function PackPanel({ p }: { p: Product }) {
           { id: 'diecut', label: 'Die cut', icon: <Scissors size={14} /> },
           { id: 'brief', label: 'Brief', icon: <FileText size={14} /> },
           { id: 'fichiers', label: `Fichiers (${(p.pack.files ?? []).length})`, icon: <Layers size={14} /> },
+          { id: 'etiquetage', label: p.labelAdvice ? 'Étiquetage ✓' : 'Étiquetage', icon: <Tag size={14} /> },
         ]}
       />
       {sub === 'pack' && (
@@ -1178,6 +1181,7 @@ function PackPanel({ p }: { p: Product }) {
         </div>
       )}
       {sub === 'fichiers' && <PackFiles p={p} />}
+      {sub === 'etiquetage' && <LabelAdviceCard p={p} />}
 
       <div className="pk-startbox mt">
         <div className="bold small">Démarrage du pack</div>

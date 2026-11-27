@@ -9,6 +9,9 @@
     },
     "api/lire-proforma.ts": {
       "maxDuration": 120
+    },
+    "api/avis-etiquetage.ts": {
+      "maxDuration": 120
     }
   }
 }
