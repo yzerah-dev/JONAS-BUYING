@@ -1,7 +1,22 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowUpDown, Calendar, Check, CheckCircle2, ChevronDown, ChevronRight, ChevronUp, Factory, LayoutGrid, List, PenLine, Rows3, Search } from 'lucide-react';
-import { byId, isReliquat, openReliquats, shipmentLabel, pendingRevision, pendingVersion, proformaTotals, useAuth, useStore, PROFORMA_STATUS_LABEL, type State, hasDeposit } from '../data/store';
+import {
+  byId,
+  containerEta,
+  realDeparture,
+  isReliquat,
+  openReliquats,
+  shipmentLabel,
+  pendingRevision,
+  pendingVersion,
+  proformaTotals,
+  useAuth,
+  useStore,
+  PROFORMA_STATUS_LABEL,
+  type State,
+  hasDeposit,
+} from '../data/store';
 import { PROFORMA_STATUSES, type Proforma, type ProformaStatus } from '../data/types';
 import { ProductPic, ProformaStatusPill, SupplierMark } from '../components/ui';
 import { toast } from '../components/ui-shared';
@@ -360,6 +375,7 @@ function Group({
                 <th>Commande</th>
                 <th className="c">Packs</th>
                 <th>Statut</th>
+                <th className="c">ETD → ETA</th>
                 {showMoney && <th className="r">Montant</th>}
                 <th />
               </tr>
@@ -498,6 +514,35 @@ function PackCell({ ok, total, done }: { ok: number; total: number; done: boolea
   );
 }
 
+/** Départ (ETD) et arrivée (ETA) : dates réelles ou révisées des conteneurs si connues, sinon celles de la proforma */
+function pfDates(state: State, p: Proforma) {
+  const cs = state.containers.filter((c) => c.allocations.some((x) => x.proformaId === p.id));
+  const etdReal = realDeparture(state, p);
+  const etas = cs.map((c) => containerEta(c)).sort();
+  const eta = etas.length ? etas[etas.length - 1] : p.eta;
+  return { etd: etdReal ?? p.etd, etdReal: !!etdReal, eta, etaChanged: eta !== p.eta, arrived: cs.length > 0 && cs.every((c) => !!c.etaReal) };
+}
+
+function EtdEta({ p, state }: { p: Proforma; state: State }) {
+  const d = pfDates(state, p);
+  const day = (x: string) => fdate(x).slice(0, 5);
+  return (
+    <span className="pfx-dates" title={`Départ ${d.etdReal ? 'réel' : 'prévu'} le ${fdate(d.etd)} · arrivée ${d.arrived ? 'réelle' : d.etaChanged ? 'révisée' : 'prévue'} le ${fdate(d.eta)}`}>
+      <span className={`pfx-date ${d.etdReal ? 'real' : ''}`}>
+        <small>ETD</small>
+        <b>{weekLabel(d.etd)}</b>
+        <em>{day(d.etd)}</em>
+      </span>
+      <span className="pfx-arrow">→</span>
+      <span className={`pfx-date ${d.arrived ? 'real' : d.etaChanged ? 'late' : ''}`}>
+        <small>ETA</small>
+        <b>{weekLabel(d.eta)}</b>
+        <em>{day(d.eta)}</em>
+      </span>
+    </span>
+  );
+}
+
 /** Statut en pastille : point de couleur + libellé (maquette) */
 function StatusDot({ status }: { status: ProformaStatus }) {
   return (
@@ -541,9 +586,8 @@ function PfCard({ p, state, showMoney, onSign, onOpen, move }: RowProps) {
       <div className="pfg-body">
         <b className="pfg-title">{title}</b>
         <strong className="pfg-sup">{sup.name}</strong>
-        <small className="muted">
-          {p.id} · {weekLabel(p.etd)}
-        </small>
+        <small className="muted">{p.id}</small>
+        <EtdEta p={p} state={state} />
         <div className="pfg-row">
           <StatusDot status={p.status} />
           <span className={packsDone ? 'pfx-ok' : 'pfx-packs'} title="Packs validés">
@@ -635,6 +679,9 @@ function Row({ p, state, showMoney, onSign, onOpen, move }: RowProps) {
         {revision && <small className="pfx-note">Modification v{revision.version} à signer</small>}
         {p.status === 'a_signer' && !pendingVersion(p) && <small className="pfx-note">Attente de la proforma du fournisseur</small>}
       </td>
+      <td className="c">
+        <EtdEta p={p} state={state} />
+      </td>
       {showMoney && (
         <td className="r">
           <div className="pfx-amount">
@@ -688,7 +735,9 @@ function Card({ p, state, showMoney, onSign, onOpen, move }: RowProps) {
         <span className="pf-line-pack">
           <PackCell ok={t.packsOk} total={t.packsTotal} done={packsDone} />
         </span>
-        <span className="pf-line-week">{weekLabel(p.etd)}</span>
+        <span className="pf-line-week" title={`ETD ${fdate(pfDates(state, p).etd)} · ETA ${fdate(pfDates(state, p).eta)}`}>
+          {weekLabel(pfDates(state, p).etd)}
+        </span>
         {open ? <ChevronUp size={18} className="muted" /> : <ChevronDown size={18} className="muted" />}
       </button>
       {open && (
@@ -708,12 +757,14 @@ function Card({ p, state, showMoney, onSign, onOpen, move }: RowProps) {
               <b>≈ {dec(t.eq40)}</b>
             </div>
             <div>
-              <small>Chargement</small>
-              <b>{weekLabel(p.etd)}</b>
+              <small>ETD</small>
+              <b>{weekLabel(pfDates(state, p).etd)}</b>
+              <small>{fdate(pfDates(state, p).etd).slice(0, 5)}</small>
             </div>
             <div>
-              <small>Arrivée</small>
-              <b>{weekLabel(p.eta)}</b>
+              <small>ETA</small>
+              <b>{weekLabel(pfDates(state, p).eta)}</b>
+              <small>{fdate(pfDates(state, p).eta).slice(0, 5)}</small>
             </div>
             <div>
               <small>Pack</small>
