@@ -517,6 +517,25 @@ export function PortalProformas() {
                         </table>
                       </div>
                     )}
+                    {!!pf.cancelledLines?.length && (
+                      <div className="mt pfl-portal">
+                        <div className="small bold" style={{ color: '#b42318' }}>
+                          {tr('pp.cancelledLines', { n: pf.cancelledLines.length })}
+                        </div>
+                        {pf.cancelledLines.map((l) => {
+                          const p = byId(state.products, l.productId);
+                          return (
+                            <div key={l.productId} className="row small" style={{ gap: 8 }}>
+                              <ProductThumb product={p} size={28} />
+                              <s className="muted">
+                                {p.ref} · {p.name} · {num(l.qty)} · {money(l.price, t.currency)}
+                              </s>
+                              <span className="pill red">{tr('pp.cancelledTag')}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                     <div className="row wrap mt">
                       {pf.documents.map((d) => (
                         <button
