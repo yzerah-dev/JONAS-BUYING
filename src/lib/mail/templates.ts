@@ -266,10 +266,10 @@ export function mailHtml(d: MailData, lang: MailLang) {
 <body style="margin:0;padding:0;background:#eef3f1;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,'PingFang SC','Microsoft YaHei',sans-serif;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef3f1;"><tr><td align="center" style="padding:28px 12px;">
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 4px 18px rgba(16,40,32,.08);">
-  <tr><td align="center" style="padding:34px 32px 26px 32px;background:#ffffff;">
-    <div style="font-family:'Arial Black',Arial,Helvetica,sans-serif;font-size:46px;line-height:1;font-weight:900;letter-spacing:9px;color:${INK};padding-left:9px;">JONAS</div>
-    <div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1;font-weight:700;letter-spacing:8.5px;color:${GREEN};margin-top:10px;padding-left:8.5px;">INTERNATIONAL</div>
-    <div style="width:64px;height:4px;border-radius:4px;background:${GREEN};margin:18px auto 0 auto;font-size:0;line-height:0;">&nbsp;</div>
+  <tr><td align="center" style="padding:26px 32px 20px 32px;background:#ffffff;">
+    <div style="font-family:'Arial Black',Arial,Helvetica,sans-serif;font-size:34px;line-height:1;font-weight:900;letter-spacing:7px;color:${INK};padding-left:7px;">JONAS</div>
+    <div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:1;font-weight:700;letter-spacing:6.5px;color:${GREEN};margin-top:8px;padding-left:6.5px;">INTERNATIONAL</div>
+    <div style="width:48px;height:3px;border-radius:3px;background:${GREEN};margin:14px auto 0 auto;font-size:0;line-height:0;">&nbsp;</div>
   </td></tr>
   <tr><td style="background:linear-gradient(135deg,${GREEN},${GREEN_DARK});background-color:${GREEN};padding:11px 32px;text-align:center;color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:12.5px;letter-spacing:.6px;">
     JONAS BUYING &nbsp;·&nbsp; <b>${esc(d.supplierName)}</b>
