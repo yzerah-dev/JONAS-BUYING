@@ -52,17 +52,19 @@ import {
   proformaTotals,
   useAuth,
   useStore,
+  UNASSIGNED,
   type State,
   brandOf,
 } from '../data/store';
 import type { Container, Product, Proforma, ProformaStatus } from '../data/types';
 import { BrandLogo, ProductPic, ContainerStatusPill, PackPill, Pill, ProductThumb, ProformaStatusPill, Progress, Ring, Seg, SupplierLogo, Tabs } from '../components/ui';
-import { toast } from '../components/ui-shared';
+import { designerColor, toast } from '../components/ui-shared';
+import AssignDesigner from '../components/AssignDesigner';
 import { BookingRequestButton } from '../components/BookingDialog';
 import BookingReview, { LastRejection } from '../components/BookingReview';
 import ProformaVersions, { SignDialog } from '../components/ProformaVersions';
 import ShipmentsPanel from '../components/Shipments';
-import { TODAY, addDays, dec, diffDays, fdate, m3, money, num, weekLabel, weekStart } from '../lib/format';
+import { TODAY, addDays, dec, diffDays, fdate, initials, m3, money, num, weekLabel, weekStart } from '../lib/format';
 import { useT, type I18n } from '../i18n/context';
 import type { Key } from '../i18n/dict';
 
@@ -302,6 +304,16 @@ const packTone = (p: Product) => (packDone(p) ? 'pk-ok' : packLate(p) ? 'pk-late
 function ProductsTab({ pf, state, mode }: { pf: Proforma; state: State; mode: 'galerie' | 'liste' }) {
   const navigate = useNavigate();
   const [filter, setFilter] = useState<PackFilter>('all');
+  // Sélection de plusieurs produits pour les affecter à un designer
+  const canAssign = useAuth().can('pack.assign');
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const toggle = (id: string) =>
+    setSel((x) => {
+      const n = new Set(x);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
   const cur = pf.currency ?? 'EUR';
   const all = pf.lines.map((l) => ({ l, p: byId(state.products, l.productId) }));
   const match = (f: PackFilter, p: Product) => (f === 'all' ? true : f === 'missing' ? !packDone(p) : f === 'late' ? packLate(p) : packDone(p));
@@ -319,7 +331,37 @@ function ProductsTab({ pf, state, mode }: { pf: Proforma; state: State; mode: 'g
           { id: 'ok', label: `Pack OK (${all.filter(({ p }) => match('ok', p)).length})` },
         ]}
       />
+      {canAssign && rows.length > 0 && (
+        <label className="row small" style={{ gap: 6, marginLeft: 'auto', cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={rows.every((r) => sel.has(r.p.id))}
+            onChange={(e) => setSel(e.target.checked ? new Set(rows.map((r) => r.p.id)) : new Set())}
+            aria-label="Tout sélectionner"
+          />{' '}
+          Tout sélectionner
+        </label>
+      )}
     </div>
+  );
+  const bulk = sel.size > 0 && (
+    <div className="pfp-bulk">
+      <b>
+        {sel.size} produit{sel.size > 1 ? 's' : ''} sélectionné{sel.size > 1 ? 's' : ''}
+      </b>
+      <button type="button" className="btn sm ghost" onClick={() => setSel(new Set())}>
+        Désélectionner
+      </button>
+      <AssignDesigner ids={[...sel]} onDone={() => setSel(new Set())} dark />
+    </div>
+  );
+  const Who = ({ p }: { p: Product }) => (
+    <span className="pfp-who" title="Designer du pack">
+      <span className="dev-avatar" style={{ background: designerColor(p.pack.designer) }}>
+        {p.pack.designer === UNASSIGNED ? '?' : initials(p.pack.designer)}
+      </span>
+      {p.pack.designer}
+    </span>
   );
   if (!rows.length)
     return (
@@ -332,10 +374,12 @@ function ProductsTab({ pf, state, mode }: { pf: Proforma; state: State; mode: 'g
     return (
       <>
         {bar}
+        {bulk}
         <div className="card tbl-wrap">
           <table className="tbl">
             <thead>
               <tr>
+                {canAssign && <th />}
                 <th>Produit</th>
                 <th>Marque</th>
                 <th className="num">PA</th>
@@ -345,6 +389,7 @@ function ProductsTab({ pf, state, mode }: { pf: Proforma; state: State; mode: 'g
                 <th className="num">CBM total</th>
                 <th className="num">Montant</th>
                 <th>Date max artwork</th>
+                <th>Designer</th>
                 <th>État pack</th>
               </tr>
             </thead>
@@ -353,6 +398,11 @@ function ProductsTab({ pf, state, mode }: { pf: Proforma; state: State; mode: 'g
                 const p = byId(state.products, l.productId);
                 return (
                   <tr key={p.id} className={`clickable ${packTone(p)}`} onClick={() => navigate(`/produits/${p.id}`)}>
+                    {canAssign && (
+                      <td onClick={(e) => e.stopPropagation()}>
+                        <input type="checkbox" checked={sel.has(p.id)} onChange={() => toggle(p.id)} aria-label={`Sélectionner ${p.ref}`} />
+                      </td>
+                    )}
                     <td>
                       <div className="row">
                         <ProductThumb product={p} size={40} />
@@ -373,6 +423,9 @@ function ProductsTab({ pf, state, mode }: { pf: Proforma; state: State; mode: 'g
                     <td className="num">{money(l.qty * l.price, cur)}</td>
                     <td>{fdate(p.pack.artworkDeadline)}</td>
                     <td>
+                      <Who p={p} />
+                    </td>
+                    <td>
                       <PackPill product={p} />
                     </td>
                   </tr>
@@ -386,17 +439,22 @@ function ProductsTab({ pf, state, mode }: { pf: Proforma; state: State; mode: 'g
   return (
     <>
       {bar}
+      {bulk}
       <div className="gallery">
         {lines.map((l) => {
           const p = byId(state.products, l.productId);
           return (
-            <div key={p.id} className={`pcard pfp-card ${packTone(p)}`} onClick={() => navigate(`/produits/${p.id}`)}>
+            <div key={p.id} className={`pcard pfp-card ${packTone(p)} ${sel.has(p.id) ? 'checked' : ''}`} onClick={() => navigate(`/produits/${p.id}`)}>
+              {canAssign && (
+                <input type="checkbox" className="pfp-check" checked={sel.has(p.id)} onClick={(e) => e.stopPropagation()} onChange={() => toggle(p.id)} aria-label={`Sélectionner ${p.ref}`} />
+              )}
               <div className="photo" style={{ background: p.tint }}>
                 <ProductPic product={p} />
               </div>
               <div>
                 <span className="ref-tag">{p.ref}</span>
                 <div className="pfp-name">{p.name}</div>
+                <Who p={p} />
               </div>
               <div className="pfp-figs">
                 <div>

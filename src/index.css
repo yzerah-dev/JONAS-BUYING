@@ -2438,3 +2438,19 @@ tr.pf-moving td, .pf-line.pf-moving { background: #fff6e8 !important; outline: 2
 .np-assign { display: grid; grid-template-columns: auto 1fr 1fr; gap: 10px; align-items: end; padding: 10px 12px; border-radius: 12px; background: #f4f8f6; }
 .np-assign label { display: grid; gap: 4px; font-size: 13px; }
 @media (max-width: 820px) { .np-assign { grid-template-columns: 1fr; } }
+
+/* Affecter des packs à un designer (lot) */
+.asg { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; flex: 1 1 100%; }
+.asg-lbl { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; margin-right: 2px; }
+.asg-btn { display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 12px 0 4px; border-radius: 999px; border: 1px solid var(--line); background: #fff; color: var(--ink); font-size: 13.5px; font-weight: 700; cursor: pointer; }
+.asg-btn .dev-avatar { width: 26px; height: 26px; font-size: 11px; }
+.asg-btn:hover { border-color: var(--green); background: var(--green-softer); }
+.asg-btn.cur { border-color: var(--orange); background: var(--orange-soft); }
+.asg.dark { padding-top: 6px; border-top: 1px solid rgba(255, 255, 255, 0.2); }
+.pfp-bulk { position: sticky; top: 80px; z-index: 6; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 14px; margin-bottom: 12px; border-radius: 14px; background: var(--ink); color: #fff; }
+.pfp-bulk .btn.ghost { color: #fff; }
+.pfp-card { position: relative; }
+.pfp-check { position: absolute; top: 10px; left: 10px; z-index: 2; width: 22px; height: 22px; accent-color: var(--green); cursor: pointer; }
+.pfp-card.checked { outline: 3px solid var(--green); outline-offset: -1px; }
+.pfp-who { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; color: var(--ink-2); }
+.pfp-who .dev-avatar { width: 22px; height: 22px; font-size: 10px; }

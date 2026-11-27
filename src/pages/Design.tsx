@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import PackFiles from '../components/PackFiles';
 import FilterChip from '../components/FilterChip';
+import AssignDesigner from '../components/AssignDesigner';
 import { pressable } from '../lib/a11y';
 import { brandOf, byId, capacityOf, matchTrack, packDone, packLate, packTrack, TRACK_CHIPS, TRACK_ORDER, useAuth, useStore, type State, type TrackFilter } from '../data/store';
 import PackTrackDots, { TrackRound } from '../components/PackTrack';
@@ -525,6 +526,7 @@ function DesignPage() {
                   </button>
                 </span>
               )}
+              <AssignDesigner ids={[...selected]} onDone={() => setSelected(new Set())} dark />
               {canAssign && (
                 <div className="pk-wkbar" role="group" aria-label="Déplacer vers la semaine">
                   <span>Déplacer vers :</span>
