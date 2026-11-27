@@ -26,6 +26,7 @@ import type {
   JournalEntry,
   PackFile,
   PackFileKind,
+  Quotation,
   ProformaStatus,
   ReceptionLine,
   Settings,
@@ -49,6 +50,8 @@ export interface State {
   currentUserId: string;
   settings: Settings;
   journal: JournalEntry[];
+  /** Offres de prix (demandes JONAS et offres spontanées des fournisseurs) */
+  quotations: Quotation[];
   /** Vue seulement (jamais enregistré) : proformas annulées, sorties de « proformas » */
   archived?: Proforma[];
 }
@@ -89,6 +92,7 @@ function initialState(): State {
     currentUserId: 'yzerah',
     settings: DEFAULT_SETTINGS,
     journal: [] as JournalEntry[],
+    quotations: seed.quotations,
   });
 }
 
@@ -115,6 +119,7 @@ function loadRaw(): State {
           companyRev: COMPANY_REV,
         },
         journal: st.journal ?? [],
+        quotations: st.quotations ?? structuredClone(seed.quotations),
       };
     }
   } catch {
@@ -246,7 +251,17 @@ export type Action =
   | { type: 'setCompany'; company: Company }
   | { type: 'setFx'; currency: 'USD' | 'CNY'; rate: number }
   | { type: 'setProformaCurrency'; id: string; currency: 'EUR' | 'USD' | 'CNY' }
-  | { type: 'setForwarder'; containerId: string; forwarder: Forwarder };
+  | { type: 'setForwarder'; containerId: string; forwarder: Forwarder }
+  /** Demande de prix JONAS : une offre par fournisseur */
+  | { type: 'requestQuotes'; quotations: Quotation[] }
+  /** Offre spontanée (fournisseur depuis son portail, ou offre reçue saisie par JONAS) */
+  | { type: 'submitOffer'; quotation: Quotation }
+  /** Le fournisseur répond à une demande de prix */
+  | { type: 'answerQuote'; id: string; price: number; photos?: ProductPhoto[]; note?: string }
+  /** Acceptée : produit créé (en développement), ajouté au panier par l'interface */
+  | { type: 'acceptQuote'; id: string; ref: string; ean: string; qty: number; pcb?: number }
+  | { type: 'refuseQuote'; id: string; reason?: string }
+  | { type: 'deleteQuote'; id: string };
 
 /** Horodatage de démo : date du jour de l'application + heure réelle */
 const nowStamp = () => `${TODAY}T${new Date().toTimeString().slice(0, 5)}`;
@@ -261,6 +276,68 @@ function mapPF(s: State, id: string, f: (p: Proforma) => Proforma): State {
 }
 function mapC(s: State, id: string, f: (c: Container) => Container): State {
   return { ...s, containers: s.containers.map((c) => (c.id === id ? f(c) : c)) };
+}
+function mapQ(s: State, id: string, f: (q: Quotation) => Quotation): State {
+  return { ...s, quotations: s.quotations.map((q) => (q.id === id ? f(q) : q)) };
+}
+
+/** Peut demander des prix et décider des offres (acheteurs, Direction, Pilote) */
+export const canQuote = (u: User) => u.active && !isSupplier(u) && u.role !== 'transitaire' && (can(u, 'proforma.edit') || can(u, 'proforma.sign'));
+
+/** Offres encore à traiter par JONAS */
+export const pendingQuotes = (s: State) => s.quotations.filter((q) => q.status === 'en_attente');
+
+/** Nouvel identifiant d'offre */
+export const newQuoteId = (i = 0) => `Q-${Date.now().toString(36).toUpperCase()}${i ? `-${i}` : ''}`;
+
+/** Fiche produit créée à partir d'une offre acceptée : en développement, prix d'achat dans la devise du fournisseur */
+function productFromQuotation(s: State, q: Quotation, ref: string, ean: string, qty: number, pcb?: number): Product {
+  const mine = s.products.filter((p) => p.supplierId === q.supplierId);
+  const most = <K extends keyof Product>(k: K, fallback: Product[K]) => {
+    const count = new Map<Product[K], number>();
+    for (const p of mine) count.set(p[k], (count.get(p[k]) ?? 0) + 1);
+    return [...count.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? fallback;
+  };
+  const fx = s.settings.fx[q.currency] ?? 1;
+  const start = new Date().toISOString().slice(0, 10);
+  const [photo, ...photos] = q.photos;
+  return {
+    id: ref,
+    ref,
+    ean,
+    name: q.name.trim(),
+    description: { en: q.name.trim() },
+    brandId: '',
+    supplierId: q.supplierId,
+    rayon: most('rayon', 'Divers'),
+    collection: 'Nouveauté',
+    gender: 'Mixte',
+    material: 'À préciser',
+    emoji: q.emoji || most('emoji', '📦'),
+    tint: '#eef1f5',
+    pa: Math.round((q.price ?? 0) * fx * 100) / 100,
+    paSupplier: { price: q.price ?? 0, currency: q.currency },
+    pcb: Math.max(1, Math.round(pcb || 1)),
+    cbmCarton: 0,
+    weight: 0.5,
+    developed: false,
+    devStage: 0,
+    devDeadline: addDays(start, 60),
+    nextAction: 'Valider le brief',
+    targetQty: qty,
+    pack: {
+      type: 'À définir',
+      designer: UNASSIGNED,
+      artworkDeadline: addDays(start, 45),
+      validations: { direction: { state: 'todo' }, moinard: { state: 'todo' }, fournisseur: { state: 'todo' } },
+      dieCut: 'none',
+      artworkVersions: 0,
+      sentToSupplier: false,
+    },
+    stock: { Péronne: 0, Meaux: 0, Lillois: 0 },
+    ...(photo ? { photo } : {}),
+    ...(photos.length ? { photos } : {}),
+  };
 }
 
 /** Met à jour le statut des proformas d'après leurs conteneurs (une saisie → partout). */
@@ -485,6 +562,35 @@ export function isAllowed(s: State, a: Action): boolean {
     case 'setSupplierLogo':
       // Le fournisseur pour sa propre fiche (portail), ou l'équipe achats
       return s.suppliers.some((x) => x.id === a.supplierId) && ((isSupplier(u) && u.supplierId === a.supplierId) || canAddSupplier(u));
+    case 'requestQuotes':
+      return (
+        canQuote(u) &&
+        a.quotations.length > 0 &&
+        a.quotations.every((q) => q.origin === 'rfq' && q.status === 'demande' && !!q.name.trim() && s.suppliers.some((x) => x.id === q.supplierId) && !s.quotations.some((x) => x.id === q.id))
+      );
+    case 'submitOffer': {
+      const q = a.quotation;
+      if (q.origin !== 'spontanee' || q.status !== 'en_attente' || !q.name.trim() || !((q.price ?? 0) > 0) || s.quotations.some((x) => x.id === q.id)) return false;
+      return isSupplier(u) ? q.supplierId === u.supplierId : canQuote(u) && s.suppliers.some((x) => x.id === q.supplierId);
+    }
+    case 'answerQuote': {
+      const q = s.quotations.find((x) => x.id === a.id);
+      return !!q && q.status === 'demande' && a.price > 0 && ((isSupplier(u) && u.supplierId === q.supplierId) || canQuote(u));
+    }
+    case 'acceptQuote': {
+      const q = s.quotations.find((x) => x.id === a.id);
+      return !!q && canQuote(u) && q.status === 'en_attente' && (q.price ?? 0) > 0 && a.qty > 0 && !!a.ref && !s.products.some((p) => p.id === a.ref || p.ref === a.ref);
+    }
+    case 'refuseQuote': {
+      const q = s.quotations.find((x) => x.id === a.id);
+      if (!q || (q.status !== 'demande' && q.status !== 'en_attente')) return false;
+      // Le fournisseur décline une demande de prix ; JONAS refuse une offre (ou annule sa demande)
+      return isSupplier(u) ? u.supplierId === q.supplierId && q.status === 'demande' : canQuote(u);
+    }
+    case 'deleteQuote': {
+      const q = s.quotations.find((x) => x.id === a.id);
+      return !!q && canQuote(u) && q.status !== 'acceptee';
+    }
     case 'setSupplierTerms':
       return !!s.suppliers.find((x) => x.id === a.supplierId) && (can(u, 'finance.pay') || can(u, 'proforma.sign')) && a.terms.depositPct >= 0 && a.terms.depositPct <= 100 && a.terms.balanceDays >= 0;
     case 'createProforma': {
@@ -1305,6 +1411,31 @@ function applyAction(s: State, a: Action): State {
           return a.logo ? { ...rest, logo: a.logo } : rest;
         }),
       };
+    case 'requestQuotes':
+      return { ...s, quotations: [...a.quotations, ...s.quotations] };
+    case 'submitOffer':
+      return { ...s, quotations: [a.quotation, ...s.quotations] };
+    case 'answerQuote':
+      return mapQ(s, a.id, (q) => ({
+        ...q,
+        price: a.price,
+        status: 'en_attente',
+        answeredAt: new Date().toISOString(),
+        ...(a.photos?.length ? { photos: [...q.photos, ...a.photos].slice(0, 10) } : {}),
+        ...(a.note?.trim() ? { note: [q.note, a.note.trim()].filter(Boolean).join('\n') } : {}),
+      }));
+    case 'acceptQuote': {
+      const q = s.quotations.find((x) => x.id === a.id)!;
+      const p = productFromQuotation(s, q, a.ref, a.ean, a.qty, a.pcb);
+      const next = mapQ(s, a.id, (x) => ({ ...x, status: 'acceptee', decidedAt: new Date().toISOString(), decidedBy: me, productId: p.id }));
+      return { ...next, products: [...next.products, p] };
+    }
+    case 'refuseQuote': {
+      const side = isSupplier(currentUser(s)) ? 'fournisseur' : 'jonas';
+      return mapQ(s, a.id, (q) => ({ ...q, status: 'refusee', decidedAt: new Date().toISOString(), decidedBy: me, refusedBy: side, ...(a.reason?.trim() ? { reason: a.reason.trim() } : {}) }));
+    }
+    case 'deleteQuote':
+      return { ...s, quotations: s.quotations.filter((q) => q.id !== a.id) };
     case 'setSupplierTerms':
       return { ...s, suppliers: s.suppliers.map((x) => (x.id === a.supplierId ? { ...x, terms: a.terms } : x)) };
     case 'addSupplier':
@@ -2130,6 +2261,27 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
         target: a.proformaId ?? a.supplierId,
         text: a.demo ? `E-mail fournisseur préparé (démo) : ${a.subject}` : a.ok ? `E-mail envoyé à ${a.to.join(', ')} : ${a.subject}` : `Échec de l'envoi : ${a.subject}`,
       };
+    case 'requestQuotes':
+      return {
+        target: a.quotations[0].group ?? a.quotations[0].id,
+        text: `Demande de prix « ${a.quotations[0].name} » envoyée à ${a.quotations.map((q) => s.suppliers.find((x) => x.id === q.supplierId)?.shortName ?? q.supplierId).join(', ')}`,
+      };
+    case 'submitOffer':
+      return { target: a.quotation.id, text: `Offre de ${s.suppliers.find((x) => x.id === a.quotation.supplierId)?.shortName} : ${a.quotation.name} à ${a.quotation.price} ${a.quotation.currency}` };
+    case 'answerQuote': {
+      const q = s.quotations.find((x) => x.id === a.id);
+      return { target: a.id, text: `Prix reçu de ${s.suppliers.find((x) => x.id === q?.supplierId)?.shortName} : ${q?.name} à ${a.price} ${q?.currency}` };
+    }
+    case 'acceptQuote': {
+      const q = s.quotations.find((x) => x.id === a.id);
+      return { target: a.ref, text: `Offre acceptée : ${q?.name} (${s.suppliers.find((x) => x.id === q?.supplierId)?.shortName}) → produit ${a.ref} créé, ${a.qty} pcs au panier` };
+    }
+    case 'refuseQuote': {
+      const q = s.quotations.find((x) => x.id === a.id);
+      return { target: a.id, text: `${q?.status === 'demande' ? 'Demande de prix déclinée' : 'Offre refusée'} : ${q?.name}${a.reason?.trim() ? ` (${a.reason.trim()})` : ''}` };
+    }
+    case 'deleteQuote':
+      return { target: a.id, text: `Offre supprimée : ${s.quotations.find((x) => x.id === a.id)?.name}` };
     case 'setSupplierLogo':
       return { target: a.supplierId, text: `${s.suppliers.find((x) => x.id === a.supplierId)?.shortName} : logo ${a.logo ? 'mis à jour' : 'retiré'}` };
     case 'setSupplierTerms':

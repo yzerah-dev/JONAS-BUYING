@@ -23,6 +23,8 @@ const Finance = lazy(() => import('./pages/Finance'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Journal = lazy(() => import('./pages/Journal'));
 const Booking = lazy(() => import('./pages/Booking'));
+const Quotations = lazy(() => import('./pages/Quotations'));
+const PortalOffers = lazy(() => import('./portal/PortalOffers'));
 const portal = <K extends keyof typeof import('./portal/PortalPages')>(name: K) => lazy(() => import('./portal/PortalPages').then((m) => ({ default: m[name] as () => ReactNode })));
 const PortalHome = portal('PortalHome');
 const PortalProducts = portal('PortalProducts');
@@ -61,12 +63,14 @@ export default function App() {
             <Route path="parametres" element={page(<Settings />)} />
             <Route path="journal" element={page(<Journal />)} />
             <Route path="booking" element={page(<Booking />)} />
+            <Route path="offres" element={page(<Quotations />)} />
           </Route>
           <Route path="portail" element={<PortalLayout />}>
             <Route index element={page(<PortalHome />)} />
             <Route path="produits" element={page(<PortalProducts />)} />
             <Route path="produits/:id" element={page(<PortalProductDetail />)} />
             <Route path="proformas" element={page(<PortalProformas />)} />
+            <Route path="offres" element={page(<PortalOffers />)} />
             <Route path="packs" element={page(<PortalPacks />)} />
             <Route path="booking" element={page(<PortalBooking />)} />
             <Route path="chargement" element={page(<PortalLoading />)} />

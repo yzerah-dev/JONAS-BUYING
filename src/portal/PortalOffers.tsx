@@ -1,0 +1,192 @@
+import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { Plus, Send, X } from 'lucide-react';
+import { newQuoteId, supplierTerms } from '../data/store';
+import type { ProductPhoto, Quotation } from '../data/types';
+import { supplierScope } from '../lib/files';
+import { QuoteCard, QuotePhotosInput } from '../components/Quotations';
+import { parsePrice } from '../lib/quotes';
+import { Seg } from '../components/ui';
+import { toast } from '../components/ui-shared';
+import { useT } from '../i18n';
+import { usePortal } from './usePortal';
+
+type View = 'chiffrer' | 'envoyees' | 'closes';
+
+/** Portail : demandes de prix de JONAS (donner son prix ou décliner) et offres spontanées du fournisseur */
+export default function PortalOffers() {
+  const { state, dispatch, supplier, user } = usePortal();
+  const { t } = useT();
+  const [params, setParams] = useSearchParams();
+  const mine = state.quotations.filter((q) => q.supplierId === supplier?.id);
+  const toAnswer = mine.filter((q) => q.status === 'demande');
+  const sent = mine.filter((q) => q.status === 'en_attente');
+  const closed = mine.filter((q) => q.status === 'acceptee' || q.status === 'refusee');
+  const view = (params.get('vue') as View | null) ?? (toAnswer.length || !sent.length ? 'chiffrer' : 'envoyees');
+  const [creating, setCreating] = useState(false);
+  const [price, setPrice] = useState<Record<string, string>>({});
+  const [declining, setDeclining] = useState<string | null>(null);
+  const [reason, setReason] = useState('');
+  if (!supplier) return null;
+  const list = (view === 'chiffrer' ? toAnswer : view === 'envoyees' ? sent : closed).slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return (
+    <>
+      <div className="page-head">
+        <h1>{t('nav.offers')}</h1>
+        <span className="page-sub">{t('q.portal.sub')}</span>
+        <div className="grow" />
+        <button type="button" className="btn primary" onClick={() => setCreating(true)}>
+          <Plus size={16} /> {t('q.new')}
+        </button>
+      </div>
+      <div className="mb">
+        <Seg
+          value={view}
+          onChange={(v) => setParams({ vue: v })}
+          options={[
+            { id: 'chiffrer', label: t('q.tab.toAnswer', { n: toAnswer.length }) },
+            { id: 'envoyees', label: t('q.tab.sent', { n: sent.length }) },
+            { id: 'closes', label: t('q.tab.closed', { n: closed.length }) },
+          ]}
+        />
+      </div>
+      {list.length === 0 && <div className="card empty">{t('q.empty')}</div>}
+      <div className="qt-grid">
+        {list.map((q) => (
+          <QuoteCard key={q.id} q={q} showSupplier={false}>
+            {q.status === 'demande' &&
+              (declining === q.id ? (
+                <>
+                  <input className="qt-price-in grow" value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t('q.declineReason')} aria-label={t('q.declineReason')} autoFocus />
+                  <button
+                    type="button"
+                    className="btn danger"
+                    onClick={() => {
+                      dispatch({ type: 'refuseQuote', id: q.id, reason });
+                      setDeclining(null);
+                      setReason('');
+                      toast(t('q.declined'));
+                    }}
+                  >
+                    {t('q.decline')}
+                  </button>
+                  <button type="button" className="btn ghost" onClick={() => setDeclining(null)}>
+                    {t('q.cancel')}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <input
+                    className="qt-price-in"
+                    inputMode="decimal"
+                    placeholder={t('q.price', { c: q.currency })}
+                    aria-label={t('q.price', { c: q.currency })}
+                    value={price[q.id] ?? ''}
+                    onChange={(e) => setPrice({ ...price, [q.id]: e.target.value })}
+                  />
+                  <button
+                    type="button"
+                    className="btn primary"
+                    disabled={!parsePrice(price[q.id] ?? '')}
+                    onClick={() => {
+                      dispatch({ type: 'answerQuote', id: q.id, price: parsePrice(price[q.id] ?? '') });
+                      toast(t('q.answered'));
+                    }}
+                  >
+                    <Send size={15} /> {t('q.answer')}
+                  </button>
+                  <button type="button" className="btn ghost" onClick={() => setDeclining(q.id)}>
+                    {t('q.decline')}
+                  </button>
+                </>
+              ))}
+          </QuoteCard>
+        ))}
+      </div>
+      {creating && (
+        <NewOffer
+          supplierId={supplier.id}
+          currency={supplierTerms(state, supplier.id).currency}
+          onClose={() => setCreating(false)}
+          onSend={(q) => {
+            dispatch({ type: 'submitOffer', quotation: { ...q, createdBy: user.name } });
+            toast(t('q.sentOk'));
+            setCreating(false);
+            setParams({ vue: 'envoyees' });
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+function NewOffer({ supplierId, currency, onClose, onSend }: { supplierId: string; currency: Quotation['currency']; onClose: () => void; onSend: (q: Quotation) => void }) {
+  const { t } = useT();
+  const [photos, setPhotos] = useState<ProductPhoto[]>([]);
+  const [name, setName] = useState('');
+  const [price, setPrice] = useState('');
+  const [note, setNote] = useState('');
+  const ok = !!name.trim() && parsePrice(price) > 0;
+  return (
+    <div className="palette-back" onMouseDown={onClose}>
+      <div className="card rc-dialog bk-dialog" role="dialog" aria-label={t('q.newTitle')} onMouseDown={(e) => e.stopPropagation()}>
+        <header className="rc-head">
+          <div>
+            <h2>{t('q.newTitle')}</h2>
+            <span className="muted small">{t('q.newHint')}</span>
+          </div>
+          <button type="button" className="icon-btn" onClick={onClose} aria-label={t('q.cancel')}>
+            <X size={20} />
+          </button>
+        </header>
+        <div className="bk-form">
+          <div className="bk-wide">
+            <div className="lbl">{t('q.photos')}</div>
+            <QuotePhotosInput scope={supplierScope(supplierId)} photos={photos} onChange={setPhotos} />
+          </div>
+          <label className="bk-wide">
+            <span>{t('q.name')}</span>
+            <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
+          </label>
+          <label>
+            <span>{t('q.price', { c: currency })}</span>
+            <input className="input" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} />
+          </label>
+          <label>
+            <span>{t('q.note')}</span>
+            <input className="input" value={note} onChange={(e) => setNote(e.target.value)} />
+          </label>
+        </div>
+        <footer className="rc-foot">
+          <span />
+          <button type="button" className="btn ghost" onClick={onClose}>
+            {t('q.cancel')}
+          </button>
+          <button
+            type="button"
+            className="btn primary"
+            disabled={!ok}
+            onClick={() =>
+              onSend({
+                id: newQuoteId(),
+                kind: 'quotation',
+                supplierId,
+                origin: 'spontanee',
+                name: name.trim(),
+                photos,
+                price: parsePrice(price),
+                currency,
+                ...(note.trim() ? { note: note.trim() } : {}),
+                status: 'en_attente',
+                createdAt: new Date().toISOString(),
+                createdBy: '',
+              })
+            }
+          >
+            <Send size={16} /> {t('q.send')}
+          </button>
+        </footer>
+      </div>
+    </div>
+  );
+}

@@ -51,3 +51,22 @@ test('retour du lien e-mail : code lu, adresse nettoyée sans casser le HashRout
   expect(authMessage({ code: 'invalid_credentials', message: 'Invalid login credentials' }, true)).toMatch(/mot de passe incorrect/);
   expect(authMessage({ message: 'For security purposes, you can only request this after 42 seconds.', status: 429 }, false)).toMatch(/patientez/);
 });
+
+test('offres de prix : rangées dans « products » (mêmes droits d’accès), relues comme offres, jamais comme produits', () => {
+  const s = { ...load(), currentUserId: 'david' };
+  const docs = toDocs(s);
+  expect(docs.filter((d) => d.collection === 'products' && d.id.startsWith('Q-')).length).toBe(s.quotations.length);
+  const back = fromDocs(docs, { ...s, products: [], quotations: [] });
+  expect(back.quotations).toEqual(s.quotations);
+  expect(back.products).toEqual(s.products);
+  // Réponse reçue d'un fournisseur (temps réel) puis acceptation locale : produit créé + offre mise à jour
+  const q = { ...s.quotations.find((x) => x.status === 'demande')!, price: 2.1, status: 'en_attente' as const };
+  const got = applyRemoteChange(s, { collection: 'products', id: q.id, data: q });
+  expect(got.quotations.find((x) => x.id === q.id)!.price).toBe(2.1);
+  expect(got.products).toBe(s.products);
+  const next = reducer(got, { type: 'acceptQuote', id: q.id, ref: 'TEST-Q1', ean: '3701570000000', qty: 500 });
+  const { upserts, deletes } = diffState(got, next);
+  expect(deletes).toEqual([]);
+  expect(upserts.map((d) => `${d.collection}:${d.collection === 'journal' ? 'entrée' : d.id}`).sort()).toEqual(['journal:entrée', `products:${q.id}`, 'products:TEST-Q1'].sort());
+  expect(applyRemoteChange(next, { collection: 'products', id: q.id, data: null }).quotations.some((x) => x.id === q.id)).toBe(false);
+});

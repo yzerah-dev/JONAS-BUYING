@@ -657,3 +657,42 @@ export interface LoadingDate {
 
 export type CustomsStatus = 'en_cours' | 'dedouane';
 export const CUSTOMS_LABEL: Record<CustomsStatus, string> = { en_cours: 'Dédouanement en cours', dedouane: 'Dédouané' };
+
+/**
+ * Offre de prix (quotation) : demande de prix envoyée par JONAS à un fournisseur (une offre par fournisseur),
+ * ou offre spontanée déposée par le fournisseur depuis son portail. Contenu : photos, désignation, prix (devise du fournisseur).
+ * Acceptée : le produit est créé au catalogue (en développement) et ajouté au panier de commande.
+ * Enregistrée dans la collection « products » de la base partagée (marquée kind = 'quotation') : mêmes règles d'accès.
+ */
+export type QuotationStatus = 'demande' | 'en_attente' | 'acceptee' | 'refusee';
+
+export interface Quotation {
+  id: string;
+  kind: 'quotation';
+  supplierId: string;
+  /** Demande de prix JONAS, ou offre spontanée du fournisseur */
+  origin: 'rfq' | 'spontanee';
+  /** Même demande envoyée à plusieurs fournisseurs : comparaison des offres */
+  group?: string;
+  name: string;
+  photos: ProductPhoto[];
+  /** Pictogramme si aucune photo */
+  emoji?: string;
+  /** Prix unitaire proposé par le fournisseur, dans sa devise */
+  price?: number;
+  currency: Currency;
+  /** Prix cible indiqué par JONAS (demande de prix) */
+  targetPrice?: number;
+  note?: string;
+  status: QuotationStatus;
+  createdAt: string;
+  createdBy: string;
+  answeredAt?: string;
+  decidedAt?: string;
+  decidedBy?: string;
+  /** Refus : motif, et qui a refusé (JONAS ou le fournisseur qui décline la demande) */
+  reason?: string;
+  refusedBy?: 'jonas' | 'fournisseur';
+  /** Produit créé à l'acceptation */
+  productId?: string;
+}

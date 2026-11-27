@@ -12,6 +12,7 @@ import type {
   Supplier,
   Validation,
   ValidationStep,
+  Quotation,
 } from './types';
 import { CONTAINER_CAPACITY } from './types';
 import { addDays } from '../lib/format';
@@ -794,3 +795,54 @@ export const users: User[] = [
     }
   }
 }
+
+// Offres de prix de démonstration : une demande envoyée à deux fournisseurs (une réponse reçue), une offre spontanée
+export const quotations: Quotation[] = [
+  {
+    id: 'Q-DEMO-1',
+    kind: 'quotation',
+    supplierId: 'tide',
+    origin: 'spontanee',
+    name: 'Bougie parfumée verre ambré 200 g',
+    photos: [],
+    emoji: '🕯️',
+    price: 1.85,
+    currency: 'EUR',
+    note: 'MOQ 3000 pcs, 4 fragrances',
+    status: 'en_attente',
+    createdAt: '2026-11-24T08:30:00.000Z',
+    createdBy: 'Mr. Chen',
+  },
+  {
+    id: 'Q-DEMO-2',
+    kind: 'quotation',
+    supplierId: 'horizon',
+    origin: 'rfq',
+    group: 'G-DEMO-1',
+    name: 'Coussin extérieur déperlant 45 × 45',
+    photos: [],
+    emoji: '🛋️',
+    targetPrice: 2.2,
+    price: 2.35,
+    currency: 'EUR',
+    status: 'en_attente',
+    createdAt: '2026-11-20T09:00:00.000Z',
+    createdBy: 'David',
+    answeredAt: '2026-11-23T03:10:00.000Z',
+  },
+  {
+    id: 'Q-DEMO-3',
+    kind: 'quotation',
+    supplierId: 'tide',
+    origin: 'rfq',
+    group: 'G-DEMO-1',
+    name: 'Coussin extérieur déperlant 45 × 45',
+    photos: [],
+    emoji: '🛋️',
+    targetPrice: 2.2,
+    currency: 'EUR',
+    status: 'demande',
+    createdAt: '2026-11-20T09:00:00.000Z',
+    createdBy: 'David',
+  },
+];

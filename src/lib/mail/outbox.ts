@@ -37,6 +37,8 @@ export interface MailEvent {
   productIds?: string[];
   /** Plan de chargement : conteneur concerné */
   containerId?: string;
+  /** Demande de prix : offre concernée */
+  quoteId?: string;
 }
 
 /** Événements à notifier entre deux états (action locale) */
@@ -67,6 +69,9 @@ export function detectMailEvents(prev: State, next: State): MailEvent[] {
   };
   group('diecut', (p, o) => p.pack.dieCut === 'requested' && o.pack.dieCut !== 'requested');
   group('pack', (p, o) => p.pack.sentToSupplier && !o.pack.sentToSupplier);
+  // Demandes de prix : un e-mail par fournisseur interrogé
+  const prevQ = new Set((prev.quotations ?? []).map((q) => q.id));
+  for (const q of next.quotations ?? []) if (!prevQ.has(q.id) && q.origin === 'rfq') out.push({ kind: 'quote', supplierId: q.supplierId, quoteId: q.id });
   return out;
 }
 
@@ -80,6 +85,12 @@ export interface PreparedMail {
   attachments: { filename: string; blob: Blob }[];
   status: 'sending' | 'sent' | 'demo' | 'failed' | 'no_contact';
   error?: string;
+}
+
+function quoteItems(s: State, id?: string) {
+  const q = s.quotations.find((x) => x.id === id);
+  if (!q) return [];
+  return [{ ref: 'RFQ', name: q.name, sub: [q.targetPrice ? `Target ${money(q.targetPrice, q.currency)}` : '', q.note ?? ''].filter(Boolean).join(' · ') || undefined }];
 }
 
 const proformaOf = (s: State, productIds: string[]) => s.proformas.find((pf) => pf.lines.some((l) => productIds.includes(l.productId)));
@@ -124,6 +135,10 @@ export async function prepareMail(s: State, ev: MailEvent): Promise<PreparedMail
       const { loadingPlanXlsx, loadingPlanFileName } = await import('../loadingPlan');
       files.push({ filename: loadingPlanFileName(c), blob: loadingPlanXlsx(s, c) });
     }
+  } else if (ev.kind === 'quote') {
+    link = `${APP_URL}/#/portail/offres`;
+    const q = s.quotations.find((x) => x.id === ev.quoteId);
+    q?.photos.forEach((ph, i) => files.push({ filename: `photo-${i + 1}.${ph.mime.split('/')[1]?.replace('jpeg', 'jpg') || 'jpg'}`, blob: getBlob(ph.fileId) }));
   } else if (ev.kind === 'pack') {
     link = `${APP_URL}/#/portail/packs`;
     for (const p of prods) {
@@ -161,7 +176,7 @@ export async function prepareMail(s: State, ev: MailEvent): Promise<PreparedMail
     pfTitle: pf?.title,
     amount: t && ev.kind !== 'loading' ? (ev.kind === 'deposit' ? money(Math.round(t.depositCur), t.currency) : money(Math.round(t.amountCur), t.currency)) : undefined,
     loading: pf && (ev.kind === 'order' || ev.kind === 'signed') ? `${weekLabel(pf.etd)} · ${pf.etd}` : undefined,
-    items: ev.kind === 'deposit' ? undefined : items,
+    items: ev.kind === 'deposit' ? undefined : ev.kind === 'quote' ? quoteItems(s, ev.quoteId) : items,
     container: ctn ? `${ctn.type} · ${ctn.number ?? ctn.id} · ${containerCbm(s, ctn).toFixed(1).replace('.', ',')} / ${containerCapacity(ctn)} m³` : undefined,
     attached: attachments.map((a) => a.filename),
     onPlatform,
@@ -170,7 +185,7 @@ export async function prepareMail(s: State, ev: MailEvent): Promise<PreparedMail
     sender: me?.name,
   };
   return {
-    id: `${ev.kind}-${ev.proformaId ?? ev.productIds?.join('.') ?? ''}-${Date.now()}`,
+    id: `${ev.kind}-${ev.proformaId ?? ev.quoteId ?? ev.productIds?.join('.') ?? ''}-${Date.now()}`,
     event: ev,
     supplier: sup,
     to,

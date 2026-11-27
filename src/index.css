@@ -2598,3 +2598,36 @@ tr.pf-moving td, .pf-line.pf-moving { background: #fff6e8 !important; outline: 2
 .ch-files { flex: none; min-height: 160px; max-height: calc(100vh / var(--z, 1) - 220px); }
 .ch-input textarea { max-height: 280px; min-height: 42px; line-height: 1.4; overflow-y: auto; box-sizing: border-box; }
 .ch { margin-bottom: 72px; }
+
+/* Offres de prix (quotations) */
+.nav-badge { margin-left: auto; min-width: 22px; height: 22px; padding: 0 7px; border-radius: 999px; background: #e0701a; color: #fff; font-size: 12px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; }
+.qt-count { font-size: 12px; background: rgba(10, 20, 16, 0.08); padding: 1px 7px; border-radius: 999px; }
+.qt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr)); gap: 16px; }
+.qt-card { display: flex; flex-direction: column; overflow: hidden; padding: 0; }
+.qt-hero { position: relative; aspect-ratio: 4 / 3; background: #f4f6f8; display: flex; align-items: center; justify-content: center; font-size: 72px; }
+.qt-hero .product-pic { width: 100%; height: 100%; object-fit: contain; background: #fff; }
+.qt-status { position: absolute; top: 10px; left: 10px; color: #fff; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; }
+.qt-best { position: absolute; top: 10px; right: 10px; background: #fff7d6; color: #8a5a00; font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12); }
+.qt-strip { display: flex; gap: 6px; padding: 8px 12px 0; overflow-x: auto; }
+.qt-strip button { border: 2px solid transparent; border-radius: 8px; padding: 0; background: none; cursor: pointer; }
+.qt-strip button.on { border-color: var(--green); }
+.qt-thumb { position: relative; width: 52px; height: 52px; border-radius: 6px; overflow: hidden; background: #f4f6f8; display: inline-flex; flex-shrink: 0; }
+.qt-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.qt-thumb-x { position: absolute; top: 2px; right: 2px; width: 20px; height: 20px; border-radius: 50%; border: 0; background: rgba(0, 0, 0, 0.6); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+.qt-photos { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px; border: 2px dashed var(--line); border-radius: 12px; }
+.qt-photos .qt-thumb { width: 84px; height: 84px; }
+.qt-add { width: 84px; height: 84px; border-radius: 8px; border: 0; background: #eef3f1; color: var(--green-dark); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 11px; font-weight: 700; cursor: pointer; text-align: center; }
+.qt-body { padding: 12px 14px; display: grid; gap: 6px; }
+.qt-sup { display: flex; align-items: center; gap: 8px; font-size: 15px; }
+.qt-name { font-size: 16px; font-weight: 700; line-height: 1.3; }
+.qt-price { font-size: 24px; font-weight: 800; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.qt-price small { font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.qt-note { background: #f6f8f7; border-radius: 8px; padding: 6px 9px; white-space: pre-wrap; }
+.qt-actions { margin-top: auto; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 10px 14px 14px; border-top: 1px solid var(--line); }
+.qt-price-in { width: 170px; height: 38px; border: 1px solid var(--line); border-radius: 10px; padding: 0 10px; font-size: 15px; }
+.qt-price-in.grow { flex: 1 1 170px; }
+.qt-refusee .qt-hero { opacity: 0.6; }
+.qt-sups { display: flex; flex-wrap: wrap; gap: 8px; }
+.qt-sup-pick { display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px 5px 6px; border-radius: 999px; border: 1px solid var(--line); background: #fff; font-weight: 600; cursor: pointer; }
+.qt-sup-pick small { color: var(--ink-2); font-weight: 500; }
+.qt-sup-pick.on { border-color: var(--green); background: var(--green-soft); color: var(--green-dark); }

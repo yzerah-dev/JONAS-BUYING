@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { BarChart3, CalendarCheck, Box, Boxes, Euro, History, Layers, ListChecks, Search, Settings, Truck } from 'lucide-react';
+import { BarChart3, CalendarCheck, Box, Boxes, Euro, History, Layers, ListChecks, Search, Settings, Tag, Truck } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 import SearchPalette from './SearchPalette';
-import { currentUser, useStore } from '../data/store';
+import { currentUser, pendingQuotes, useStore } from '../data/store';
 import { canSee, isSupplier, type Module } from '../data/permissions';
 import { useTableLabels } from './useTableLabels';
 import { ContainerGlyph, Toaster } from './ui';
@@ -16,6 +16,7 @@ import MailOutbox from './MailOutbox';
 // Menu principal (maquette) puis modules complémentaires
 const NAV: { to: string; label: string; icon: typeof Layers; module: Module }[] = [
   { to: '/proformas', label: 'Proformas', icon: Layers, module: 'proformas' },
+  { to: '/offres', label: 'Offres de prix', icon: Tag, module: 'proformas' },
   // Développement et packs : une seule page
   { to: '/design', label: 'Développement', icon: Box, module: 'design' },
   { to: '/conteneurs', label: 'Conteneurs', icon: ContainerGlyph as unknown as typeof Layers, module: 'conteneurs' },
@@ -36,6 +37,7 @@ function moduleOf(path: string): Module {
     '': 'home',
     performance: 'home',
     proformas: 'proformas',
+    offres: 'proformas',
     produits: 'produits',
     listes: 'produits',
     developpement: 'design',
@@ -90,6 +92,7 @@ export default function Layout() {
         {NAV.filter((n) => canSee(user, n.module)).map((n) => (
           <NavLink key={n.to} to={n.to}>
             <n.icon size={22} strokeWidth={1.8} /> {n.label}
+            {n.to === '/offres' && pendingQuotes(state).length > 0 && <span className="nav-badge">{pendingQuotes(state).length}</span>}
           </NavLink>
         ))}
         {NAV_MORE.some((n) => canSee(user, n.module)) && <div className="nav-sep" />}

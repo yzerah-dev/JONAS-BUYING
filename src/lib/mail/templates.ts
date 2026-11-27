@@ -2,7 +2,7 @@
 // Mise en page en tableaux et styles en ligne : lisible dans Gmail, Outlook, Apple Mail et les messageries chinoises.
 
 export type MailLang = 'fr' | 'en' | 'zh';
-export type MailKind = 'order' | 'signed' | 'diecut' | 'deposit' | 'pack' | 'loading';
+export type MailKind = 'order' | 'signed' | 'diecut' | 'deposit' | 'pack' | 'loading' | 'quote';
 
 export interface MailItem {
   ref: string;
@@ -105,6 +105,12 @@ const T: Record<
         intro: () => 'Voici le plan de chargement prévu par JONAS (fichier Excel joint). Merci de le vérifier et de le valider, ou de proposer vos modifications, dans votre espace.',
         button: 'Voir le plan de chargement',
       },
+      quote: {
+        subject: (d) => `Demande de prix – ${d.items?.[0]?.name ?? ''}`,
+        title: 'Demande de prix',
+        intro: () => 'JONAS INTERNATIONAL vous demande votre meilleur prix pour l’article ci-dessous (photos jointes). Merci d’indiquer votre prix unitaire dans votre espace fournisseur.',
+        button: 'Donner mon prix',
+      },
     },
   },
   en: {
@@ -155,6 +161,12 @@ const T: Record<
         title: 'Loading plan',
         intro: () => 'Please find the loading plan prepared by JONAS (Excel file attached). Please check and confirm it, or propose your changes, in your supplier space.',
         button: 'View the loading plan',
+      },
+      quote: {
+        subject: (d) => `Price request – ${d.items?.[0]?.name ?? ''}`,
+        title: 'Price request',
+        intro: () => 'JONAS INTERNATIONAL asks for your best price for the item below (photos attached). Please enter your unit price in your supplier space.',
+        button: 'Give my price',
       },
     },
   },
@@ -207,6 +219,12 @@ const T: Record<
         intro: () => '附件为 JONAS 制定的装柜计划（Excel 文件）。请在您的供应商门户中核对并确认，或提出修改。',
         button: '查看装柜计划',
       },
+      quote: {
+        subject: (d) => `询价 – ${d.items?.[0]?.name ?? ''}`,
+        title: '询价',
+        intro: () => 'JONAS INTERNATIONAL 请您为以下产品提供最优价格（附照片）。请在您的供应商门户中填写单价。',
+        button: '填写报价',
+      },
     },
   },
 };
@@ -227,7 +245,7 @@ const GREEN_DARK = '#0b5e47';
 const INK = '#14201c';
 const MUTED = '#5f6d68';
 const LINE = '#e3e9e6';
-const ACCENT: Record<MailKind, string> = { order: '#1d6fd8', signed: GREEN, diecut: '#e0701a', deposit: '#7b2cbf', pack: GREEN, loading: '#2a63c7' };
+const ACCENT: Record<MailKind, string> = { order: '#1d6fd8', signed: GREEN, diecut: '#e0701a', deposit: '#7b2cbf', pack: GREEN, loading: '#2a63c7', quote: '#0f766e' };
 
 function section(d: MailData, l: MailLang, first: boolean) {
   const t = T[l];
