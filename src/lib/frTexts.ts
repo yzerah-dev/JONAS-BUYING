@@ -1,6 +1,28 @@
 import { remoteEnabled } from '../data/remote';
 import { supabase } from '../data/supabaseSync';
 import { sampleCap } from './proformaExtract';
+import { getBlob } from './files';
+
+/** Photo réduite à 640 px (JPEG) pour Claude : base64 + type, ou null */
+async function smallPhoto(fileId: string): Promise<{ data: string; type: string } | null> {
+  try {
+    const blob = await getBlob(fileId);
+    if (!blob) return null;
+    const bmp = await createImageBitmap(blob);
+    const k = Math.min(1, 640 / Math.max(bmp.width, bmp.height));
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(bmp.width * k));
+    c.height = Math.max(1, Math.round(bmp.height * k));
+    const ctx = c.getContext('2d')!;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, c.width, c.height);
+    ctx.drawImage(bmp, 0, 0, c.width, c.height);
+    const url = c.toDataURL('image/jpeg', 0.82);
+    return { data: url.slice(url.indexOf(',') + 1), type: 'image/jpeg' };
+  } catch {
+    return null;
+  }
+}
 
 export interface FrText {
   id: string;
@@ -14,6 +36,7 @@ const PROMPT = `Tu es rédacteur produit pour JONAS, importateur français (baza
 Pour chaque article, à partir du texte anglais du fournisseur, écris :
 - "name" : la désignation commerciale en français, courte et claire (2 à 6 mots, majuscule au premier mot seulement, sans référence, sans prix, sans quantité ni conditionnement). Exemples : « Mug léopard 350 ml », « Gourde léopard 500 ml », « Râpe 2 faces avec boîte ».
 - "fr" : la description longue en français, retravaillée pour un catalogue : une phrase d'accroche puis les caractéristiques utiles (matière, dimensions, contenance, coloris ou nombre de modèles). Reprends fidèlement le texte anglais, n'invente rien. Texte simple, 2 à 5 lignes.
+Si une photo de l'article est disponible, elle fait foi : contrôle le texte par rapport à elle (objet, forme, nombre de pièces, couleurs, motif) et corrige la désignation et la description en cas de désaccord.
 Renvoie UNIQUEMENT un objet JSON : {"items": [{"id": "…", "name": "…", "fr": "…"}]} avec chaque "id" inchangé.`;
 
 const clean = (v: unknown, ids: Set<string>): FrText[] => {
@@ -29,8 +52,9 @@ export type FrFailure = 'unavailable' | 'not_configured' | 'error';
  * Désignation et description françaises à partir du texte anglais du fournisseur, par Claude.
  * Démo (claude.ai) : Claude de la page. Plateforme : fonction serveur /api/textes-fr (clé Claude côté Vercel).
  */
-export async function frenchTexts(items: { id: string; en: string }[]): Promise<FrText[] | FrFailure> {
-  const list = items.filter((i) => i.en.trim());
+export async function frenchTexts(items: { id: string; en: string; photo?: string }[]): Promise<FrText[] | FrFailure> {
+  const list = items.filter((i) => i.en.trim()).map(({ id, en }) => ({ id, en }));
+  const photoOf = new Map(items.filter((i) => i.photo).map((i) => [i.id, i.photo!]));
   if (!list.length) return [];
   const ids = new Set(list.map((i) => i.id));
   const sample = await sampleCap();
@@ -46,7 +70,9 @@ export async function frenchTexts(items: { id: string; en: string }[]): Promise<
     const { data } = await supabase().auth.getSession();
     const token = data.session?.access_token;
     if (!token) return 'unavailable';
-    const r = await fetch('/api/textes-fr', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ items: list }) });
+    // Photo de chaque article, réduite (contrôle du texte par rapport à la photo)
+    const withPhotos = await Promise.all(list.map(async (i) => ({ ...i, photo: photoOf.has(i.id) ? ((await smallPhoto(photoOf.get(i.id)!)) ?? undefined) : undefined })));
+    const r = await fetch('/api/textes-fr', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ items: withPhotos }) });
     if (r.status === 503 || r.status === 404) return 'not_configured';
     if (!r.ok) return 'error';
     return clean(await r.json(), ids);

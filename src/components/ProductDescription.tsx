@@ -30,7 +30,7 @@ export default function ProductDescription({ product: p }: { product: Product })
     const source = p.description?.en?.trim() || p.name;
     setBusy(true);
     try {
-      const res = await frenchTexts([{ id: p.id, en: source }]);
+      const res = await frenchTexts([{ id: p.id, en: source, photo: p.photo?.fileId }]);
       if (res === 'not_configured') return toast('Traduction automatique pas encore activée : la clé Claude (ANTHROPIC_API_KEY) doit être ajoutée dans Vercel.');
       if (typeof res === 'string' || !res.length) return toast('Français non généré : réessayez dans un instant.');
       dispatch(frenchPatch({ ...p, description: { ...p.description, en: source } }, res[0]));

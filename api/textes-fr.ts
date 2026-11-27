@@ -24,6 +24,10 @@ const SYSTEM = `Tu es rédacteur produit pour JONAS, importateur français (baza
 Pour chaque article, à partir du texte anglais du fournisseur, écris :
 - "name" : la désignation commerciale en français, courte et claire (2 à 6 mots, majuscule au premier mot seulement, sans référence, sans prix, sans quantité ni conditionnement). Exemples : « Mug léopard 350 ml », « Gourde léopard 500 ml », « Râpe 2 faces avec boîte », « Set de 4 valises ».
 - "fr" : la description longue en français, retravaillée pour un catalogue : une phrase d'accroche puis les caractéristiques utiles (matière, dimensions, contenance, coloris ou nombre de modèles, entretien si indiqué). Reprends fidèlement les informations du texte anglais, n'invente rien. Texte simple, sans markdown, 2 à 5 lignes.
+Une photo de l'article est souvent jointe (juste après son texte). Elle fait foi :
+- contrôle le texte anglais par rapport à la photo : type d'objet, forme, nombre de pièces ou de modèles, couleurs, motif (ex. léopard, rayures), accessoires visibles ;
+- si le texte et la photo ne concordent pas, ou si le texte est incomplet, corrige la désignation et la description d'après la photo ;
+- n'ajoute que ce que l'on voit vraiment ; les caractéristiques invisibles (matière, dimensions, contenance) viennent uniquement du texte du fournisseur.
 Renvoie chaque article avec son "id" inchangé.`;
 
 async function userOf(token: string) {
@@ -38,9 +42,15 @@ export async function POST(request: Request): Promise<Response> {
   const user = await userOf(token);
   if (!user?.id) return Response.json({ error: 'unauthorized' }, { status: 401 });
 
-  const body = (await request.json().catch(() => null)) as { items?: { id?: unknown; en?: unknown }[] } | null;
+  const body = (await request.json().catch(() => null)) as { items?: { id?: unknown; en?: unknown; photo?: { data?: unknown; type?: unknown } }[] } | null;
+  const IMG = /^image\/(jpeg|png|webp|gif)$/;
   const items = (body?.items ?? [])
-    .map((i) => ({ id: String(i.id ?? ''), en: String(i.en ?? '').slice(0, 4000) }))
+    .map((i) => ({
+      id: String(i.id ?? ''),
+      en: String(i.en ?? '').slice(0, 4000),
+      // Photo du produit (réduite par le navigateur) : base64 + type d'image
+      photo: i.photo && typeof i.photo.data === 'string' && IMG.test(String(i.photo.type)) && i.photo.data.length < 1_500_000 ? { data: i.photo.data, type: String(i.photo.type) } : undefined,
+    }))
     .filter((i) => i.id && i.en.trim())
     .slice(0, MAX_ITEMS);
   if (!items.length) return Response.json({ items: [] });
@@ -52,7 +62,17 @@ export async function POST(request: Request): Promise<Response> {
       max_tokens: 16000,
       output_config: { effort: 'low', format: zodOutputFormat(Result) },
       system: SYSTEM,
-      messages: [{ role: 'user', content: `Articles (JSON) :\n${JSON.stringify(items)}` }],
+      messages: [
+        {
+          role: 'user',
+          content: items.flatMap((i) => [
+            { type: 'text' as const, text: `Article ${JSON.stringify({ id: i.id, en: i.en })}${i.photo ? ' — photo ci-dessous :' : ' — pas de photo.'}` },
+            ...(i.photo
+              ? [{ type: 'image' as const, source: { type: 'base64' as const, media_type: i.photo.type as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif', data: i.photo.data } }]
+              : []),
+          ]),
+        },
+      ],
     });
     if (response.stop_reason === 'refusal' || !response.parsed_output) return Response.json({ error: 'no_result' }, { status: 502 });
     const known = new Set(items.map((i) => i.id));

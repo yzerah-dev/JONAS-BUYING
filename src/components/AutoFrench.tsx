@@ -28,7 +28,7 @@ export default function AutoFrench() {
     busy.current = true;
     const batch: Product[] = todo.slice(0, BATCH);
     batch.forEach((p) => tried.add(p.id));
-    frenchTexts(batch.map((p) => ({ id: p.id, en: p.description!.en! })))
+    frenchTexts(batch.map((p) => ({ id: p.id, en: p.description!.en!, photo: p.photo?.fileId })))
       .then((res) => {
         if (res === 'not_configured' || res === 'unavailable') off = true;
         if (typeof res === 'string') return;
