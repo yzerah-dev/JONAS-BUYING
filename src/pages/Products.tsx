@@ -86,7 +86,13 @@ export default function Products() {
             onChange={pickF('supplier')}
             options={state.suppliers.map((x) => ({ id: x.id, label: x.shortName, sub: `${x.flag} ${x.city}` }))}
           />
-          <FilterChip label="Marque" allLabel="Toutes les marques" value={f.brand} onChange={pickF('brand')} options={state.brands.map((b) => ({ id: b.id, label: b.name }))} />
+          <FilterChip
+            label="Marque"
+            allLabel="Toutes les marques"
+            value={f.brand}
+            onChange={pickF('brand')}
+            options={[{ id: '', label: 'À définir' }, ...state.brands.map((b) => ({ id: b.id, label: b.name }))]}
+          />
           <FilterChip label="Collection" allLabel="Toutes" value={f.collection} onChange={pickF('collection')} options={collections.map((c) => ({ id: c, label: c }))} />
           <FilterChip label="Rayon" allLabel="Tous les rayons" value={f.rayon} onChange={pickF('rayon')} options={rayons.map((r) => ({ id: r, label: r }))} />
           <FilterChip

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Loader2, Plus, Send, X } from 'lucide-react';
-import { currentUser, nextProformaId, supplierTerms, useAuth, useStore } from '../data/store';
+import { currentUser, nextProformaId, supplierTerms, UNASSIGNED, useAuth, useStore } from '../data/store';
 import { isSupplier } from '../data/permissions';
 import { newFileId, putBlob, supplierScope } from '../lib/files';
 import { TODAY, addDays } from '../lib/format';
@@ -48,6 +48,12 @@ function NewProformaDialog({ onClose, onCreated }: { onClose: () => void; onCrea
   const [etd, setEtd] = useState(addDays(TODAY, 70));
   const [eta, setEta] = useState(addDays(TODAY, 105));
   const [lines, setLines] = useState<EditLine[]>([emptyLine()]);
+  // Nouveaux produits : marque et designer du pack choisis ici (sinon « À définir » / « À attribuer »)
+  const [newBrand, setNewBrand] = useState('');
+  const [newDesigner, setNewDesigner] = useState(UNASSIGNED);
+  const designers = [...new Set([...state.users.filter((u) => u.role === 'designer' && u.active && u.designerName).map((u) => u.designerName!), ...state.products.map((p) => p.pack.designer)])]
+    .filter((d) => d && d !== UNASSIGNED)
+    .sort();
   const [file, setFile] = useState<File | null>(null);
   const [reading, setReading] = useState(false);
   // Commande JONAS : articles saisis, importés d'un Excel, ou d'un bon de commande TCI (PDF)
@@ -103,7 +109,8 @@ function NewProformaDialog({ onClose, onCreated }: { onClose: () => void; onCrea
         order.file = { fileId, name: orderFile.name, size: orderFile.size, mime: orderFile.type || 'application/octet-stream' };
       }
     }
-    const ls = await withLinePhotos(lines, ls0, supplierId, id);
+    const ls1 = supplierSide ? ls0 : ls0.map((l) => (l.newProduct ? { ...l, newProduct: { ...l.newProduct, brandId: newBrand, designer: newDesigner } } : l));
+    const ls = await withLinePhotos(lines, ls1, supplierId, id);
     dispatch({ type: 'createProforma', id, supplierId, title, etd, eta, lines: ls, file: f, order });
     toast(supplierSide ? t('np.createdSup', { id }) : file ? t('np.createdJonas', { id }) : t('po.created', { id }));
     onClose();
@@ -217,6 +224,32 @@ function NewProformaDialog({ onClose, onCreated }: { onClose: () => void; onCrea
           <div className="bk-wide">
             <LinesEditor supplierId={supplierId} currency={currency} lines={lines} setLines={setLines} />
           </div>
+          {!supplierSide && (
+            <div className="bk-wide np-assign" role="group" aria-label="Nouveaux produits">
+              <span className="small bold">Nouveaux produits</span>
+              <label htmlFor="np-brand">
+                Marque
+                <select id="np-brand" className="input" value={newBrand} onChange={(e) => setNewBrand(e.target.value)}>
+                  <option value="">À définir</option>
+                  {state.brands.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                      {b.tagline ? ` ${b.tagline}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label htmlFor="np-designer">
+                Designer du pack
+                <select id="np-designer" className="input" value={newDesigner} onChange={(e) => setNewDesigner(e.target.value)}>
+                  <option value={UNASSIGNED}>À attribuer</option>
+                  {designers.map((d) => (
+                    <option key={d}>{d}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          )}
         </div>
         <footer className="rc-foot">
           <span />

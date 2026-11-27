@@ -353,7 +353,16 @@ export interface ImportLine {
   productId?: string;
   /** Nouveau produit : la référence JONAS et l'EAN JONAS sont attribués à la création */
   /** ref / ean : référence et EAN JONAS déjà portés par la proforma (colonne « buyer », code-barres au préfixe GS1 JONAS) */
-  newProduct?: { supplierRef?: string; ref?: string; ean?: string; name: string; pcb: number; cbmCarton: number };
+  newProduct?: {
+    supplierRef?: string;
+    ref?: string;
+    ean?: string;
+    name: string;
+    pcb: number;
+    cbmCarton: number;
+    /** Marque et designer choisis à la commande (sinon « À définir » / « À attribuer ») */ brandId?: string;
+    designer?: string;
+  };
   qty: number;
   price: number;
   /** Photo lue sur la proforma (image d'un Excel) : celle du nouveau produit, ou d'un produit existant qui n'en a pas */

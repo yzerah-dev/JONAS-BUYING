@@ -116,6 +116,9 @@ test('produit créé par une proforma : pack « À faire », puis « En cours »
     });
   const p = await created();
   expect(p.pack.validations.direction.state).toBe('todo');
+  // Pas de marque ni de designer par défaut : à définir / à attribuer
+  expect(p.brandId).toBe('');
+  expect(p.pack.designer).toBe('À attribuer');
   await expect(page.locator('main')).toContainText('Pack à faire');
   // Le designer du produit appuie sur « Je commence maintenant »
   await page.evaluate((id) => {
@@ -152,4 +155,34 @@ test('proforma signée par JONAS : les die cuts manquants passent en « Die cuts
   await loginAs(page, 'Ms. Lin Yu');
   await go(page, 'portail/packs?vue=diecut');
   await expect(page.locator('.gallery')).toContainText(pid);
+});
+
+test('nouvelle commande : marque et designer du pack choisis pour les nouveaux produits', async ({ page }) => {
+  await resetApp(page);
+  await loginAs(page, 'David');
+  await go(page, 'proformas');
+  await page.getByRole('button', { name: 'Nouvelle commande' }).click();
+  const dlg = page.getByRole('dialog');
+  await page.locator('#np-sup').fill('tide');
+  await page.getByRole('option', { name: /Xiamen Tide Living/ }).click();
+  await page.locator('#np-title').fill('Tasses');
+  await page.locator('#ln-prod-0').click();
+  await page.getByRole('option', { name: /Nouveau produit/ }).click();
+  await dlg.getByLabel('Désignation 1').fill('Mug léopard 350 ml');
+  await dlg.getByLabel('Pcs/carton 1').fill('24');
+  await dlg.getByLabel('m³/carton 1').fill('0.03');
+  await dlg.getByLabel('Quantité 1').fill('7200');
+  await dlg.getByLabel('Prix unitaire 1').fill('0.5');
+  await page.locator('#np-brand').selectOption({ label: 'CAMILLE PARIS' });
+  await page.locator('#np-designer').selectOption('ROLAND');
+  await dlg.getByRole('button', { name: 'Passer la commande' }).click();
+  await expect(page).toHaveURL(/proformas\/PF-2026-0154$/);
+  const p = await page.evaluate(() => {
+    const k = Object.keys(localStorage).find((x) => x.startsWith('jonas-buying-state'))!;
+    const st = JSON.parse(localStorage.getItem(k)!);
+    const id = st.proformas.find((x: { id: string }) => x.id === 'PF-2026-0154').lines[0].productId;
+    return st.products.find((x: { id: string }) => x.id === id);
+  });
+  expect(p.brandId).toBe('camille');
+  expect(p.pack.designer).toBe('ROLAND');
 });

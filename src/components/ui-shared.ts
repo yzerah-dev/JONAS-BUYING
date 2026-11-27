@@ -31,7 +31,7 @@ export const CONTAINER_COLOR: Record<ContainerStatus, string> = {
 };
 
 /** Couleur fixe par designer (identique sur tous les écrans) */
-const DESIGNER_FIXED: Record<string, string> = { Léa: '#d6336c', Sarah: '#7048e8', Hugo: '#1c7ed6' };
+const DESIGNER_FIXED: Record<string, string> = { Léa: '#d6336c', Sarah: '#7048e8', Hugo: '#1c7ed6', 'À attribuer': '#98a2a0' };
 const DESIGNER_PALETTE = ['#e8590c', '#0ca678', '#ae3ec9', '#f08c00', '#1098ad'];
 export function designerColor(name: string): string {
   if (DESIGNER_FIXED[name]) return DESIGNER_FIXED[name];

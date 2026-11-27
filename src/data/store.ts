@@ -797,7 +797,8 @@ function materializeLines(s: State, supplierId: string, lines: ImportLine[], etd
       name: n.name.trim(),
       // Désignation du fournisseur conservée telle quelle (description anglaise) ; la désignation peut ensuite être simplifiée en français
       description: { en: n.name.trim() },
-      brandId: most('brandId', 'jonas'),
+      // Marque et designer : choisis à la commande, sinon à définir / à attribuer (jamais une valeur par défaut)
+      brandId: n.brandId ?? '',
       supplierId,
       rayon: most('rayon', 'Divers'),
       collection: 'Nouveauté',
@@ -817,7 +818,7 @@ function materializeLines(s: State, supplierId: string, lines: ImportLine[], etd
       targetQty: l.qty,
       pack: {
         type: 'À définir',
-        designer: most('pack', mine[0]?.pack ?? ({ designer: 'ABIR' } as Product['pack'])).designer,
+        designer: n.designer?.trim() || UNASSIGNED,
         artworkDeadline: deadline,
         // Rien à valider tant que le designer n'a pas déposé de pack : « À faire »
         validations: { direction: { state: 'todo' }, moinard: { state: 'todo' }, fournisseur: { state: 'todo' } },
@@ -2441,7 +2442,9 @@ function canEditPhotos(s: State, u: User, productId: string) {
 
 export const byId = <T extends { id: string }>(list: T[], id: string) => list.find((x) => x.id === id)!;
 /** Marque d'un produit ; une marque absente de la liste (base vierge) s'affiche sans bloquer l'écran */
-export const brandOf = (brands: Brand[], id: string): Brand => brands.find((b) => b.id === id) ?? { id, name: id === 'jonas' ? 'JONAS' : id ? id.toUpperCase() : '—', tagline: '' };
+/** Designer d'un pack pas encore attribué */
+export const UNASSIGNED = 'À attribuer';
+export const brandOf = (brands: Brand[], id: string): Brand => brands.find((b) => b.id === id) ?? { id, name: id === 'jonas' ? 'JONAS' : id ? id.toUpperCase() : 'À définir', tagline: '' };
 
 export function lineCbm(p: Product, qty: number) {
   return (qty / p.pcb) * p.cbmCarton;
