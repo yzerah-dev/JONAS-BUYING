@@ -901,9 +901,15 @@ const shipped = (pf: Proforma) => pf.status === 'en_transit' || pf.status === 'a
 export const canCancelProforma = (s: State, u: User, pf: Proforma) => (can(u, 'proforma.edit') || can(u, 'proforma.sign')) && !shipped(pf) && !inSplit(s, pf);
 /** Supprimer définitivement : pilote et Direction seulement, tant que la marchandise n'est pas partie */
 export const canDeleteProforma = (s: State, u: User, pf: Proforma) => can(u, 'proforma.sign') && !shipped(pf) && !inSplit(s, pf);
-/** Annuler un produit : proforma pas encore signée par JONAS (aucune version signée), équipe achats */
+/** Annuler un produit : proforma pas encore signée par JONAS (aucune version signée, quel que soit son statut), pas bookée ni partie, équipe achats */
 export const canCancelLines = (u: User | undefined, pf: Proforma) =>
-  !!u && (can(u, 'proforma.edit') || can(u, 'proforma.sign')) && !pf.cancelled && pf.status === 'a_signer' && !signedVersion(pf);
+  !!u &&
+  (can(u, 'proforma.edit') || can(u, 'proforma.sign')) &&
+  !pf.cancelled &&
+  !signedVersion(pf) &&
+  ['a_signer', 'en_dev', 'en_production'].includes(pf.status) &&
+  !pf.split &&
+  !pf.booking;
 /** Pourquoi on ne peut pas annuler / supprimer (message affiché) */
 export const cancelBlock = (s: State, pf: Proforma) =>
   shipped(pf) ? 'Marchandise partie : la proforma ne peut plus être annulée.' : inSplit(s, pf) ? 'Expédition partielle en cours : gérez-la depuis l’onglet Expéditions.' : '';
