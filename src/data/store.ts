@@ -89,7 +89,12 @@ function initialState(): State {
   });
 }
 
+/** État au démarrage (démo / navigateur), avec le statut « Développé » recalculé */
 export function load(): State {
+  return syncDevStatus(loadRaw());
+}
+
+function loadRaw(): State {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
@@ -1901,7 +1906,7 @@ function applyAction(s: State, a: Action): State {
     case 'toggleUrgent':
       return mapP(s, a.productId, (p) => ({ ...p, urgent: !p.urgent }));
     case 'markDeveloped':
-      return mapP(s, a.productId, (p) => ({ ...p, developed: true, urgent: false, devStage: DEV_STAGES.length - 1, nextAction: 'Passer commande' }));
+      return mapP(s, a.productId, (p) => ({ ...p, developed: true, devForced: true, urgent: false, devStage: DEV_STAGES.length - 1, nextAction: 'Passer commande' }));
     case 'advanceDev':
       return mapP(s, a.productId, (p) => {
         const devStage = Math.min(p.devStage + 1, DEV_STAGES.length - 1);
@@ -2201,8 +2206,35 @@ export function syncPackStatuses(prev: State, next: State, a?: Action): State {
   return touched ? { ...next, proformas } : next;
 }
 
+/** Produits dont une proforma est signée (hors proformas annulées) */
+function signedProductIds(s: State) {
+  const ids = new Set<string>();
+  for (const pf of s.proformas) if (pf.status !== 'a_signer' && !pf.cancelled) for (const l of pf.lines) ids.add(l.productId);
+  return ids;
+}
+
+/** Développé si : forcé à la main, ou étape ≥ Lancement, ou pack validé (Direction, Moinard, fournisseur) ET proforma signée */
+export function devStatusOf(p: Product, signed: Set<string>): boolean {
+  return !!p.devForced || p.devStage >= DEV_STAGES.length - 2 || (packDone(p) && signed.has(p.id));
+}
+
+/** Recalcule « Développé / En dév. » des produits ; les anciens produits déjà développés restent développés (forcés) */
+export function syncDevStatus(s: State): State {
+  const signed = signedProductIds(s);
+  let touched = false;
+  const products = s.products.map((p) => {
+    // Anciennes fiches sans « devForced » : un produit déjà développé le reste
+    const forced = p.devForced ?? p.developed;
+    const developed = devStatusOf({ ...p, devForced: forced }, signed);
+    if (developed === p.developed) return p; // rien n'est réécrit tant que le statut ne change pas
+    touched = true;
+    return { ...p, devForced: forced, developed, nextAction: developed ? 'Passer commande' : p.nextAction };
+  });
+  return touched ? { ...s, products } : s;
+}
+
 export function reducer(s: State, a: Action): State {
-  const next = syncPackStatuses(s, applyAction(s, a), a);
+  const next = syncDevStatus(syncPackStatuses(s, applyAction(s, a), a));
   if (next === s) return s;
   const d = describe(s, a);
   if (!d) return next;

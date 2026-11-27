@@ -178,7 +178,10 @@ export interface Product {
   pcb: number; // pièces par carton
   cbmCarton: number; // m³ par carton
   weight: number; // kg / pièce
+  /** Développé : calculé (pack validé par les 3 + proforma signée, ou étape ≥ Lancement) ou forcé à la main */
   developed: boolean;
+  /** « Marquer développé » à la main (reste développé quoi qu'il arrive) */
+  devForced?: boolean;
   devStage: number; // index dans DEV_STAGES
   devDeadline: ISODate;
   nextAction: string;

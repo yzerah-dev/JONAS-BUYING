@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useReducer, useRef, useState, type ReactNode } from 'react';
-import { STORAGE_KEY, StoreContext, load, reducer, type Action, type State } from './store';
+import { STORAGE_KEY, StoreContext, load, reducer, syncDevStatus, type Action, type State } from './store';
 import { processMailEvents } from '../lib/mail/outbox';
 import { applyRemoteChange, diffState, fromDocs, remoteEnabled, type Collection } from './remote';
 import { currentMember, loadDocs, pushDocs, subscribeDocs, supabase } from './supabaseSync';
@@ -98,7 +98,7 @@ function RemoteStoreProvider({ children }: { children: ReactNode }) {
       if (!member) return setPhase('nomember');
       const docs = await loadDocs();
       const base = load();
-      const next = { ...fromDocs(docs, base), currentUserId: member.app_user_id };
+      const next = syncDevStatus({ ...fromDocs(docs, base), currentUserId: member.app_user_id });
       synced.current = next;
       dispatch({ type: '__replace', state: next });
       setPhase('ready');

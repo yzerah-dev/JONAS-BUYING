@@ -1286,7 +1286,12 @@ function PackPanel({ p }: { p: Product }) {
             <Check size={15} /> Marquer développé
           </button>
         )}
-        {p.developed && <span className="pill green">Produit développé</span>}
+        {p.developed && <span className="pill green">Produit développé{p.devForced ? ' (à la main)' : ''}</span>}
+        {!p.developed && (
+          <span className="small muted" style={{ flexBasis: '100%' }}>
+            Passe « Développé » automatiquement quand le pack est validé (Direction, Moinard, fournisseur) et la proforma signée.
+          </span>
+        )}
       </div>
       {!done && pendingStep && !auth.allowed({ type: 'validatePack', productId: p.id }) && (
         <div className="small muted mt">
