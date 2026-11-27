@@ -186,6 +186,10 @@ export interface Product {
   labelAdvice?: LabelAdvice;
   /** Contrôle réglementaire du pack déposé (dernière version) par Claude */
   packCheck?: PackCheck;
+  /** Discussion JONAS ↔ fournisseur sur ce produit (comme une conversation WhatsApp) */
+  chat?: ChatMessage[];
+  /** Dernière lecture de la discussion, côté JONAS et côté fournisseur */
+  chatRead?: { jonas?: string; fournisseur?: string };
   devStage: number; // index dans DEV_STAGES
   devDeadline: ISODate;
   nextAction: string;
@@ -396,6 +400,18 @@ export interface PackCheck {
   checks: { item: string; status: 'ok' | 'manquant' | 'a_corriger' | 'a_verifier'; detail: string }[];
   /** Fautes ou textes à reprendre : texte vu → correction */
   texts: { found: string; fix: string }[];
+}
+
+/** Message de la discussion d'un produit */
+export interface ChatMessage {
+  id: string;
+  at: string;
+  /** Nom de l'auteur et son côté */
+  by: string;
+  side: 'jonas' | 'fournisseur';
+  text: string;
+  /** Pièce jointe (photo, PDF…) dans le stockage de fichiers */
+  file?: { fileId: string; name: string; size: number; type: string };
 }
 
 export interface ImportLine {

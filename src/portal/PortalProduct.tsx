@@ -12,6 +12,7 @@ import { useT } from '../i18n';
 import { awaitsSupplier, usePortal } from './usePortal';
 import SupplierPackRounds from './SupplierPackRounds';
 import PackDecision, { LastPackRejection } from './PackDecision';
+import ProductChat from '../components/ProductChat';
 
 type Tab = 'all' | 'order' | 'pack' | 'dev';
 
@@ -251,8 +252,11 @@ export function PortalProductDetail() {
         </div>
       </div>
       <div className="pp-detail">
-        <div className="card pad">
-          <ProductGallery product={p} />
+        <div className="col" style={{ gap: 16 }}>
+          <div className="card pad">
+            <ProductGallery product={p} />
+          </div>
+          <ProductChat p={p} />
         </div>
         <div className="col" style={{ gap: 16 }}>
           <section className="card pad" aria-label={t('pp.info')}>

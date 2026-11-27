@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
+  MessageCircle,
   BarChart3,
   Boxes,
   Calendar,
@@ -30,10 +31,12 @@ import ProductEdit from '../components/ProductEdit';
 import ProductInfoView from '../components/ProductInfoView';
 import { BrandLogo, ContainerStatusPill, PackPill, Pill, ProformaStatusPill, Progress, Tabs, ValidationCircuit, PA } from '../components/ui';
 import LabelAdviceCard from '../components/LabelAdviceCard';
+import ProductChat from '../components/ProductChat';
+import { unreadCount } from '../lib/chat';
 import { TODAY, dec, fdate, fshort, money, num, weekLabel } from '../lib/format';
 import { cur0, curSumLabel, sumCur } from '../lib/curr';
 
-type Tab = 'info' | 'overview' | 'design' | 'dev' | 'commandes' | 'production' | 'logistique' | 'stock' | 'docs';
+type Tab = 'info' | 'overview' | 'design' | 'discussion' | 'dev' | 'commandes' | 'production' | 'logistique' | 'stock' | 'docs';
 
 export default function ProductDetail() {
   const { id } = useParams();
@@ -126,6 +129,11 @@ export default function ProductDetail() {
           { id: 'info', label: 'Informations produit', icon: <Info size={16} /> },
           { id: 'overview', label: 'Vue d’ensemble', icon: <LayoutGrid size={16} /> },
           { id: 'design', label: 'Design & Pack', icon: <Palette size={16} /> },
+          {
+            id: 'discussion',
+            label: `Discussion fournisseur${unreadCount(p, 'jonas') ? ` (${unreadCount(p, 'jonas')} nouveau${unreadCount(p, 'jonas') > 1 ? 'x' : ''})` : p.chat?.length ? ` (${p.chat.length})` : ''}`,
+            icon: <MessageCircle size={16} />,
+          },
           { id: 'dev', label: 'Développement', icon: <FlaskConical size={16} /> },
           { id: 'commandes', label: 'Commandes', icon: <ShoppingCart size={16} /> },
           { id: 'production', label: 'Production', icon: <Factory size={16} /> },
@@ -154,6 +162,7 @@ export default function ProductDetail() {
           </div>
         </div>
       )}
+      {tab === 'discussion' && <ProductChat p={p} />}
       {tab === 'design' && (
         <>
           <DesignCard p={p} full />

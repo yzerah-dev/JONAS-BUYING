@@ -5,6 +5,7 @@ import { can, canSee } from './permissions';
 import { VALIDATION_LABELS, VALIDATION_STEPS } from './types';
 import { TODAY, addDays, diffDays, fshort } from '../lib/format';
 import { curSumLabel, sumCur } from '../lib/curr';
+import { unreadCount } from '../lib/chat';
 
 export interface Notice {
   /** Identifiant stable (sert à marquer comme lu) */
@@ -194,6 +195,24 @@ export function notificationsFor(s: State): Notice[] {
         detail: curSumLabel(sumCur(soon.map((p) => ({ currency: p.currency, v: p.amountCur })))),
         to: '/finance',
       });
+  }
+
+  // Discussions produit : messages des fournisseurs non lus (équipe JONAS)
+  if (u.role !== 'fournisseur' && u.role !== 'transitaire') {
+    const unread = s.products.filter((p) => unreadCount(p, 'jonas') > 0);
+    if (unread.length) {
+      const n = unread.reduce((t, p) => t + unreadCount(p, 'jonas'), 0);
+      add({
+        id: `chat-${unread.map((p) => `${p.id}:${p.chat?.length}`).join(',')}`,
+        level: 'info',
+        title: `${n} message(s) fournisseur non lu(s)`,
+        detail: unread
+          .slice(0, 4)
+          .map((p) => p.ref)
+          .join(', '),
+        to: `/produits/${unread[0].id}`,
+      });
+    }
   }
 
   // Seulement ce que le rôle peut ouvrir

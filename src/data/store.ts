@@ -8,6 +8,7 @@ import type {
   ImportLine,
   LabelAdvice,
   PackCheck,
+  ChatMessage,
   ProformaLine,
   SupplierTerms,
   Company,
@@ -133,6 +134,8 @@ export type Action =
   | { type: 'setContainerNumber'; containerId: string; number: string; seal?: string }
   | { type: 'setLabelAdvice'; productId: string; advice: LabelAdvice }
   | { type: 'setPackCheck'; productId: string; check: PackCheck }
+  | { type: 'sendProductMessage'; productId: string; message: ChatMessage }
+  | { type: 'readProductChat'; productId: string; at: string }
   | { type: 'signProforma'; id: string; etdWanted: ISODate }
   | {
       type: 'createProforma';
@@ -573,6 +576,14 @@ export function isAllowed(s: State, a: Action): boolean {
     case 'validatePlan': {
       const c = s.containers.find((x) => x.id === a.containerId);
       return can(u, 'logistics.plan') && !!c && OPEN_STATUSES.includes(c.status) && !c.planValidated;
+    }
+    case 'sendProductMessage':
+    case 'readProductChat': {
+      // Discussion produit : l'équipe JONAS et le fournisseur du produit (pas les transitaires)
+      const p = s.products.find((x) => x.id === a.productId);
+      if (!p || isForwarder(u)) return false;
+      if (a.type === 'sendProductMessage' && !a.message.text.trim() && !a.message.file) return false;
+      return isSupplier(u) ? p.supplierId === u.supplierId : true;
     }
     case 'setPackCheck':
     case 'setLabelAdvice':
@@ -1154,6 +1165,19 @@ function applyAction(s: State, a: Action): State {
       return mapP(s, a.productId, (p) => ({ ...p, labelAdvice: a.advice }));
     case 'setPackCheck':
       return mapP(s, a.productId, (p) => ({ ...p, packCheck: a.check }));
+    case 'sendProductMessage': {
+      const side = isSupplier(currentUser(s)) ? 'fournisseur' : 'jonas';
+      return mapP(s, a.productId, (p) => ({
+        ...p,
+        chat: [...(p.chat ?? []), { ...a.message, side, by: currentUser(s).name, text: a.message.text.trim().slice(0, 4000) }],
+        // L'auteur a lu tout le fil
+        chatRead: { ...(p.chatRead ?? {}), [side]: a.message.at },
+      }));
+    }
+    case 'readProductChat': {
+      const side = isSupplier(currentUser(s)) ? 'fournisseur' : 'jonas';
+      return mapP(s, a.productId, (p) => ((p.chatRead?.[side] ?? '') >= a.at ? p : { ...p, chatRead: { ...(p.chatRead ?? {}), [side]: a.at } }));
+    }
     case 'setContainerNumber':
       return mapC(s, a.containerId, (c) => ({
         ...c,
@@ -2180,8 +2204,15 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
       const prev = s.containers.find((c) => c.id === a.containerId)?.loading?.date;
       return { target: ctn(a.containerId), text: prev && prev !== a.date ? `Date de chargement changée par le fournisseur : ${a.date}` : `Date de chargement validée : ${a.date}` };
     }
+    case 'sendProductMessage':
+      return { target: ref(a.productId), text: `Message : ${a.message.text.slice(0, 80)}${a.message.file ? ` (📎 ${a.message.file.name})` : ''}` };
+    case 'readProductChat':
+      return null;
     case 'setPackCheck':
-      return { target: ref(a.productId), text: `Contrôle du pack v${a.check.version} : ${a.check.verdict === 'conforme' ? 'conforme' : a.check.verdict === 'a_corriger' ? 'à corriger' : 'non conforme'}` };
+      return {
+        target: ref(a.productId),
+        text: `Contrôle du pack v${a.check.version} : ${a.check.verdict === 'conforme' ? 'conforme' : a.check.verdict === 'a_corriger' ? 'à corriger' : 'non conforme'}`,
+      };
     case 'setLabelAdvice':
       return { target: ref(a.productId), text: `Avis d'étiquetage : ${a.advice.category}` };
     case 'setContainerNumber':
