@@ -1,7 +1,7 @@
 // E-mails automatiques aux fournisseurs : on compare l'état avant / après une action locale de JONAS et on
 // prépare un e-mail par événement (commande, signature, die cut, acompte, pack validé), avec ses pièces jointes.
 // En base partagée : envoi par la fonction serveur /api/envoi-mail. En démo : e-mail préparé, consultable, non envoyé.
-import { byId, currentUser, proformaTotals, type State } from '../../data/store';
+import { byId, containerCapacity, containerCbm, currentUser, proformaTotals, type State } from '../../data/store';
 import type { Product, Proforma, Supplier } from '../../data/types';
 import { getBlob } from '../files';
 import { conditionsPdf, purchaseOrderPdf, versionFileName, versionPdf } from '../proformaPdf';
@@ -35,6 +35,8 @@ export interface MailEvent {
   supplierId: string;
   proformaId?: string;
   productIds?: string[];
+  /** Plan de chargement : conteneur concerné */
+  containerId?: string;
 }
 
 /** Événements à notifier entre deux états (action locale) */
@@ -91,8 +93,14 @@ export async function prepareMail(s: State, ev: MailEvent): Promise<PreparedMail
   const ctx = { supplier: sup, products: s.products, company: s.settings.company };
   const files: { filename: string; blob: Blob | null | undefined | Promise<Blob | null | undefined> }[] = [];
   const t = pf ? proformaTotals(s, pf) : undefined;
-  const prods = (ev.productIds ?? pf?.lines.map((l) => l.productId) ?? []).map((id) => s.products.find((p) => p.id === id)).filter((p): p is Product => !!p);
-  const items = prods.map((p) => ({ ref: p.supplierRef ? `${p.supplierRef} · ${p.ref}` : p.ref, name: p.name }));
+  const ctnOf = ev.containerId ? s.containers.find((x) => x.id === ev.containerId) : undefined;
+  const prods = (ev.productIds ?? (ctnOf ? ctnOf.allocations.map((a) => a.productId) : undefined) ?? pf?.lines.map((l) => l.productId) ?? [])
+    .map((id) => s.products.find((p) => p.id === id))
+    .filter((p): p is Product => !!p);
+  const items = prods.map((p) => {
+    const a = ctnOf?.allocations.find((x) => x.productId === p.id);
+    return { ref: p.supplierRef ? `${p.supplierRef} · ${p.ref}` : p.ref, name: p.name, sub: a ? `${a.qty} pcs · ${p.pcb ? Math.round((a.qty / p.pcb) * 100) / 100 : 0} ctn` : undefined };
+  });
   let link = `${APP_URL}/#/portail`;
 
   if (ev.kind === 'order' && pf) {
@@ -109,6 +117,13 @@ export async function prepareMail(s: State, ev: MailEvent): Promise<PreparedMail
     if (pf.depositProof) files.push({ filename: pf.depositProof.name, blob: getBlob(pf.depositProof.fileId) });
   } else if (ev.kind === 'diecut') {
     link = `${APP_URL}/#/portail/packs?vue=diecut`;
+  } else if (ev.kind === 'loading' && ev.containerId) {
+    link = `${APP_URL}/#/portail/chargement`;
+    const c = s.containers.find((x) => x.id === ev.containerId);
+    if (c) {
+      const { loadingPlanXlsx, loadingPlanFileName } = await import('../loadingPlan');
+      files.push({ filename: loadingPlanFileName(c), blob: loadingPlanXlsx(s, c) });
+    }
   } else if (ev.kind === 'pack') {
     link = `${APP_URL}/#/portail/packs`;
     for (const p of prods) {
@@ -137,15 +152,17 @@ export async function prepareMail(s: State, ev: MailEvent): Promise<PreparedMail
   }
 
   const me = currentUser(s);
+  const ctn = ev.containerId ? s.containers.find((x) => x.id === ev.containerId) : undefined;
   const data: MailData = {
     kind: ev.kind,
     supplierName: sup.name,
     contactName: to[0]?.name || undefined,
     pfId: pf?.id,
     pfTitle: pf?.title,
-    amount: t ? (ev.kind === 'deposit' ? money(Math.round(t.depositCur), t.currency) : money(Math.round(t.amountCur), t.currency)) : undefined,
+    amount: t && ev.kind !== 'loading' ? (ev.kind === 'deposit' ? money(Math.round(t.depositCur), t.currency) : money(Math.round(t.amountCur), t.currency)) : undefined,
     loading: pf && (ev.kind === 'order' || ev.kind === 'signed') ? `${weekLabel(pf.etd)} · ${pf.etd}` : undefined,
     items: ev.kind === 'deposit' ? undefined : items,
+    container: ctn ? `${ctn.type} · ${ctn.number ?? ctn.id} · ${containerCbm(s, ctn).toFixed(1).replace('.', ',')} / ${containerCapacity(ctn)} m³` : undefined,
     attached: attachments.map((a) => a.filename),
     onPlatform,
     link,
@@ -275,4 +292,9 @@ export function processMailEvents(prev: State, next: State, opts: { remote: bool
     timer = null;
     for (const ev of batch) void deliver(s, ev, opts);
   }, 500);
+}
+
+/** Envoi demandé à la main (ex. « Envoyer le plan de chargement ») : même circuit que les e-mails automatiques */
+export function sendMailNow(s: State, ev: MailEvent, opts: { remote: boolean; log: LogFn }) {
+  void deliver(s, ev, opts);
 }

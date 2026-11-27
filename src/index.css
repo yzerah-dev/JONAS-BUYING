@@ -2493,3 +2493,5 @@ tr.pf-moving td, .pf-line.pf-moving { background: #fff6e8 !important; outline: 2
 .ctp-num { grid-template-columns: minmax(0, 1fr) auto; }
 .ctp-num label:first-child { grid-column: 1 / -1; }
 .ctp-num .input { width: 100%; box-sizing: border-box; min-width: 0; }
+.lp-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.lp-btns .btn { flex: 1 1 200px; justify-content: center; }

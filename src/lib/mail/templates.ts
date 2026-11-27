@@ -2,7 +2,7 @@
 // Mise en page en tableaux et styles en ligne : lisible dans Gmail, Outlook, Apple Mail et les messageries chinoises.
 
 export type MailLang = 'fr' | 'en' | 'zh';
-export type MailKind = 'order' | 'signed' | 'diecut' | 'deposit' | 'pack';
+export type MailKind = 'order' | 'signed' | 'diecut' | 'deposit' | 'pack' | 'loading';
 
 export interface MailItem {
   ref: string;
@@ -20,6 +20,8 @@ export interface MailData {
   amount?: string;
   /** Semaine de chargement souhaitée, ex. « S05 · 2027-02-04 » */
   loading?: string;
+  /** Conteneur (plan de chargement) : « 40HC · MSCU1234567 · 26,5 / 69 m³ » */
+  container?: string;
   items?: MailItem[];
   /** Pièces jointes (noms) et documents trop lourds laissés sur la plateforme */
   attached: string[];
@@ -45,6 +47,7 @@ const T: Record<
     attached: string;
     onPlatform: string;
     pf: string;
+    ctn: string;
     amount: string;
     loading: string;
     items: string;
@@ -59,6 +62,7 @@ const T: Record<
     attached: 'Pièces jointes',
     onPlatform: 'Disponible sur la plateforme',
     pf: 'Proforma',
+    ctn: 'Conteneur',
     amount: 'Montant',
     loading: 'Chargement souhaité',
     items: 'Articles',
@@ -95,6 +99,12 @@ const T: Record<
         intro: () => 'Le pack des articles ci-dessous est validé par JONAS. Merci de le vérifier et de le valider dans votre espace avant la production.',
         button: 'Valider le pack',
       },
+      loading: {
+        subject: (d) => `Plan de chargement ${d.container ?? ''}`.trim(),
+        title: 'Plan de chargement',
+        intro: () => 'Voici le plan de chargement prévu par JONAS (fichier Excel joint). Merci de le vérifier et de le valider, ou de proposer vos modifications, dans votre espace.',
+        button: 'Voir le plan de chargement',
+      },
     },
   },
   en: {
@@ -103,6 +113,7 @@ const T: Record<
     attached: 'Attachments',
     onPlatform: 'Available on the platform',
     pf: 'Proforma',
+    ctn: 'Container',
     amount: 'Amount',
     loading: 'Requested loading',
     items: 'Items',
@@ -139,6 +150,12 @@ const T: Record<
         intro: () => 'The packaging artwork of the items below is approved by JONAS. Please check it and approve it in your space before production.',
         button: 'Approve the packaging',
       },
+      loading: {
+        subject: (d) => `Loading plan ${d.container ?? ''}`.trim(),
+        title: 'Loading plan',
+        intro: () => 'Please find the loading plan prepared by JONAS (Excel file attached). Please check and confirm it, or propose your changes, in your supplier space.',
+        button: 'View the loading plan',
+      },
     },
   },
   zh: {
@@ -147,6 +164,7 @@ const T: Record<
     attached: '附件',
     onPlatform: '可在平台上查看',
     pf: '形式发票',
+    ctn: '集装箱',
     amount: '金额',
     loading: '期望装柜',
     items: '产品',
@@ -183,6 +201,12 @@ const T: Record<
         intro: () => '以下产品的包装设计已由 JONAS 确认。请在生产前在您的门户中检查并确认。',
         button: '确认包装',
       },
+      loading: {
+        subject: (d) => `装柜计划 ${d.container ?? ''}`.trim(),
+        title: '装柜计划',
+        intro: () => '附件为 JONAS 制定的装柜计划（Excel 文件）。请在您的供应商门户中核对并确认，或提出修改。',
+        button: '查看装柜计划',
+      },
     },
   },
 };
@@ -203,13 +227,14 @@ const GREEN_DARK = '#0b5e47';
 const INK = '#14201c';
 const MUTED = '#5f6d68';
 const LINE = '#e3e9e6';
-const ACCENT: Record<MailKind, string> = { order: '#1d6fd8', signed: GREEN, diecut: '#e0701a', deposit: '#7b2cbf', pack: GREEN };
+const ACCENT: Record<MailKind, string> = { order: '#1d6fd8', signed: GREEN, diecut: '#e0701a', deposit: '#7b2cbf', pack: GREEN, loading: '#2a63c7' };
 
 function section(d: MailData, l: MailLang, first: boolean) {
   const t = T[l];
   const k = t.kinds[d.kind];
   const rows: [string, string][] = [];
   if (d.pfId) rows.push([t.pf, `${esc(d.pfId)}${d.pfTitle ? ` · ${esc(d.pfTitle)}` : ''}`]);
+  if (d.container) rows.push([t.ctn, esc(d.container)]);
   if (d.amount) rows.push([t.amount, esc(d.amount)]);
   if (d.loading) rows.push([t.loading, esc(d.loading)]);
   const items = (d.items ?? []).slice(0, 30);

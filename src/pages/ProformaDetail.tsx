@@ -62,6 +62,7 @@ import type { Container, Product, Proforma, ProformaStatus } from '../data/types
 import { BrandLogo, ProductPic, ContainerStatusPill, PackPill, Pill, ProductThumb, ProformaStatusPill, Progress, Ring, Seg, SupplierLogo, Tabs } from '../components/ui';
 import { designerColor, toast } from '../components/ui-shared';
 import AssignDesigner from '../components/AssignDesigner';
+import LoadingPlanButtons from '../components/LoadingPlanButtons';
 import { BookingRequestButton } from '../components/BookingDialog';
 import BookingReview, { LastRejection } from '../components/BookingReview';
 import ProformaVersions, { SignDialog } from '../components/ProformaVersions';
@@ -1100,6 +1101,7 @@ function ContainerPanel({ c, index, portal }: { c: Container; index: number; por
         </tbody>
       </table>
       <div className="col mt" style={{ gap: 8 }}>
+        <LoadingPlanButtons c={c} send={!portal} />
         {!portal && auth.canSee('conteneurs') && (
           <Link to={`/conteneurs?c=${c.id}`} className="btn ghost sm">
             {t('cp.seeContainers')}
