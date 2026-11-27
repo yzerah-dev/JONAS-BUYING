@@ -71,6 +71,15 @@ export async function demoProformaPdf(pf: Proforma, doc: ProformaDoc, ctx: PdfCo
     page.drawLine({ start: { x: 36, y: y - 6 }, end: { x: 559, y: y - 6 }, thickness: 0.4, color: rgb(0.85, 0.85, 0.88) });
     y -= 20;
   }
+  for (const l of pf.cancelledLines ?? []) {
+    const p = ctx.products.find((x) => x.id === l.productId);
+    txt(p?.ref ?? l.productId, cols[0], y, 9, font, GREY);
+    txt((p?.name ?? '').slice(0, 38), cols[1], y, 9, font, GREY);
+    txt(l.qty.toLocaleString('en-US'), cols[2], y, 9, font, GREY);
+    txt(l.price.toFixed(2), cols[3], y, 9, font, GREY);
+    strikeCancelled(page, y, cols[0], cols[4] - 6, bold);
+    y -= 20;
+  }
   y -= 6;
   txt(`TOTAL (${pf.currency ?? 'EUR'})`, cols[3], y, 10, bold);
   txt(total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), cols[4], y, 10, bold);
@@ -81,10 +90,10 @@ export async function demoProformaPdf(pf: Proforma, doc: ProformaDoc, ctx: PdfCo
   return pdf.save();
 }
 
-async function originalBytes(pf: Proforma, doc: ProformaDoc, ctx: PdfContext): Promise<{ bytes: Uint8Array; type: string }> {
+async function originalBytes(pf: Proforma, doc: ProformaDoc, ctx: PdfContext): Promise<{ bytes: Uint8Array; type: string; demo?: boolean }> {
   const blob = await getBlob(doc.fileId).catch(() => undefined);
   if (blob) return { bytes: new Uint8Array(await blob.arrayBuffer()), type: doc.type || blob.type };
-  return { bytes: await demoProformaPdf(pf, doc, ctx), type: 'application/pdf' };
+  return { bytes: await demoProformaPdf(pf, doc, ctx), type: 'application/pdf', demo: true };
 }
 
 /** Proforma Excel / CSV mise en page en PDF (A4 paysage) : cellules telles qu'affichées dans Excel.
@@ -225,10 +234,35 @@ function drawCancelled(page: PDFPage, doc: ProformaDoc, by: ProformaDoc | undefi
   page.drawText(t, { x: 30, y: height - 23, size: 9.5, font: bold, color: RED });
 }
 
+/** Ligne annulée dans un tableau généré : texte barré + mention ANNULÉ (hors total) */
+function strikeCancelled(page: PDFPage, y: number, x0: number, x1: number, bold: PDFFont) {
+  page.drawLine({ start: { x: x0, y: y + 3 }, end: { x: x1, y: y + 3 }, thickness: 0.9, color: RED });
+  page.drawRectangle({ x: x1 + 4, y: y - 3, width: 46, height: 13, color: rgb(1, 0.93, 0.93), borderColor: RED, borderWidth: 0.8 });
+  page.drawText('ANNULÉ', { x: x1 + 8, y, size: 7.5, font: bold, color: RED });
+}
+
+/** Proforma du fournisseur (fichier d'origine) : encadré « PRODUITS ANNULÉS » en haut de la première page */
+function drawCancelledLines(page: PDFPage, pf: Proforma, ctx: PdfContext, font: PDFFont, bold: PDFFont, top: number) {
+  const ls = pf.cancelledLines ?? [];
+  if (!ls.length) return;
+  const { width } = page.getSize();
+  const rows = ls.map((l) => {
+    const p = ctx.products.find((x) => x.id === l.productId);
+    return safe(`${p?.ref ?? l.productId}  ${(p?.name ?? '').slice(0, 48)}  ·  ${l.qty.toLocaleString('en-US')} pcs  ·  ${l.price.toFixed(2)}  —  ANNULÉ / CANCELLED`);
+  });
+  const h = 22 + rows.length * 12;
+  const y0 = top - h;
+  page.drawRectangle({ x: 20, y: y0, width: width - 40, height: h, color: rgb(1, 0.95, 0.95), borderColor: RED, borderWidth: 1.2, opacity: 0.95 });
+  page.drawText(safe(`PRODUITS ANNULÉS PAR JONAS / CANCELLED BY JONAS (${ls.length}) — hors commande / not ordered`), { x: 30, y: top - 14, size: 9, font: bold, color: RED });
+  rows.forEach((t, i) => page.drawText(t, { x: 30, y: top - 27 - i * 12, size: 8.5, font, color: RED }));
+}
+
 /** PDF d'une version : original, + signature/tampon si signée, + bandeau si annulée */
 export async function versionPdf(pf: Proforma, doc: ProformaDoc, ctx: PdfContext): Promise<Blob> {
-  const { bytes, type } = await originalBytes(pf, doc, ctx);
-  if (!doc.signature) {
+  const { bytes, type, demo } = await originalBytes(pf, doc, ctx);
+  // Produits annulés avant signature : portés sur la version en cours (à signer / signée)
+  const showCancelled = !!pf.cancelledLines?.length && (doc.status === 'a_signer' || doc.status === 'signee');
+  if (!doc.signature && !showCancelled) {
     if (type === 'application/pdf') return new Blob([bytes as BlobPart], { type });
   }
   const pdf = await asPdf(bytes, type, doc.name);
@@ -243,6 +277,8 @@ export async function versionPdf(pf: Proforma, doc: ProformaDoc, ctx: PdfContext
     const by = pf.versions?.find((v) => v.version === doc.cancelledBy!.version);
     for (const p of pages) drawCancelled(p, doc, by, bold);
   }
+  // Démo : les lignes annulées sont déjà barrées dans le tableau régénéré
+  if (showCancelled && !demo) drawCancelledLines(pages[0], pf, ctx, font, bold, pages[0].getSize().height - 12);
   const out = await pdf.save();
   return new Blob([out as BlobPart], { type: 'application/pdf' });
 }
@@ -289,6 +325,17 @@ export async function purchaseOrderPdf(pf: Proforma, ctx: PdfContext): Promise<B
     page.drawLine({ start: { x: 36, y: y - 6 }, end: { x: 559, y: y - 6 }, thickness: 0.4, color: rgb(0.85, 0.85, 0.88) });
     y -= 18;
     if (y < 120) break;
+  }
+  for (const l of pf.cancelledLines ?? []) {
+    if (y < 120) break;
+    const p = ctx.products.find((x) => x.id === l.productId);
+    txt(p?.ref ?? l.productId, cols[0], y, 8.5, font, GREY);
+    txt(p?.ean ?? '', cols[1], y, 8, font, GREY);
+    txt((p?.name ?? '').slice(0, 34), cols[2], y, 8.5, font, GREY);
+    txt(l.qty.toLocaleString('en-US'), cols[3], y, 8.5, font, GREY);
+    txt(l.price.toFixed(2), cols[4], y, 8.5, font, GREY);
+    strikeCancelled(page, y, cols[0], cols[5] - 6, bold);
+    y -= 18;
   }
   y -= 6;
   txt(`TOTAL (${pf.currency ?? 'EUR'})`, cols[4] - 30, y, 10, bold);

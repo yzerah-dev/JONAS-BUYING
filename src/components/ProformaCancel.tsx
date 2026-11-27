@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Ban, RotateCcw, Trash2, X } from 'lucide-react';
-import { byId, cancelBlock, canCancelProforma, canDeleteProforma, currentUser, proformaTotals, useAuth, useStore } from '../data/store';
+import { byId, cancelBlock, canCancelLines, canCancelProforma, canDeleteProforma, currentUser, proformaTotals, useAuth, useStore } from '../data/store';
 import type { Proforma } from '../data/types';
-import { ProformaStatusPill } from './ui';
+import { ProductPic, ProformaStatusPill } from './ui';
 import { toast } from './ui-shared';
 import { fdate, num } from '../lib/format';
 import { cur0 } from '../lib/curr';
@@ -241,6 +241,145 @@ function CancelDialogDeleteOnly({ pf, onClose, onDone }: { pf: Proforma; onClose
           </button>
         </footer>
       </form>
+    </div>
+  );
+}
+
+/** Bouton « Annuler » d'un produit sur une proforma pas encore signée */
+export function LineCancelButton({ pf, productId, compact }: { pf: Proforma; productId: string; compact?: boolean }) {
+  const { state, dispatch } = useStore();
+  const auth = useAuth();
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState('');
+  if (!canCancelLines(currentUser(state), pf)) return null;
+  const p = byId(state.products, productId);
+  const line = pf.lines.find((l) => l.productId === productId);
+  const last = pf.lines.length <= 1;
+  const allowed = auth.allowed({ type: 'cancelLine', id: pf.id, productId });
+  return (
+    <>
+      <button
+        type="button"
+        className={`btn sm pfl-cancel${compact ? ' compact' : ''}`}
+        disabled={!allowed}
+        title={last ? 'Dernier produit : annulez la proforma' : `Annuler ${p.ref} sur ${pf.id}`}
+        aria-label={`Annuler le produit ${p.ref}`}
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen(true);
+        }}
+      >
+        <Ban size={14} /> Annuler
+      </button>
+      {open && (
+        <div
+          className="palette-back"
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            setOpen(false);
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <form
+            className="card rc-dialog bk-dialog"
+            role="dialog"
+            aria-label={`Annuler ${p.ref}`}
+            onMouseDown={(e) => e.stopPropagation()}
+            onSubmit={(e) => {
+              e.preventDefault();
+              dispatch({ type: 'cancelLine', id: pf.id, productId, reason });
+              toast(`${p.ref} annulé sur ${pf.id}`);
+              setOpen(false);
+            }}
+          >
+            <header className="rc-head">
+              <div>
+                <h2>Annuler {p.ref}</h2>
+                <span className="muted small">{p.name}</span>
+              </div>
+              <button type="button" className="icon-btn" onClick={() => setOpen(false)} aria-label="Fermer">
+                <X size={20} />
+              </button>
+            </header>
+            <div className="bk-form" style={{ display: 'grid', gap: 10 }}>
+              <p className="small" style={{ margin: 0 }}>
+                Le produit ({line ? `${num(line.qty)} pcs` : ''}) sort de la proforma {pf.id} : totaux, CBM et conteneurs sont recalculés. Il reste affiché <b>ANNULÉ</b> sur la proforma et peut
+                être rétabli tant qu’elle n’est pas signée.
+              </p>
+              <label htmlFor="pfl-reason" className="bk-wide">
+                Motif (facultatif)
+                <textarea id="pfl-reason" className="input" rows={2} autoFocus value={reason} placeholder="Ex. prix trop élevé, produit en doublon…" onChange={(e) => setReason(e.target.value)} />
+              </label>
+            </div>
+            <footer className="rc-foot">
+              <span />
+              <button type="button" className="btn" onClick={() => setOpen(false)}>
+                Retour
+              </button>
+              <button type="submit" className="btn danger">
+                <Ban size={16} /> Annuler le produit
+              </button>
+            </footer>
+          </form>
+        </div>
+      )}
+    </>
+  );
+}
+
+/** Produits annulés de la proforma : grisés, marqués ANNULÉ, rétablissables avant signature */
+export function CancelledLines({ pf }: { pf: Proforma }) {
+  const { state, dispatch } = useStore();
+  const auth = useAuth();
+  const navigate = useNavigate();
+  const lines = pf.cancelledLines ?? [];
+  if (!lines.length) return null;
+  const cur = pf.currency ?? 'EUR';
+  return (
+    <div className="mt">
+      <div className="card-title row" style={{ gap: 8 }}>
+        <Ban size={16} /> Produits annulés ({lines.length})
+      </div>
+      <div className="gallery">
+        {lines.map((l) => {
+          const p = byId(state.products, l.productId);
+          const canRestore = auth.allowed({ type: 'restoreLine', id: pf.id, productId: l.productId });
+          return (
+            <div key={l.productId} className="pcard pfp-card pfl-cancelled" onClick={() => navigate(`/produits/${p.id}`)}>
+              <div className="photo" style={{ background: p.tint }}>
+                <ProductPic product={p} />
+                <span className="pfl-stamp">ANNULÉ</span>
+              </div>
+              <div>
+                <span className="ref-tag">{p.ref}</span>
+                <div className="pfp-name">{p.name}</div>
+              </div>
+              <div className="small muted">
+                <s>
+                  {num(l.qty)} pcs · {cur0(l.qty * l.price, cur)}
+                </s>
+                <div className="xs">
+                  Annulé le {fdate(l.at.slice(0, 10))} par {l.by}
+                  {l.reason ? ` · ${l.reason}` : ''}
+                </div>
+              </div>
+              {canRestore && (
+                <button
+                  type="button"
+                  className="btn sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    dispatch({ type: 'restoreLine', id: pf.id, productId: l.productId });
+                    toast(`${p.ref} rétabli sur ${pf.id}`);
+                  }}
+                >
+                  <RotateCcw size={14} /> Rétablir
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

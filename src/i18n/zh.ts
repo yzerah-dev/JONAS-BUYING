@@ -676,6 +676,8 @@ export const zh: Record<Key, string> = {
   'cp.qtySet': '{ref}：柜内 {n} 件',
   'ex.jonasCodesLater': 'JONAS 货号和条码：JONAS 签署时分配',
   'pp.view.list': '列表',
+  'pp.cancelledLines': 'JONAS 已取消的产品（{n}）— 不在订单内',
+  'pp.cancelledTag': '已取消',
   'pp.view.gallery': '图库',
   'pp.size': '尺寸',
   'pp.sizeFromSupplier': '取自供应商描述',
