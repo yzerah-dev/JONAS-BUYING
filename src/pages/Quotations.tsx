@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Check, FileQuestion, Handshake, LayoutGrid, Table2, Trash2, X } from 'lucide-react';
-import { canQuote, currentUser, useStore } from '../data/store';
+import { FileQuestion, Images, LayoutGrid, Table2 } from 'lucide-react';
+import { byId, canQuote, currentUser, useStore } from '../data/store';
 import type { Quotation } from '../data/types';
 import { CartButton } from '../components/Cart';
-import { QuoteCard } from '../components/Quotations';
-import { QuoteTracker } from '../components/QuoteTracker';
-import { AcceptDialog, CounterDialog, RefuseDialog, RfqDialog } from '../components/QuoteDialogs';
-import { parsePrice } from '../lib/quotes';
+import { QuoteCardGrid, QuoteTrackerWithActions, RequestPic } from '../components/QuoteBoard';
+import { RfqDialog } from '../components/QuoteDialogs';
+import { isClosed, quoteRequests, requestSummary } from '../lib/quotes';
+import { fdate, num } from '../lib/format';
 import FilterChip from '../components/FilterChip';
-import { toast } from '../components/ui-shared';
+import { SupplierLogo } from '../components/ui';
 
 type Tab = 'en_attente' | 'fournisseur' | 'acceptee' | 'refusee';
 const TABS: { id: Tab; label: string }[] = [
@@ -20,34 +20,32 @@ const TABS: { id: Tab; label: string }[] = [
 ];
 /** « Chez le fournisseur » : prix attendu, ou contre-offre JONAS en négociation */
 const inTab = (q: Quotation, t: Tab) => (t === 'fournisseur' ? q.status === 'demande' || q.status === 'negociation' : q.status === t);
+type Mode = 'galerie' | 'suivi' | 'cartes';
 
 /** Quotations : demandes de prix aux fournisseurs et offres reçues (à accepter → produit créé et mis au panier) */
 export default function Quotations() {
-  const { state, dispatch } = useStore();
-  const me = currentUser(state);
-  const allowed = canQuote(me);
+  const { state } = useStore();
+  const allowed = canQuote(currentUser(state));
   const [params, setParams] = useSearchParams();
   const tab = ((v) => (v === 'demande' ? 'fournisseur' : v))(params.get('vue') as Tab | 'demande' | null) ?? 'en_attente';
   const [supplier, setSupplier] = useState('all');
-  // Suivi des prix (tableau par demande, fournisseurs côte à côte) ou cartes par statut
-  const mode = params.get('mode') === 'cartes' ? 'cartes' : 'suivi';
-  const setMode = (m: 'cartes' | 'suivi') => setParams(m === 'cartes' ? { mode: m, vue: tab } : {});
+  const [closed, setClosed] = useState(false);
+  // Galerie (une carte par produit demandé), suivi des prix (tableau), ou offres une par une par statut
+  const mode: Mode = (['suivi', 'cartes'] as const).find((m) => m === params.get('mode')) ?? 'galerie';
+  const setMode = (m: Mode) => setParams(m === 'galerie' ? {} : m === 'cartes' ? { mode: m, vue: tab } : { mode: m });
   const [rfq, setRfq] = useState(false);
-  const [accepting, setAccepting] = useState<Quotation | null>(null);
-  const [refusing, setRefusing] = useState<Quotation | null>(null);
-  const [countering, setCountering] = useState<Quotation | null>(null);
-  const [pricing, setPricing] = useState<Record<string, string>>({});
 
-  const count = (st: Tab) => state.quotations.filter((q) => inTab(q, st)).length;
-  const list = state.quotations
-    .filter((q) => inTab(q, tab) && (supplier === 'all' || q.supplierId === supplier))
-    .sort((a, b) => (b.answeredAt ?? b.createdAt).localeCompare(a.answeredAt ?? a.createdAt));
-  // Même demande envoyée à plusieurs fournisseurs : meilleur prix parmi les réponses (même devise)
-  const best = new Set<string>();
-  const groups = new Map<string, Quotation[]>();
-  for (const q of state.quotations) if (q.group && q.price && q.status === 'en_attente') groups.set(`${q.group}~${q.currency}`, [...(groups.get(`${q.group}~${q.currency}`) ?? []), q]);
-  for (const g of groups.values()) if (g.length > 1) best.add(g.reduce((m, q) => (q.price! < m.price! ? q : m)).id);
+  const mine = state.quotations.filter((q) => supplier === 'all' || q.supplierId === supplier);
+  const count = (st: Tab) => mine.filter((q) => inTab(q, st)).length;
+  const list = mine.filter((q) => inTab(q, tab)).sort((a, b) => (b.answeredAt ?? b.createdAt).localeCompare(a.answeredAt ?? a.createdAt));
+  const requests = quoteRequests(mine);
+  const shown = requests.filter((r) => closed || r.quotes.some((q) => !isClosed(q)));
   const suppliersUsed = [...new Set(state.quotations.map((q) => q.supplierId))];
+  const MODES: { id: Mode; label: string; icon: typeof Images }[] = [
+    { id: 'galerie', label: 'Galerie', icon: Images },
+    { id: 'suivi', label: 'Suivi des prix', icon: Table2 },
+    { id: 'cartes', label: 'Par statut', icon: LayoutGrid },
+  ];
 
   return (
     <>
@@ -64,12 +62,11 @@ export default function Quotations() {
       </div>
       <div className="row wrap mb" style={{ gap: 8 }}>
         <span className="pfx-seg" role="group" aria-label="Présentation">
-          <button type="button" aria-pressed={mode === 'suivi'} className={mode === 'suivi' ? 'on' : ''} onClick={() => setMode('suivi')}>
-            <Table2 size={16} /> Suivi des prix
-          </button>
-          <button type="button" aria-pressed={mode === 'cartes'} className={mode === 'cartes' ? 'on' : ''} onClick={() => setMode('cartes')}>
-            <LayoutGrid size={16} /> Cartes
-          </button>
+          {MODES.map((m) => (
+            <button key={m.id} type="button" aria-pressed={mode === m.id} className={mode === m.id ? 'on' : ''} onClick={() => setMode(m.id)}>
+              <m.icon size={16} /> {m.label}
+            </button>
+          ))}
         </span>
         {mode === 'cartes' && (
           <span className="pfx-seg" role="group" aria-label="Statut">
@@ -83,91 +80,68 @@ export default function Quotations() {
         {suppliersUsed.length > 1 && (
           <FilterChip label="Fournisseur" value={supplier} onChange={setSupplier} options={suppliersUsed.map((id) => ({ id, label: state.suppliers.find((s) => s.id === id)?.shortName ?? id }))} />
         )}
+        {mode === 'galerie' && (
+          <label className="qtt-closed small">
+            <input type="checkbox" checked={closed} onChange={(e) => setClosed(e.target.checked)} /> Afficher les demandes clôturées
+          </label>
+        )}
       </div>
-      {mode === 'suivi' && (
-        <QuoteTracker
-          quotes={state.quotations.filter((q) => supplier === 'all' || q.supplierId === supplier)}
-          allowed={allowed}
-          onCounter={setCountering}
-          onAccept={setAccepting}
-          onRefuse={setRefusing}
-        />
+
+      {mode === 'galerie' && (
+        <>
+          {!shown.length && <div className="card empty">Aucune demande de prix en cours.</div>}
+          <div className="qtg-grid">
+            {shown.map((r) => {
+              const head = r.quotes[0];
+              const s = requestSummary(r.quotes);
+              return (
+                <Link key={r.key} to={`/offres/${encodeURIComponent(r.key)}`} className="card qtg-card" aria-label={`Offres ${head.name}`}>
+                  <RequestPic quotes={r.quotes} className="qtg-hero" />
+                  <div className="qtg-body">
+                    <b className="qtg-name">{head.name}</b>
+                    <div className="xs muted">
+                      {head.origin === 'rfq' ? 'Demande de prix' : 'Offre spontanée'} · {fdate(head.createdAt.slice(0, 10))}
+                      {head.qty ? ` · ${num(head.qty)} pcs` : ''}
+                    </div>
+                    <div className="qtg-price">
+                      {s.lowLabel ? (
+                        <>
+                          <small>{r.quotes.length > 1 ? 'dès' : ''}</small> {s.lowLabel}
+                        </>
+                      ) : (
+                        <span className="muted">Prix attendu</span>
+                      )}
+                    </div>
+                    <div className="qtg-tags">
+                      {r.quotes.length > 1 && (
+                        <span className="pill grey">
+                          {s.answered} / {r.quotes.length} réponse(s)
+                        </span>
+                      )}
+                      {s.toDecide > 0 && <span className="pill orange">{s.toDecide} à décider</span>}
+                      {s.nego > 0 && <span className="pill blue">{s.nego} en négociation</span>}
+                      {s.accepted && <span className="pill green">Acceptée · {byId(state.suppliers, s.accepted.supplierId).shortName}</span>}
+                    </div>
+                    <div className="qtg-sups">
+                      {r.quotes.map((q) => (
+                        <SupplierLogo key={q.id} supplier={byId(state.suppliers, q.supplierId)} size={26} />
+                      ))}
+                      <span className="grow" />
+                      <span className="qtg-open">Voir les offres ›</span>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </>
       )}
+      {mode === 'suivi' && <QuoteTrackerWithActions quotes={mine} />}
       {mode === 'cartes' && list.length === 0 && (
         <div className="card empty">{tab === 'en_attente' ? 'Aucune offre en attente.' : tab === 'fournisseur' ? 'Aucune demande en attente chez un fournisseur.' : 'Rien ici pour le moment.'}</div>
       )}
-      <div className="qt-grid" hidden={mode !== 'cartes'}>
-        {mode === 'cartes' &&
-          list.map((q) => (
-            <QuoteCard key={q.id} q={q} best={best.has(q.id)}>
-              {allowed && q.status === 'en_attente' && (
-                <>
-                  <button type="button" className="btn primary" onClick={() => setAccepting(q)}>
-                    <Check size={16} /> Accepter
-                  </button>
-                  <button type="button" className="btn" onClick={() => setCountering(q)}>
-                    <Handshake size={16} /> Contre-offre
-                  </button>
-                  <button type="button" className="btn ghost" onClick={() => setRefusing(q)}>
-                    <X size={16} /> Refuser
-                  </button>
-                </>
-              )}
-              {allowed && q.status === 'negociation' && (
-                <button type="button" className="btn" onClick={() => setCountering(q)}>
-                  <Handshake size={16} /> Nouvelle contre-offre
-                </button>
-              )}
-              {allowed && (q.status === 'demande' || q.status === 'negociation') && (
-                <>
-                  <input
-                    className="qt-price-in"
-                    inputMode="decimal"
-                    placeholder={`Prix reçu (${q.currency})`}
-                    aria-label={`Prix reçu ${q.name}`}
-                    value={pricing[q.id] ?? ''}
-                    onChange={(e) => setPricing({ ...pricing, [q.id]: e.target.value })}
-                  />
-                  <button
-                    type="button"
-                    className="btn"
-                    disabled={!parsePrice(pricing[q.id] ?? '')}
-                    onClick={() => {
-                      dispatch({ type: 'answerQuote', id: q.id, price: parsePrice(pricing[q.id] ?? '') });
-                      toast('Prix enregistré : offre en attente');
-                    }}
-                  >
-                    OK
-                  </button>
-                  <button type="button" className="btn ghost" onClick={() => setRefusing(q)}>
-                    Annuler la demande
-                  </button>
-                </>
-              )}
-              {q.status === 'acceptee' && q.productId && (
-                <Link className="btn" to={`/produits/${q.productId}`} state={{ back: '/offres?vue=acceptee', backLabel: 'Offres de prix' }}>
-                  Voir le produit
-                </Link>
-              )}
-              {allowed && q.status === 'refusee' && (
-                <button
-                  type="button"
-                  className="btn ghost"
-                  onClick={() => {
-                    dispatch({ type: 'deleteQuote', id: q.id });
-                    toast('Offre supprimée');
-                  }}
-                >
-                  <Trash2 size={16} /> Supprimer
-                </button>
-              )}
-            </QuoteCard>
-          ))}
-      </div>
+      {mode === 'cartes' && <QuoteCardGrid quotes={list} back={`/offres?mode=cartes&vue=${tab}`} />}
       {rfq && <RfqDialog onClose={() => setRfq(false)} />}
-      {accepting && <AcceptDialog q={accepting} onClose={() => setAccepting(null)} />}
-      {refusing && <RefuseDialog q={refusing} onClose={() => setRefusing(null)} />}
-      {countering && <CounterDialog q={countering} onClose={() => setCountering(null)} />}
     </>
   );
 }

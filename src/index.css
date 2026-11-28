@@ -2665,3 +2665,21 @@ tr.pf-moving td, .pf-line.pf-moving { background: #fff6e8 !important; outline: 2
   .qtt-th { display: none; }
   .qtt-act { justify-content: flex-start; }
 }
+/* Offres de prix : galerie par produit et fiche d'une demande */
+.qtg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr)); gap: 16px; }
+.qtg-card { display: flex; flex-direction: column; padding: 0; overflow: hidden; color: inherit; text-decoration: none; transition: box-shadow 0.15s, transform 0.15s; }
+.qtg-card:hover { box-shadow: 0 6px 20px rgba(16, 40, 32, 0.12); transform: translateY(-2px); }
+.qtg-hero { aspect-ratio: 4 / 3; background: #f4f6f8; display: grid; place-items: center; font-size: 76px; overflow: hidden; }
+.qtg-hero img { width: 100%; height: 100%; object-fit: contain; background: #fff; }
+.qtg-body { padding: 12px 14px 14px; display: grid; gap: 7px; }
+.qtg-name { font-size: 16px; line-height: 1.3; }
+.qtg-price { font-size: 24px; font-weight: 800; }
+.qtg-price small { font-size: 13px; font-weight: 600; color: var(--muted); }
+.qtg-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.qtg-sups { display: flex; align-items: center; gap: 4px; padding-top: 6px; border-top: 1px solid var(--line); }
+.qtg-open { font-size: 13px; font-weight: 700; color: var(--green-dark); }
+.qtd-head { display: flex; gap: 18px; padding: 16px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+.qtd-pic { width: 150px; height: 150px; border-radius: 14px; background: #f4f6f8; display: grid; place-items: center; font-size: 72px; overflow: hidden; flex-shrink: 0; }
+.qtd-pic img { width: 100%; height: 100%; object-fit: contain; background: #fff; }
+.qtd-name { font-size: 24px; color: var(--green-dark); }
+.qtd-h { margin: 18px 0 10px; font-size: 17px; }

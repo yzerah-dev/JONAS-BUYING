@@ -37,15 +37,22 @@ export function QuoteTracker({
   onAccept,
   onRefuse,
   allowed,
+  showClosed,
+  bare,
 }: {
   quotes: Quotation[];
   onCounter: (q: Quotation) => void;
   onAccept: (q: Quotation) => void;
   onRefuse: (q: Quotation) => void;
   allowed: boolean;
+  /** Imposé par la page (fiche d'une demande : tout afficher) ; sinon case à cocher */
+  showClosed?: boolean;
+  /** Fiche d'une demande : sans l'en-tête (déjà affiché par la page) */
+  bare?: boolean;
 }) {
   const { state } = useStore();
-  const [closed, setClosed] = useState(false);
+  const [closedBox, setClosed] = useState(false);
+  const closed = showClosed ?? closedBox;
   const byKey = new Map<string, Quotation[]>();
   for (const q of quotes) byKey.set(q.group ?? q.id, [...(byKey.get(q.group ?? q.id) ?? []), q]);
   const activity = (q: Quotation) => [q.createdAt, q.answeredAt ?? '', q.decidedAt ?? '', ...(q.rounds ?? []).map((r) => r.at)].sort().pop()!;
@@ -57,9 +64,11 @@ export function QuoteTracker({
 
   return (
     <div className="qtt">
-      <label className="qtt-closed small">
-        <input type="checkbox" checked={closed} onChange={(e) => setClosed(e.target.checked)} /> Afficher les demandes clôturées{!closed && hidden > 0 ? ` (${hidden})` : ''}
-      </label>
+      {showClosed === undefined && (
+        <label className="qtt-closed small">
+          <input type="checkbox" checked={closed} onChange={(e) => setClosed(e.target.checked)} /> Afficher les demandes clôturées{!closed && hidden > 0 ? ` (${hidden})` : ''}
+        </label>
+      )}
       {!requests.length && <div className="card empty">Aucune demande de prix en cours.</div>}
       {requests.map((r) => {
         const head = r.quotes[0];
@@ -68,28 +77,30 @@ export function QuoteTracker({
         const answered = r.quotes.filter((q) => q.status !== 'demande').length;
         return (
           <section key={r.key} className="card qtt-req" aria-label={`Suivi des prix ${head.name}`}>
-            <header className="qtt-head">
-              <Pic q={head} />
-              <div className="grow">
-                <b className="qtt-name">{head.name}</b>
-                <div className="small muted">
-                  {head.origin === 'rfq' ? 'Demande de prix' : 'Offre spontanée'} du {fdate(head.createdAt.slice(0, 10))}
-                  {head.qty ? ` · ${head.qty.toLocaleString('fr-FR')} pcs` : ''}
-                  {head.targetPrice ? ` · prix cible ${money(head.targetPrice, head.currency)}` : ''}
-                  {head.sourceProductId ? (
-                    <>
-                      {' · '}
-                      <Link to={`/produits/${head.sourceProductId}`}>{head.sourceProductId}</Link>
-                    </>
-                  ) : null}
+            {!bare && (
+              <header className="qtt-head">
+                <Pic q={head} />
+                <div className="grow">
+                  <b className="qtt-name">{head.name}</b>
+                  <div className="small muted">
+                    {head.origin === 'rfq' ? 'Demande de prix' : 'Offre spontanée'} du {fdate(head.createdAt.slice(0, 10))}
+                    {head.qty ? ` · ${head.qty.toLocaleString('fr-FR')} pcs` : ''}
+                    {head.targetPrice ? ` · prix cible ${money(head.targetPrice, head.currency)}` : ''}
+                    {head.sourceProductId ? (
+                      <>
+                        {' · '}
+                        <Link to={`/produits/${head.sourceProductId}`}>{head.sourceProductId}</Link>
+                      </>
+                    ) : null}
+                  </div>
                 </div>
-              </div>
-              {head.origin === 'rfq' && (
-                <span className="pill grey">
-                  {answered} / {r.quotes.length} réponse(s)
-                </span>
-              )}
-            </header>
+                {head.origin === 'rfq' && (
+                  <span className="pill grey">
+                    {answered} / {r.quotes.length} réponse(s)
+                  </span>
+                )}
+              </header>
+            )}
             <div className="qtt-table" role="table">
               <div className="qtt-row qtt-th" role="row">
                 <span role="columnheader">Fournisseur</span>

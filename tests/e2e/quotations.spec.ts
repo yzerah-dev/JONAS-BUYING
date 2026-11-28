@@ -147,7 +147,7 @@ test('demande de prix depuis une fiche produit, négociation (contre-offre accep
 test('suivi des prix reçus : tableau par demande, contre-offre depuis le tableau ; rubriques du portail', async ({ page }) => {
   await resetApp(page);
   await loginAs(page, 'David');
-  await go(page, 'offres');
+  await go(page, 'offres?mode=suivi');
   // Vue par défaut : suivi des prix ; la demande « Coussin » envoyée à 2 fournisseurs, 1 réponse
   const req = page.getByRole('region', { name: /Suivi des prix Coussin extérieur/ });
   await expect(req).toContainText('1 / 2 réponse(s)');
@@ -182,4 +182,31 @@ test('suivi des prix reçus : tableau par demande, contre-offre depuis le tablea
   await mine.locator('input.qt-price-in').fill('1,78');
   await mine.locator('.qt-actions .btn:has-text("Proposer")').click();
   await expect(page.locator('a[href*="/portail/offres"] .pill.red')).toHaveCount(0);
+});
+
+test('galerie des demandes : une carte par produit, ouverture pour voir et traiter les offres de chaque fournisseur', async ({ page }) => {
+  await resetApp(page);
+  await loginAs(page, 'David');
+  await go(page, 'offres');
+  // Galerie par défaut : 2 demandes (Coussin envoyé à 2 fournisseurs, Bougie offre spontanée)
+  await expect(page.locator('.qtg-card')).toHaveCount(2);
+  const coussin = page.getByRole('link', { name: /Offres Coussin extérieur/ });
+  await expect(coussin).toContainText('1 / 2 réponse(s)');
+  await expect(coussin).toContainText('1 à décider');
+  await expect(coussin.locator('.qtg-price')).toContainText('2,35');
+  await coussin.click();
+
+  // Fiche de la demande : comparatif + une carte par fournisseur
+  await expect(page.locator('h1')).toHaveText('Offres reçues');
+  await expect(page.locator('.qtd-name')).toHaveText('Coussin extérieur déperlant 45 × 45');
+  await expect(page.getByTestId('track-Q-DEMO-2')).toBeVisible();
+  await expect(page.locator('.qt-card')).toHaveCount(2);
+  await page.locator('.qt-card', { hasText: 'Horizon Home' }).getByRole('button', { name: 'Accepter' }).click();
+  const acc = page.getByRole('dialog', { name: 'Accepter l’offre' });
+  await acc.getByRole('button', { name: 'Accepter et ajouter au panier' }).click();
+  await toast(page, /Offre acceptée/);
+  await expect(page.getByTestId('track-Q-DEMO-2')).toContainText('Acceptée');
+
+  await page.getByRole('button', { name: 'Retour aux offres' }).click();
+  await expect(page.getByRole('link', { name: /Offres Coussin extérieur/ })).toContainText('Acceptée · Horizon Home');
 });
