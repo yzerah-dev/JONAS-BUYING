@@ -2705,3 +2705,41 @@ tr.picked td { background: var(--green-softer); }
 .qt-multi-th { font-size: 12px; font-weight: 700; color: var(--muted); }
 .qt-multi-p { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 13px; }
 .qt-multi-p > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---------- Téléphone : réglages complémentaires ---------- */
+@media (max-width: 820px) {
+  /* Assistant : rond compact, ne masque plus les champs et boutons en bas d'écran */
+  .as-fab { width: 52px; height: 52px; padding: 0; justify-content: center; right: 12px; bottom: 12px; }
+  .as-fab-label { display: none; }
+  .main { padding-bottom: 84px; }
+  .card-title { flex-wrap: wrap; }
+  .page-head { flex-wrap: wrap; row-gap: 8px; }
+  .page-sub { flex-basis: 100%; }
+
+  /* Offres de prix */
+  .qt-grid, .qtg-grid { grid-template-columns: 1fr; }
+  .qt-hero, .qtg-hero { aspect-ratio: 16 / 10; }
+  .pfx-seg { max-width: 100%; overflow-x: auto; }
+  .qtd-head { gap: 12px; }
+  .qtd-pic { width: 96px; height: 96px; font-size: 48px; }
+  .qtd-name { font-size: 20px; }
+  .qtt-head { padding: 10px 12px; }
+  .qtt-row { grid-template-columns: minmax(0, 1fr) auto; gap: 8px 10px; padding: 12px; }
+  .qtt-row > .qtt-hist, .qtt-row > .qtt-act { grid-column: 1 / -1; }
+  .qtt-row > .qtt-act { justify-content: flex-start; }
+  .qtt-act .qt-counter-in { flex: 1 1 100%; flex-wrap: nowrap; }
+  .qtt-act .qt-counter-field { flex: 1 1 auto; }
+  .qtt-act .qt-counter-in.compact .qt-price-in { width: 100%; }
+  .qt-actions .btn { flex: 1 1 auto; justify-content: center; }
+  .qt-sup-tools .input { flex: 1 1 100% !important; }
+  .qt-multi-row { grid-template-columns: minmax(0, 1fr) 76px 76px; gap: 6px; }
+  .qt-multi-p .ref-tag { display: none; }
+
+  /* Catalogue : barre de sélection pleine largeur */
+  .pr-selbar { bottom: 76px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 8px; padding: 8px 10px; }
+  .pr-selbar > .grow, .pr-selbar > .btn.ghost:not(:nth-of-type(2)) { display: none; }
+  .pr-selbar .btn.ghost { padding: 6px 10px; }
+  .pr-selbar .btn.primary { grid-column: 1 / -1; justify-content: center; }
+  .qtt-head { flex-wrap: wrap; }
+  .qtt-head .grow { flex: 1 1 calc(100% - 70px); }
+}

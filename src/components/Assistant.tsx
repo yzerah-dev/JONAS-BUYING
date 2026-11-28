@@ -426,7 +426,7 @@ Réponds en français, de façon concise (listes à puces).`;
     <>
       {!open && (
         <button className="as-fab" onClick={() => setOpen(true)} aria-label="Assistant commandes">
-          <Sparkles size={20} /> Assistant
+          <Sparkles size={20} /> <span className="as-fab-label">Assistant</span>
         </button>
       )}
       {open && (

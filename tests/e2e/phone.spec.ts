@@ -9,6 +9,10 @@ const ROUTES = [
   'performance',
   'proformas',
   'proformas/PF-2026-0143',
+  'offres',
+  'offres?mode=suivi',
+  'offres?mode=cartes',
+  'offres/G-DEMO-1',
   'produits',
   'produits/AB-M026',
   'developpement',
@@ -20,7 +24,7 @@ const ROUTES = [
   'parametres',
 ];
 
-const PORTAL_ROUTES = ['portail', 'portail/produits', 'portail/proformas?pf=PF-2026-0143', 'portail/packs?vue=tous', 'portail/chargement', 'portail/conteneurs', 'portail/finance'];
+const PORTAL_ROUTES = ['portail', 'portail/quotations', 'portail/offres', 'portail/produits', 'portail/proformas?pf=PF-2026-0143', 'portail/packs?vue=tous', 'portail/chargement', 'portail/conteneurs', 'portail/finance'];
 
 test.describe('Téléphone : pas de défilement horizontal', () => {
   for (const route of ROUTES) {
