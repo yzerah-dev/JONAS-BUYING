@@ -614,7 +614,8 @@ export function isAllowed(s: State, a: Action): boolean {
     }
     case 'counterQuote': {
       const q = s.quotations.find((x) => x.id === a.id);
-      return !!q && canQuote(u) && q.status === 'en_attente' && a.price > 0;
+      // Sur une offre reçue, ou pour relancer une négociation en cours (nouvelle contre-offre)
+      return !!q && canQuote(u) && (q.status === 'en_attente' || q.status === 'negociation') && a.price > 0;
     }
     case 'acceptCounter': {
       const q = s.quotations.find((x) => x.id === a.id);
@@ -1472,7 +1473,11 @@ function applyAction(s: State, a: Action): State {
         ...(a.note?.trim() ? { note: [q.note, a.note.trim()].filter(Boolean).join('\n') } : {}),
       }));
     case 'counterQuote':
-      return mapQ(s, a.id, (q) => ({ ...q, status: 'negociation', rounds: [...(q.rounds ?? []), round('jonas', a.price, me, a.note)] }));
+      return mapQ(s, a.id, (q) => {
+        // Premier prix du fournisseur gardé dans l'historique (offre spontanée, ou prix saisi avant l'historique)
+        const first: QuoteRound[] = !q.rounds?.length && q.price ? [{ by: 'fournisseur', price: q.price, at: q.answeredAt ?? q.createdAt, who: byId(s.suppliers, q.supplierId).shortName }] : [];
+        return { ...q, status: 'negociation', rounds: [...first, ...(q.rounds ?? []), round('jonas', a.price, me, a.note)] };
+      });
     case 'acceptCounter':
       return mapQ(s, a.id, (q) => {
         const price = lastCounter(q)!.price;

@@ -12,44 +12,53 @@ import { toast } from '../components/ui-shared';
 import { useT } from '../i18n';
 import { usePortal } from './usePortal';
 
-type View = 'chiffrer' | 'envoyees' | 'closes';
+type View = 'chiffrer' | 'nego' | 'envoyees' | 'closes';
 
-/** Portail : demandes de prix de JONAS (donner son prix ou décliner) et offres spontanées du fournisseur */
-export default function PortalOffers() {
+/**
+ * Portail fournisseur, deux rubriques :
+ * - « Demandes de quotation » (mode rfq) : demandes de prix de JONAS — donner son prix, répondre aux contre-offres, décliner ;
+ * - « Mes offres » (mode offres) : produits proposés spontanément à JONAS (et leurs négociations).
+ */
+export default function PortalOffers({ mode = 'offres' }: { mode?: 'rfq' | 'offres' }) {
   const { state, dispatch, supplier, user } = usePortal();
   const { t } = useT();
   const [params, setParams] = useSearchParams();
-  const mine = state.quotations.filter((q) => q.supplierId === supplier?.id);
-  const toAnswer = mine.filter((q) => q.status === 'demande' || q.status === 'negociation');
+  const mine = state.quotations.filter((q) => q.supplierId === supplier?.id && (mode === 'rfq' ? q.origin === 'rfq' : q.origin !== 'rfq'));
+  const toAnswer = mine.filter((q) => q.status === 'demande');
+  const nego = mine.filter((q) => q.status === 'negociation');
   const sent = mine.filter((q) => q.status === 'en_attente');
   const closed = mine.filter((q) => q.status === 'acceptee' || q.status === 'refusee');
-  const view = (params.get('vue') as View | null) ?? (toAnswer.length || !sent.length ? 'chiffrer' : 'envoyees');
+  const views: { id: View; label: string; list: Quotation[] }[] = [
+    ...(mode === 'rfq' ? [{ id: 'chiffrer' as const, label: t('q.tab.toAnswer', { n: toAnswer.length }), list: toAnswer }] : []),
+    { id: 'nego', label: t('q.tab.nego', { n: nego.length }), list: nego },
+    { id: 'envoyees', label: mode === 'rfq' ? t('q.tab.answered', { n: sent.length }) : t('q.tab.sent', { n: sent.length }), list: sent },
+    { id: 'closes', label: t('q.tab.closed', { n: closed.length }), list: closed },
+  ];
+  const asked = params.get('vue') as View | null;
+  const view = views.find((v) => v.id === asked)?.id ?? views.find((v) => v.list.length && (v.id === 'chiffrer' || v.id === 'nego'))?.id ?? views.find((v) => v.list.length)?.id ?? views[0].id;
   const [creating, setCreating] = useState(false);
   const [price, setPrice] = useState<Record<string, string>>({});
   const [declining, setDeclining] = useState<string | null>(null);
   const [reason, setReason] = useState('');
   if (!supplier) return null;
-  const list = (view === 'chiffrer' ? toAnswer : view === 'envoyees' ? sent : closed).slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const list = views
+    .find((v) => v.id === view)!
+    .list.slice()
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   return (
     <>
       <div className="page-head">
-        <h1>{t('nav.offers')}</h1>
-        <span className="page-sub">{t('q.portal.sub')}</span>
+        <h1>{mode === 'rfq' ? t('nav.rfq') : t('nav.myOffers')}</h1>
+        <span className="page-sub">{mode === 'rfq' ? t('q.rfq.sub') : t('q.portal.sub')}</span>
         <div className="grow" />
-        <button type="button" className="btn primary" onClick={() => setCreating(true)}>
-          <Plus size={16} /> {t('q.new')}
-        </button>
+        {mode === 'offres' && (
+          <button type="button" className="btn primary" onClick={() => setCreating(true)}>
+            <Plus size={16} /> {t('q.new')}
+          </button>
+        )}
       </div>
       <div className="mb">
-        <Seg
-          value={view}
-          onChange={(v) => setParams({ vue: v })}
-          options={[
-            { id: 'chiffrer', label: t('q.tab.toAnswer', { n: toAnswer.length }) },
-            { id: 'envoyees', label: t('q.tab.sent', { n: sent.length }) },
-            { id: 'closes', label: t('q.tab.closed', { n: closed.length }) },
-          ]}
-        />
+        <Seg value={view} onChange={(v) => setParams({ vue: v })} options={views.map((v) => ({ id: v.id, label: v.label }))} />
       </div>
       {list.length === 0 && <div className="card empty">{t('q.empty')}</div>}
       <div className="qt-grid">

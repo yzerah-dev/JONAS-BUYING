@@ -73,8 +73,11 @@ export function detectMailEvents(prev: State, next: State): MailEvent[] {
   const prevQ = new Set((prev.quotations ?? []).map((q) => q.id));
   for (const q of next.quotations ?? []) if (!prevQ.has(q.id) && q.origin === 'rfq') out.push({ kind: 'quote', supplierId: q.supplierId, quoteId: q.id });
   // Contre-offre JONAS (négociation)
-  const prevStatus = new Map((prev.quotations ?? []).map((q) => [q.id, q.status]));
-  for (const q of next.quotations ?? []) if (q.status === 'negociation' && prevStatus.get(q.id) === 'en_attente') out.push({ kind: 'counter', supplierId: q.supplierId, quoteId: q.id });
+  const prevRounds = new Map((prev.quotations ?? []).map((q) => [q.id, q.rounds?.length ?? 0]));
+  for (const q of next.quotations ?? []) {
+    const r = q.rounds ?? [];
+    if (q.status === 'negociation' && prevRounds.has(q.id) && r.length > prevRounds.get(q.id)! && r[r.length - 1].by === 'jonas') out.push({ kind: 'counter', supplierId: q.supplierId, quoteId: q.id });
+  }
   return out;
 }
 
@@ -149,8 +152,8 @@ export async function prepareMail(s: State, ev: MailEvent): Promise<PreparedMail
       files.push({ filename: loadingPlanFileName(c), blob: loadingPlanXlsx(s, c) });
     }
   } else if (ev.kind === 'quote' || ev.kind === 'counter') {
-    link = `${APP_URL}/#/portail/offres`;
     const q = s.quotations.find((x) => x.id === ev.quoteId);
+    link = `${APP_URL}/#/portail/${q?.origin === 'rfq' ? 'quotations' : 'offres'}${ev.kind === 'counter' ? '?vue=nego' : ''}`;
     q?.photos.forEach((ph, i) => files.push({ filename: `photo-${i + 1}.${ph.mime.split('/')[1]?.replace('jpeg', 'jpg') || 'jpg'}`, blob: getBlob(ph.fileId) }));
   } else if (ev.kind === 'pack') {
     link = `${APP_URL}/#/portail/packs`;

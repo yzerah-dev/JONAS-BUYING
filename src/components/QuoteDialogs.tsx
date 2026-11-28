@@ -182,8 +182,8 @@ export function CounterDialog({ q, onClose }: { q: Quotation; onClose: () => voi
   const p = parsePrice(price);
   return (
     <Dialog
-      title="Négocier le prix"
-      sub={`${q.name} · prix proposé ${money(q.price ?? 0, q.currency)}`}
+      title="Contre-offre"
+      sub={`${q.name} · prix du fournisseur ${money(q.price ?? 0, q.currency)}${q.status === 'negociation' ? ' · votre dernière contre-offre est remplacée' : ''}`}
       onClose={onClose}
       foot={
         <>

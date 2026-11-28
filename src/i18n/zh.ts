@@ -754,7 +754,7 @@ export const zh: Record<Key, string> = {
   'q.photoBad': '照片格式不支持（JPG、PNG 或 WEBP）',
   'q.note': '备注（起订量、交期…）',
   'q.reason': '原因：{r}',
-  'q.portal.sub': 'JONAS 的询价与您的产品报价',
+  'q.portal.sub': '您向 JONAS 推荐的产品（照片和价格）',
   'q.tab.toAnswer': '待报价（{n}）',
   'q.tab.sent': '已发报价（{n}）',
   'q.tab.closed': '已结束（{n}）',
@@ -787,6 +787,11 @@ export const zh: Record<Key, string> = {
   'q.agreed': '已接受价格',
   'q.counterOk': '已接受还价：等待 JONAS 确认订单',
   'q.product': '产品 {ref}',
+  'nav.rfq': '询价单',
+  'nav.myOffers': '我的报价',
+  'q.rfq.sub': 'JONAS 的询价：填写价格、回复还价',
+  'q.tab.nego': '议价中（{n}）',
+  'q.tab.answered': '已报价（{n}）',
 };
 
 /** Valeurs issues des données (français) traduites en chinois */

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Navigate, NavLink, Outlet } from 'react-router-dom';
-import { Bell, Boxes, CalendarCheck, Container as Ctn, Euro, FileText, Home, Package, Tag, Truck } from 'lucide-react';
+import { Bell, Boxes, CalendarCheck, Container as Ctn, Euro, FileQuestion, FileText, Home, Package, Tag, Truck } from 'lucide-react';
 import { isSupplier } from '../data/permissions';
 import { useTableLabels } from '../components/useTableLabels';
 import { Toaster } from '../components/ui';
@@ -38,7 +38,9 @@ function PortalShell() {
     n.remove();
   }, [lang]);
   if (!isSupplier(user) || !supplier) return <Navigate to="/" replace />;
-  const quotesToAnswer = state.quotations.filter((q) => q.supplierId === supplier.id && (q.status === 'demande' || q.status === 'negociation')).length;
+  const myQuotes = state.quotations.filter((q) => q.supplierId === supplier.id);
+  const quotesToAnswer = myQuotes.filter((q) => q.origin === 'rfq' && (q.status === 'demande' || q.status === 'negociation')).length;
+  const offersToAnswer = myQuotes.filter((q) => q.origin !== 'rfq' && q.status === 'negociation').length;
   const todo =
     quotesToAnswer + packsToValidate.length + dieCutsRequested.length + bookingsToDo.length + bookingsToAccept.length + proformasToUpload.length + splitsToAccept.length + docsMissing.length;
 
@@ -46,7 +48,8 @@ function PortalShell() {
     { to: '/portail', label: t('nav.home'), icon: Home, end: true },
     { to: '/portail/produits', label: t('nav.products'), icon: Boxes, badge: products.reduce((n, p) => n + unreadCount(p, 'fournisseur'), 0) },
     { to: '/portail/proformas', label: t('nav.proformas'), icon: FileText, badge: proformasToUpload.length + splitsToAccept.length },
-    { to: '/portail/offres', label: t('nav.offers'), icon: Tag, badge: quotesToAnswer },
+    { to: '/portail/quotations', label: t('nav.rfq'), icon: FileQuestion, badge: quotesToAnswer },
+    { to: '/portail/offres', label: t('nav.myOffers'), icon: Tag, badge: offersToAnswer },
     { to: '/portail/packs', label: t('nav.packs'), icon: Package, badge: packsToValidate.length + dieCutsRequested.length },
     { to: '/portail/booking', label: t('nav.booking'), icon: CalendarCheck, badge: bookingsToDo.length + bookingsToAccept.length },
     { to: '/portail/chargement', label: t('nav.loading'), icon: Truck },

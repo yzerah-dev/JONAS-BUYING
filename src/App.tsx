@@ -70,7 +70,8 @@ export default function App() {
             <Route path="produits" element={page(<PortalProducts />)} />
             <Route path="produits/:id" element={page(<PortalProductDetail />)} />
             <Route path="proformas" element={page(<PortalProformas />)} />
-            <Route path="offres" element={page(<PortalOffers />)} />
+            <Route path="quotations" element={page(<PortalOffers mode="rfq" />)} />
+            <Route path="offres" element={page(<PortalOffers mode="offres" />)} />
             <Route path="packs" element={page(<PortalPacks />)} />
             <Route path="booking" element={page(<PortalBooking />)} />
             <Route path="chargement" element={page(<PortalLoading />)} />

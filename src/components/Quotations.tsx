@@ -131,7 +131,7 @@ export function QuoteCard({ q, showSupplier = true, best, children }: { q: Quota
           </div>
         )}
         {q.note && <div className="qt-note small">{q.note}</div>}
-        {!!q.rounds?.length && (q.rounds.length > 1 || q.rounds[0].by === 'jonas') && (
+        {!!q.rounds?.length && (
           <div className="qt-rounds" aria-label={t('q.history')}>
             {q.rounds.map((r, i) => [
               i > 0 && (

@@ -787,7 +787,7 @@ export const fr = {
   'q.photoBad': 'Photo non acceptée (JPG, PNG ou WEBP)',
   'q.note': 'Remarque (MOQ, délai…)',
   'q.reason': 'Motif : {r}',
-  'q.portal.sub': 'Demandes de prix de JONAS et vos offres de produits',
+  'q.portal.sub': 'Produits que vous proposez à JONAS, avec photos et prix',
   'q.tab.toAnswer': 'À chiffrer ({n})',
   'q.tab.sent': 'Offres envoyées ({n})',
   'q.tab.closed': 'Clôturées ({n})',
@@ -820,6 +820,11 @@ export const fr = {
   'q.agreed': 'prix accepté',
   'q.counterOk': 'Contre-offre acceptée : JONAS confirme la commande',
   'q.product': 'Produit {ref}',
+  'nav.rfq': 'Demandes de quotation',
+  'nav.myOffers': 'Mes offres',
+  'q.rfq.sub': 'Demandes de prix de JONAS : donnez votre prix, répondez aux contre-offres',
+  'q.tab.nego': 'En négociation ({n})',
+  'q.tab.answered': 'Prix envoyés ({n})',
 };
 
 export type Key = keyof typeof fr;
@@ -1588,7 +1593,7 @@ export const en: Record<Key, string> = {
   'q.photoBad': 'Photo not accepted (JPG, PNG or WEBP)',
   'q.note': 'Note (MOQ, lead time…)',
   'q.reason': 'Reason: {r}',
-  'q.portal.sub': 'Price requests from JONAS and your product offers',
+  'q.portal.sub': 'Products you offer to JONAS, with photos and price',
   'q.tab.toAnswer': 'To quote ({n})',
   'q.tab.sent': 'Offers sent ({n})',
   'q.tab.closed': 'Closed ({n})',
@@ -1621,6 +1626,11 @@ export const en: Record<Key, string> = {
   'q.agreed': 'price accepted',
   'q.counterOk': 'Counter-offer accepted: JONAS will confirm the order',
   'q.product': 'Product {ref}',
+  'nav.rfq': 'Quotation requests',
+  'nav.myOffers': 'My offers',
+  'q.rfq.sub': 'Price requests from JONAS: give your price, answer counter-offers',
+  'q.tab.nego': 'Negotiating ({n})',
+  'q.tab.answered': 'Prices sent ({n})',
 };
 
 /**

@@ -6,7 +6,7 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR
 test('demande de prix à deux fournisseurs, réponse dans le portail, offre acceptée : produit créé et ajouté au panier', async ({ page }) => {
   await resetApp(page);
   await loginAs(page, 'David');
-  await go(page, 'offres');
+  await go(page, 'offres?mode=cartes');
   // Démo : 2 offres en attente (spontanée Tide + réponse Horizon), badge dans le menu
   await expect(page.locator('a[href*="/offres"] .nav-badge')).toHaveText('2');
   await expect(page.locator('.qt-card')).toHaveCount(2);
@@ -26,17 +26,17 @@ test('demande de prix à deux fournisseurs, réponse dans le portail, offre acce
 
   // Fournisseur Tide : badge, demande à chiffrer (photo recopiée dans son espace), prix envoyé
   await loginAs(page, 'Mr. Chen');
-  await expect(page.locator('a[href*="/portail/offres"] .pill.red')).toHaveText('2');
-  await go(page, 'portail/offres');
+  await expect(page.locator('a[href*="/portail/quotations"] .pill.red')).toHaveText('2');
+  await go(page, 'portail/quotations');
   const card = page.locator('.qt-card', { hasText: 'Lampe solaire jardin LED' });
   await expect(card.locator('.qt-hero img')).toHaveCount(1);
   await card.locator('input.qt-price-in').fill('1,15');
   await card.locator('.qt-actions .btn.primary').click();
-  await expect(page.locator('a[href*="/portail/offres"] .pill.red')).toHaveText('1');
+  await expect(page.locator('a[href*="/portail/quotations"] .pill.red')).toHaveText('1');
 
   // JONAS : offre en attente, acceptée → produit créé, panier
   await loginAs(page, 'David');
-  await go(page, 'offres');
+  await go(page, 'offres?mode=cartes');
   const offer = page.locator('.qt-card', { hasText: 'Lampe solaire jardin LED' });
   await expect(offer).toContainText('1,15');
   await offer.getByRole('button', { name: 'Accepter' }).click();
@@ -66,7 +66,7 @@ test('offre spontanée du fournisseur, refusée par JONAS avec un motif visible 
   await expect(page.locator('.qt-card', { hasText: 'Ceramic vase 30 cm' })).toBeVisible();
 
   await loginAs(page, 'David');
-  await go(page, 'offres');
+  await go(page, 'offres?mode=cartes');
   const offer = page.locator('.qt-card', { hasText: 'Ceramic vase 30 cm' });
   await expect(offer).toContainText('Offre spontanée');
   await offer.getByRole('button', { name: 'Refuser' }).click();
@@ -102,7 +102,7 @@ test('demande de prix depuis une fiche produit, négociation (contre-offre accep
 
   // Tide répond 2,80
   await loginAs(page, 'Mr. Chen');
-  await go(page, 'portail/offres');
+  await go(page, 'portail/quotations');
   const card = page.locator('.qt-card', { hasText: 'Tong femme paillettes' });
   await expect(card).toContainText('5');
   await card.locator('input.qt-price-in').fill('2,80');
@@ -110,10 +110,10 @@ test('demande de prix depuis une fiche produit, négociation (contre-offre accep
 
   // JONAS négocie à 2,50
   await loginAs(page, 'David');
-  await go(page, 'offres');
+  await go(page, 'offres?mode=cartes');
   const offer = page.locator('.qt-card', { hasText: 'Tong femme paillettes' });
-  await offer.getByRole('button', { name: 'Négocier' }).click();
-  const nego = page.getByRole('dialog', { name: 'Négocier le prix' });
+  await offer.getByRole('button', { name: 'Contre-offre' }).click();
+  const nego = page.getByRole('dialog', { name: 'Contre-offre' });
   await nego.getByLabel(/Votre prix/).fill('2,50');
   await expect(nego.locator('.rc-foot')).toContainText('−10,7 %');
   await nego.getByRole('button', { name: 'Envoyer la contre-offre' }).click();
@@ -123,7 +123,7 @@ test('demande de prix depuis une fiche produit, négociation (contre-offre accep
 
   // Tide voit la contre-offre (badge) et l'accepte
   await loginAs(page, 'Mr. Chen');
-  await go(page, 'portail/offres');
+  await go(page, 'portail/quotations?vue=nego');
   const c2 = page.locator('.qt-card', { hasText: 'Tong femme paillettes' });
   await expect(c2.locator('.qt-counter')).toContainText('2,50');
   await c2.locator('.qt-accept-counter').click();
@@ -131,7 +131,7 @@ test('demande de prix depuis une fiche produit, négociation (contre-offre accep
 
   // JONAS : offre à 2,50 (historique visible), acceptée → nouveau prix du produit existant, panier
   await loginAs(page, 'David');
-  await go(page, 'offres');
+  await go(page, 'offres?mode=cartes');
   const o2 = page.locator('.qt-card', { hasText: 'Tong femme paillettes' });
   await expect(o2.locator('.qt-price')).toContainText('2,50');
   await expect(o2.locator('.qt-round')).toHaveCount(3);
@@ -142,4 +142,44 @@ test('demande de prix depuis une fiche produit, négociation (contre-offre accep
   await acc.getByRole('button', { name: 'Accepter et ajouter au panier' }).click();
   await toast(page, /nouveau prix pour CP-T001/);
   await expect(page.getByRole('button', { name: /Panier \(1\)/ })).toBeVisible();
+});
+
+test('suivi des prix reçus : tableau par demande, contre-offre depuis le tableau ; rubriques du portail', async ({ page }) => {
+  await resetApp(page);
+  await loginAs(page, 'David');
+  await go(page, 'offres');
+  // Vue par défaut : suivi des prix ; la demande « Coussin » envoyée à 2 fournisseurs, 1 réponse
+  const req = page.getByRole('region', { name: /Suivi des prix Coussin extérieur/ });
+  await expect(req).toContainText('1 / 2 réponse(s)');
+  await expect(req.getByTestId('track-Q-DEMO-2')).toContainText('2,35');
+  await expect(req.getByTestId('track-Q-DEMO-2')).toContainText('+6,8 %');
+  await expect(req.getByTestId('track-Q-DEMO-3')).toContainText('En attente de réponse');
+  // Contre-offre sur l'offre spontanée Tide, depuis le tableau
+  const spont = page.getByTestId('track-Q-DEMO-1');
+  await spont.getByRole('button', { name: /Contre-offre/ }).click();
+  const dlg = page.getByRole('dialog', { name: 'Contre-offre' });
+  await dlg.getByLabel(/Votre prix/).fill('1,60');
+  await dlg.getByRole('button', { name: 'Envoyer la contre-offre' }).click();
+  await expect(spont).toContainText('Contre-offre envoyée');
+  await expect(spont.locator('.qt-round')).toHaveCount(2);
+  // Nouvelle contre-offre possible pendant la négociation
+  await spont.getByRole('button', { name: /Contre-offre/ }).click();
+  await dlg.getByLabel(/Votre prix/).fill('1,70');
+  await dlg.getByRole('button', { name: 'Envoyer la contre-offre' }).click();
+  await expect(spont.locator('.qt-round')).toHaveCount(3);
+
+  // Portail : « Demandes de quotation » (demandes JONAS) et « Mes offres » (contre-offre sur son offre spontanée)
+  await loginAs(page, 'Mr. Chen');
+  await expect(page.locator('a[href*="/portail/quotations"]')).toContainText('Demandes de quotation');
+  await expect(page.locator('a[href*="/portail/quotations"] .pill.red')).toHaveText('1');
+  await expect(page.locator('a[href*="/portail/offres"] .pill.red')).toHaveText('1');
+  await go(page, 'portail/quotations');
+  await expect(page.locator('.qt-card')).toHaveCount(1);
+  await expect(page.locator('.qt-card')).toContainText('Coussin extérieur');
+  await go(page, 'portail/offres');
+  const mine = page.locator('.qt-card', { hasText: 'Bougie parfumée' });
+  await expect(mine.locator('.qt-counter')).toContainText('1,70');
+  await mine.locator('input.qt-price-in').fill('1,78');
+  await mine.locator('.qt-actions .btn:has-text("Proposer")').click();
+  await expect(page.locator('a[href*="/portail/offres"] .pill.red')).toHaveCount(0);
 });
