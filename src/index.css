@@ -2692,3 +2692,16 @@ tr.pf-moving td, .pf-line.pf-moving { background: #fff6e8 !important; outline: 2
 .qt-actions .qt-counter-in { flex: 1 1 100%; flex-wrap: nowrap; }
 .qt-actions .qt-counter-field { flex: 1 1 auto; }
 .qt-actions .qt-counter-field .qt-price-in { width: 100%; }
+/* Catalogue : sélection de produits pour une demande de prix groupée */
+.pcard .photo { position: relative; }
+.pr-pick { position: absolute; top: 8px; left: 8px; z-index: 2; width: 30px; height: 30px; border-radius: 8px; background: rgba(255, 255, 255, 0.92); display: grid; place-items: center; cursor: pointer; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12); }
+.pr-pick input { width: 18px; height: 18px; cursor: pointer; accent-color: var(--green); }
+td .pr-pick { position: static; box-shadow: none; background: none; }
+.pcard.picked { outline: 3px solid var(--green); outline-offset: -1px; }
+tr.picked td { background: var(--green-softer); }
+.pr-selbar { position: sticky; bottom: 80px; z-index: 20; margin-top: 16px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 14px; border-radius: 14px; background: #fff; border: 1px solid var(--line); box-shadow: 0 8px 24px rgba(16, 40, 32, 0.18); }
+.qt-multi { display: grid; gap: 6px; max-height: 260px; overflow-y: auto; }
+.qt-multi-row { display: grid; grid-template-columns: minmax(0, 1fr) 120px 120px; gap: 8px; align-items: center; }
+.qt-multi-th { font-size: 12px; font-weight: 700; color: var(--muted); }
+.qt-multi-p { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 13px; }
+.qt-multi-p > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

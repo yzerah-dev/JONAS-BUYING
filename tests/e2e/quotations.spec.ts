@@ -207,3 +207,41 @@ test('galerie des demandes : une carte par produit, ouverture pour voir et trait
   await page.getByRole('button', { name: 'Retour aux offres' }).click();
   await expect(page.getByRole('link', { name: /Offres Coussin extérieur/ })).toContainText('Acceptée · Horizon Home');
 });
+
+test('catalogue : plusieurs produits sélectionnés, une demande de prix groupée (une demande par produit, un e-mail par fournisseur)', async ({ page }) => {
+  await resetApp(page);
+  await loginAs(page, 'David');
+  await go(page, 'produits');
+  const search = page.getByPlaceholder('Réf., désignation, EAN…');
+  await search.fill('CP-T001');
+  await page.getByLabel('Sélectionner CP-T001').check();
+  await search.fill('CP-C042');
+  await page.getByLabel('Sélectionner CP-C042').check();
+  const bar = page.getByRole('region', { name: 'Produits sélectionnés' });
+  await expect(bar).toContainText('2 produit(s) sélectionné(s)');
+  await bar.getByRole('button', { name: 'Demander un prix (2)' }).click();
+
+  const dlg = page.getByRole('dialog', { name: 'Demande de prix' });
+  await expect(dlg.getByRole('row')).toHaveCount(3);
+  await dlg.getByLabel('Quantité CP-T001').fill('3000');
+  await dlg.getByLabel('Prix cible CP-C042').fill('1,90');
+  await dlg.getByRole('button', { name: /Tide Living/ }).click();
+  await dlg.getByLabel('Rayon').selectOption('');
+  await dlg.getByLabel('Rechercher un fournisseur').fill('jinfa');
+  await dlg.getByRole('button', { name: /Jinfa Shoes/ }).click();
+  await dlg.getByRole('button', { name: 'Envoyer la demande' }).click();
+  await toast(page, 'Demande de prix envoyée : 2 produits à 2 fournisseur(s)');
+  await expect(bar).toHaveCount(0);
+
+  // Un seul e-mail par fournisseur, avec les 2 articles
+  const mail = page.locator('.mo-card', { hasText: 'Tide Living' });
+  await expect(mail).toHaveCount(1);
+  await mail.getByRole('button', { name: /Voir l’e-mail/ }).click();
+  await expect(page.getByRole('dialog', { name: 'Aperçu de l’e-mail' }).locator('h2')).toContainText('2 items');
+  await page.keyboard.press('Escape');
+
+  // Galerie des offres : une carte par produit, envoyée à 2 fournisseurs
+  await go(page, 'offres');
+  await expect(page.locator('.qtg-card')).toHaveCount(4);
+  await expect(page.getByRole('link', { name: /Offres Tong femme paillettes/ })).toContainText('0 / 2 réponse(s)');
+});

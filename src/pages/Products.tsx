@@ -3,14 +3,15 @@ import { CartButton, CartQty } from '../components/Cart';
 import { useCanOrder } from '../lib/cart';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LayoutGrid, List, Search, X } from 'lucide-react';
-import { brandOf, byId, matchTrack, packTrack, productQuantities, TRACK_ORDER, useStore, type TrackFilter } from '../data/store';
+import { FileQuestion, LayoutGrid, List, Search, X } from 'lucide-react';
+import { brandOf, byId, canQuote, currentUser, matchTrack, packTrack, productQuantities, TRACK_ORDER, useStore, type TrackFilter } from '../data/store';
 import PackTrackDots from '../components/PackTrack';
 import { BrandLogo, ProductPic, Pill, ProductThumb, PA } from '../components/ui';
 import { num, weekLabel } from '../lib/format';
 import FilterChip from '../components/FilterChip';
 import PhotoImport from '../components/PhotoImport';
 import ProductSheetImport from '../components/ProductSheetImport';
+import { RfqDialog } from '../components/QuoteDialogs';
 
 const NO_FILTER = { brand: 'all', rayon: 'all', supplier: 'all', collection: 'all', pack: 'all', dev: 'all', flow: 'all' };
 
@@ -24,6 +25,23 @@ export default function Products() {
   const [f, setF] = useState(NO_FILTER);
   const [sortBy, setSortBy] = useState<'ref' | 'pack'>('ref');
   const pickF = (k: keyof typeof f) => (v: string) => setF({ ...f, [k]: v });
+  // Sélection de produits pour une demande de prix groupée
+  const canAsk = canQuote(currentUser(state));
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [rfq, setRfq] = useState(false);
+  const toggle = (id: string) =>
+    setSelected((cur) => {
+      const next = new Set(cur);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const Pick = ({ id, label }: { id: string; label: string }) =>
+    canAsk ? (
+      <label className="pr-pick" onClick={(e) => e.stopPropagation()}>
+        <input type="checkbox" checked={selected.has(id)} onChange={() => toggle(id)} aria-label={`Sélectionner ${label}`} />
+      </label>
+    ) : null;
   const activeFilters = Object.values(f).filter((v) => v !== 'all').length;
 
   const rows = useMemo(() => {
@@ -154,8 +172,9 @@ export default function Products() {
       {mode === 'galerie' ? (
         <div className="gallery">
           {rows.slice(0, limit).map(({ p, qty }) => (
-            <div key={p.id} className="pcard" onClick={() => navigate(`/produits/${p.id}`)}>
+            <div key={p.id} className={`pcard ${selected.has(p.id) ? 'picked' : ''}`} onClick={() => navigate(`/produits/${p.id}`)}>
               <div className="photo" style={{ background: p.tint }}>
+                <Pick id={p.id} label={p.ref} />
                 <ProductPic product={p} />
               </div>
               <div className="row">
@@ -206,6 +225,16 @@ export default function Products() {
           <table className="tbl">
             <thead>
               <tr>
+                {canAsk && (
+                  <th>
+                    <input
+                      type="checkbox"
+                      aria-label="Sélectionner les produits affichés"
+                      checked={rows.slice(0, limit).length > 0 && rows.slice(0, limit).every(({ p }) => selected.has(p.id))}
+                      onChange={(e) => setSelected(e.target.checked ? new Set([...selected, ...rows.slice(0, limit).map(({ p }) => p.id)]) : new Set())}
+                    />
+                  </th>
+                )}
                 <th>Produit</th>
                 <th>Taille</th>
                 <th>Marque</th>
@@ -222,7 +251,12 @@ export default function Products() {
             </thead>
             <tbody>
               {rows.slice(0, limit).map(({ p, qty }) => (
-                <tr key={p.id} className="clickable" onClick={() => navigate(`/produits/${p.id}`)}>
+                <tr key={p.id} className={`clickable ${selected.has(p.id) ? 'picked' : ''}`} onClick={() => navigate(`/produits/${p.id}`)}>
+                  {canAsk && (
+                    <td>
+                      <Pick id={p.id} label={p.ref} />
+                    </td>
+                  )}
                   <td>
                     <div className="row">
                       <ProductThumb product={p} size={38} />
@@ -260,6 +294,30 @@ export default function Products() {
             </tbody>
           </table>
         </div>
+      )}
+      {canAsk && selected.size > 0 && (
+        <div className="pr-selbar" role="region" aria-label="Produits sélectionnés">
+          <b>{selected.size} produit(s) sélectionné(s)</b>
+          <button type="button" className="btn ghost" onClick={() => setSelected(new Set([...selected, ...rows.slice(0, limit).map(({ p }) => p.id)]))}>
+            Sélectionner les {Math.min(limit, rows.length)} affichés
+          </button>
+          <button type="button" className="btn ghost" onClick={() => setSelected(new Set())}>
+            <X size={15} /> Vider
+          </button>
+          <span className="grow" />
+          <button type="button" className="btn primary" onClick={() => setRfq(true)}>
+            <FileQuestion size={16} /> Demander un prix ({selected.size})
+          </button>
+        </div>
+      )}
+      {rfq && (
+        <RfqDialog
+          products={state.products.filter((p) => selected.has(p.id))}
+          onClose={(sent?: boolean) => {
+            setRfq(false);
+            if (sent) setSelected(new Set());
+          }}
+        />
       )}
       {rows.length > limit && (
         <button className="btn mt" style={{ alignSelf: 'center', margin: '16px auto 0', display: 'flex' }} onClick={() => setLimit(limit + 60)}>

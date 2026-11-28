@@ -37,8 +37,9 @@ export interface MailEvent {
   productIds?: string[];
   /** Plan de chargement : conteneur concerné */
   containerId?: string;
-  /** Demande de prix : offre concernée */
+  /** Demande de prix : offre concernée (contre-offre), ou offres d'une même demande groupée (plusieurs produits) */
   quoteId?: string;
+  quoteIds?: string[];
 }
 
 /** Événements à notifier entre deux états (action locale) */
@@ -71,12 +72,15 @@ export function detectMailEvents(prev: State, next: State): MailEvent[] {
   group('pack', (p, o) => p.pack.sentToSupplier && !o.pack.sentToSupplier);
   // Demandes de prix : un e-mail par fournisseur interrogé
   const prevQ = new Set((prev.quotations ?? []).map((q) => q.id));
-  for (const q of next.quotations ?? []) if (!prevQ.has(q.id) && q.origin === 'rfq') out.push({ kind: 'quote', supplierId: q.supplierId, quoteId: q.id });
+  const newRfq = new Map<string, string[]>();
+  for (const q of next.quotations ?? []) if (!prevQ.has(q.id) && q.origin === 'rfq') newRfq.set(q.supplierId, [...(newRfq.get(q.supplierId) ?? []), q.id]);
+  for (const [supplierId, ids] of newRfq) out.push({ kind: 'quote', supplierId, quoteId: ids[0], quoteIds: ids });
   // Contre-offre JONAS (négociation)
   const prevRounds = new Map((prev.quotations ?? []).map((q) => [q.id, q.rounds?.length ?? 0]));
   for (const q of next.quotations ?? []) {
     const r = q.rounds ?? [];
-    if (q.status === 'negociation' && prevRounds.has(q.id) && r.length > prevRounds.get(q.id)! && r[r.length - 1].by === 'jonas') out.push({ kind: 'counter', supplierId: q.supplierId, quoteId: q.id });
+    if (q.status === 'negociation' && prevRounds.has(q.id) && r.length > prevRounds.get(q.id)! && r[r.length - 1].by === 'jonas')
+      out.push({ kind: 'counter', supplierId: q.supplierId, quoteId: q.id });
   }
   return out;
 }
@@ -93,8 +97,9 @@ export interface PreparedMail {
   error?: string;
 }
 
-function quoteItems(s: State, id?: string, counter = false) {
-  const q = s.quotations.find((x) => x.id === id);
+function quoteItems(s: State, ids: (string | undefined)[], counter = false): { ref: string; name: string; sub?: string }[] {
+  if (ids.length > 1) return ids.flatMap((id) => quoteItems(s, [id], counter));
+  const q = s.quotations.find((x) => x.id === ids[0]);
   if (!q) return [];
   if (counter) {
     const c = [...(q.rounds ?? [])].reverse().find((r) => r.by === 'jonas');
@@ -152,9 +157,12 @@ export async function prepareMail(s: State, ev: MailEvent): Promise<PreparedMail
       files.push({ filename: loadingPlanFileName(c), blob: loadingPlanXlsx(s, c) });
     }
   } else if (ev.kind === 'quote' || ev.kind === 'counter') {
-    const q = s.quotations.find((x) => x.id === ev.quoteId);
-    link = `${APP_URL}/#/portail/${q?.origin === 'rfq' ? 'quotations' : 'offres'}${ev.kind === 'counter' ? '?vue=nego' : ''}`;
-    q?.photos.forEach((ph, i) => files.push({ filename: `photo-${i + 1}.${ph.mime.split('/')[1]?.replace('jpeg', 'jpg') || 'jpg'}`, blob: getBlob(ph.fileId) }));
+    const qs = (ev.quoteIds ?? [ev.quoteId]).map((id) => s.quotations.find((x) => x.id === id)).filter((x): x is NonNullable<typeof x> => !!x);
+    link = `${APP_URL}/#/portail/${qs[0]?.origin === 'rfq' ? 'quotations' : 'offres'}${ev.kind === 'counter' ? '?vue=nego' : ''}`;
+    for (const q of qs) {
+      const tag = qs.length > 1 ? `${(q.name || 'article').replace(/[^\w-]+/g, '-').slice(0, 30)}-` : '';
+      q.photos.forEach((ph, i) => files.push({ filename: `${tag}photo-${i + 1}.${ph.mime.split('/')[1]?.replace('jpeg', 'jpg') || 'jpg'}`, blob: getBlob(ph.fileId) }));
+    }
   } else if (ev.kind === 'pack') {
     link = `${APP_URL}/#/portail/packs`;
     for (const p of prods) {
@@ -192,7 +200,7 @@ export async function prepareMail(s: State, ev: MailEvent): Promise<PreparedMail
     pfTitle: pf?.title,
     amount: t && ev.kind !== 'loading' ? (ev.kind === 'deposit' ? money(Math.round(t.depositCur), t.currency) : money(Math.round(t.amountCur), t.currency)) : undefined,
     loading: pf && (ev.kind === 'order' || ev.kind === 'signed') ? `${weekLabel(pf.etd)} · ${pf.etd}` : undefined,
-    items: ev.kind === 'deposit' ? undefined : ev.kind === 'quote' || ev.kind === 'counter' ? quoteItems(s, ev.quoteId, ev.kind === 'counter') : items,
+    items: ev.kind === 'deposit' ? undefined : ev.kind === 'quote' || ev.kind === 'counter' ? quoteItems(s, ev.quoteIds ?? [ev.quoteId], ev.kind === 'counter') : items,
     container: ctn ? `${ctn.type} · ${ctn.number ?? ctn.id} · ${containerCbm(s, ctn).toFixed(1).replace('.', ',')} / ${containerCapacity(ctn)} m³` : undefined,
     attached: attachments.map((a) => a.filename),
     onPlatform,
@@ -201,7 +209,7 @@ export async function prepareMail(s: State, ev: MailEvent): Promise<PreparedMail
     sender: me?.name,
   };
   return {
-    id: `${ev.kind}-${ev.proformaId ?? ev.quoteId ?? ev.productIds?.join('.') ?? ''}-${Date.now()}`,
+    id: `${ev.kind}-${ev.proformaId ?? ev.quoteIds?.join('.') ?? ev.quoteId ?? ev.productIds?.join('.') ?? ''}-${Date.now()}`,
     event: ev,
     supplier: sup,
     to,

@@ -106,9 +106,10 @@ const T: Record<
         button: 'Voir le plan de chargement',
       },
       quote: {
-        subject: (d) => `Demande de prix – ${d.items?.[0]?.name ?? ''}`,
+        subject: (d) => ((d.items?.length ?? 0) > 1 ? `Demande de prix – ${d.items!.length} articles` : `Demande de prix – ${d.items?.[0]?.name ?? ''}`),
         title: 'Demande de prix',
-        intro: () => 'JONAS INTERNATIONAL vous demande votre meilleur prix pour l’article ci-dessous (photos jointes). Merci d’indiquer votre prix unitaire dans votre espace fournisseur.',
+        intro: (d) =>
+          `JONAS INTERNATIONAL vous demande votre meilleur prix pour ${(d.items?.length ?? 0) > 1 ? `les ${d.items!.length} articles ci-dessous` : 'l’article ci-dessous'} (photos jointes). Merci d’indiquer votre prix unitaire dans votre espace fournisseur.`,
         button: 'Donner mon prix',
       },
       counter: {
@@ -169,9 +170,10 @@ const T: Record<
         button: 'View the loading plan',
       },
       quote: {
-        subject: (d) => `Price request – ${d.items?.[0]?.name ?? ''}`,
+        subject: (d) => ((d.items?.length ?? 0) > 1 ? `Price request – ${d.items!.length} items` : `Price request – ${d.items?.[0]?.name ?? ''}`),
         title: 'Price request',
-        intro: () => 'JONAS INTERNATIONAL asks for your best price for the item below (photos attached). Please enter your unit price in your supplier space.',
+        intro: (d) =>
+          `JONAS INTERNATIONAL asks for your best price for ${(d.items?.length ?? 0) > 1 ? `the ${d.items!.length} items below` : 'the item below'} (photos attached). Please enter your unit price in your supplier space.`,
         button: 'Give my price',
       },
       counter: {
@@ -232,7 +234,7 @@ const T: Record<
         button: '查看装柜计划',
       },
       quote: {
-        subject: (d) => `询价 – ${d.items?.[0]?.name ?? ''}`,
+        subject: (d) => ((d.items?.length ?? 0) > 1 ? `询价 – ${d.items!.length} 个产品` : `询价 – ${d.items?.[0]?.name ?? ''}`),
         title: '询价',
         intro: () => 'JONAS INTERNATIONAL 请您为以下产品提供最优价格（附照片）。请在您的供应商门户中填写单价。',
         button: '填写报价',
