@@ -21,7 +21,7 @@ test('demande de prix à deux fournisseurs, réponse dans le portail, offre acce
   await dlg.getByRole('button', { name: /Horizon Home/ }).click();
   await dlg.getByRole('button', { name: 'Envoyer la demande' }).click();
   await toast(page, /Demande de prix envoyée à 2 fournisseur/);
-  await page.getByRole('button', { name: /Prix attendus/ }).click();
+  await page.getByRole('button', { name: /Chez le fournisseur/ }).click();
   await expect(page.locator('.qt-card', { hasText: 'Lampe solaire jardin LED' })).toHaveCount(2);
 
   // Fournisseur Tide : badge, demande à chiffrer (photo recopiée dans son espace), prix envoyé
@@ -78,4 +78,68 @@ test('offre spontanée du fournisseur, refusée par JONAS avec un motif visible 
   await loginAs(page, 'Mr. Chen');
   await go(page, 'portail/offres?vue=closes');
   await expect(page.locator('.qt-card', { hasText: 'Ceramic vase 30 cm' })).toContainText('Prix trop élevé');
+});
+
+test('demande de prix depuis une fiche produit, négociation (contre-offre acceptée par le fournisseur), nouveau prix et panier', async ({ page }) => {
+  await resetApp(page);
+  await loginAs(page, 'David');
+  await go(page, 'produits/CP-T001');
+  await page.getByRole('button', { name: 'Demander un prix' }).click();
+  const dlg = page.getByRole('dialog', { name: 'Demande de prix' });
+  // Pré-rempli depuis la fiche ; fournisseurs filtrés sur le rayon du produit, fournisseur actuel signalé
+  await expect(dlg.getByLabel('Désignation')).toHaveValue('Tong femme paillettes');
+  await expect(dlg.getByLabel('Rayon')).toHaveValue('Chaussures');
+  await expect(dlg.getByRole('button', { name: /Tide Living.*fournisseur actuel/ })).toBeVisible();
+  await dlg.getByLabel('Quantité envisagée (pièces)').fill('5000');
+  await dlg.getByRole('button', { name: /Tide Living/ }).click();
+  await dlg.getByLabel('Rayon').selectOption('');
+  await dlg.getByLabel('Rechercher un fournisseur').fill('jinfa');
+  await expect(dlg.locator('.qt-sup-pick')).toHaveCount(1);
+  await dlg.getByRole('button', { name: /Tout cocher \(1\)/ }).click();
+  await expect(dlg.locator('.rc-foot')).toContainText('2 fournisseur(s) sélectionné(s)');
+  await dlg.getByRole('button', { name: 'Envoyer la demande' }).click();
+  await toast(page, /envoyée à 2 fournisseur/);
+
+  // Tide répond 2,80
+  await loginAs(page, 'Mr. Chen');
+  await go(page, 'portail/offres');
+  const card = page.locator('.qt-card', { hasText: 'Tong femme paillettes' });
+  await expect(card).toContainText('5');
+  await card.locator('input.qt-price-in').fill('2,80');
+  await card.locator('.qt-actions .btn.primary').click();
+
+  // JONAS négocie à 2,50
+  await loginAs(page, 'David');
+  await go(page, 'offres');
+  const offer = page.locator('.qt-card', { hasText: 'Tong femme paillettes' });
+  await offer.getByRole('button', { name: 'Négocier' }).click();
+  const nego = page.getByRole('dialog', { name: 'Négocier le prix' });
+  await nego.getByLabel(/Votre prix/).fill('2,50');
+  await expect(nego.locator('.rc-foot')).toContainText('−10,7 %');
+  await nego.getByRole('button', { name: 'Envoyer la contre-offre' }).click();
+  await toast(page, /Contre-offre envoyée/);
+  await page.getByRole('button', { name: /Chez le fournisseur/ }).click();
+  await expect(page.locator('.qt-card', { hasText: 'Tong femme paillettes' }).first()).toBeVisible();
+
+  // Tide voit la contre-offre (badge) et l'accepte
+  await loginAs(page, 'Mr. Chen');
+  await go(page, 'portail/offres');
+  const c2 = page.locator('.qt-card', { hasText: 'Tong femme paillettes' });
+  await expect(c2.locator('.qt-counter')).toContainText('2,50');
+  await c2.locator('.qt-accept-counter').click();
+  await expect(c2).toHaveCount(0);
+
+  // JONAS : offre à 2,50 (historique visible), acceptée → nouveau prix du produit existant, panier
+  await loginAs(page, 'David');
+  await go(page, 'offres');
+  const o2 = page.locator('.qt-card', { hasText: 'Tong femme paillettes' });
+  await expect(o2.locator('.qt-price')).toContainText('2,50');
+  await expect(o2.locator('.qt-round')).toHaveCount(3);
+  await o2.getByRole('button', { name: 'Accepter' }).click();
+  const acc = page.getByRole('dialog', { name: 'Accepter l’offre' });
+  await expect(acc.getByLabel('Quantité (pièces)')).toHaveValue('5000');
+  await expect(acc).toContainText('CP-T001 est déjà chez ce fournisseur');
+  await acc.getByRole('button', { name: 'Accepter et ajouter au panier' }).click();
+  await toast(page, /nouveau prix pour CP-T001/);
+  await expect(page.getByRole('button', { name: /Panier \(1\)/ })).toBeVisible();
 });

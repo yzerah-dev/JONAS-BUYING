@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
+  FileQuestion,
   MessageCircle,
   BarChart3,
   Boxes,
@@ -21,7 +22,7 @@ import {
   Truck,
   Warehouse,
 } from 'lucide-react';
-import { byId, containerEta, containerEtd, packDone, productQuantities, useStore, type State, brandOf, purchasePrice } from '../data/store';
+import { byId, canQuote, currentUser, containerEta, containerEtd, packDone, productQuantities, useStore, type State, brandOf, purchasePrice } from '../data/store';
 import { DEV_STAGES, type Product } from '../data/types';
 import { SITES } from '../data/seed';
 import PackFlow from '../components/PackFlow';
@@ -32,6 +33,7 @@ import ProductInfoView from '../components/ProductInfoView';
 import { BrandLogo, ContainerStatusPill, PackPill, Pill, ProformaStatusPill, Progress, Tabs, ValidationCircuit, PA } from '../components/ui';
 import LabelAdviceCard from '../components/LabelAdviceCard';
 import ProductChat from '../components/ProductChat';
+import { RfqDialog } from '../components/QuoteDialogs';
 import { unreadCount } from '../lib/chat';
 import { TODAY, dec, fdate, fshort, money, num, weekLabel } from '../lib/format';
 import { cur0, curSumLabel, sumCur } from '../lib/curr';
@@ -44,6 +46,7 @@ export default function ProductDetail() {
   const navigate = useNavigate();
   const location = useLocation();
   const [tab, setTab] = useState<Tab>('info');
+  const [rfq, setRfq] = useState(false);
   // Par identifiant, ou par réf. JONAS (produit créé depuis le portail : identifiant provisoire, réf. attribuée à la signature)
   const byIdIdx = state.products.findIndex((p) => p.id === id);
   const idx = byIdIdx >= 0 ? byIdIdx : state.products.findIndex((p) => p.ref === id);
@@ -69,6 +72,12 @@ export default function ProductDetail() {
         </button>
         <h1>Fiche produit</h1>
         <div className="grow" />
+        {canQuote(currentUser(state)) && (
+          <button className="btn" onClick={() => setRfq(true)}>
+            <FileQuestion size={16} /> Demander un prix
+          </button>
+        )}
+        {rfq && <RfqDialog product={p} onClose={() => setRfq(false)} />}
         <button className="btn ghost" onClick={() => go(-1)}>
           <ChevronLeft />
         </button>

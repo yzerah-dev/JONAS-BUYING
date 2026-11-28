@@ -27,6 +27,7 @@ import type {
   PackFile,
   PackFileKind,
   Quotation,
+  QuoteRound,
   ProformaStatus,
   ReceptionLine,
   Settings,
@@ -260,6 +261,10 @@ export type Action =
   | { type: 'answerQuote'; id: string; price: number; photos?: ProductPhoto[]; note?: string }
   /** Acceptée : produit créé (en développement), ajouté au panier par l'interface */
   | { type: 'acceptQuote'; id: string; ref: string; ean: string; qty: number; pcb?: number }
+  /** JONAS négocie : contre-offre de prix au fournisseur */
+  | { type: 'counterQuote'; id: string; price: number; note?: string }
+  /** Le fournisseur accepte la contre-offre de JONAS */
+  | { type: 'acceptCounter'; id: string }
   | { type: 'refuseQuote'; id: string; reason?: string }
   | { type: 'deleteQuote'; id: string };
 
@@ -284,6 +289,17 @@ function mapQ(s: State, id: string, f: (q: Quotation) => Quotation): State {
 /** Peut demander des prix et décider des offres (acheteurs, Direction, Pilote) */
 export const canQuote = (u: User) => u.active && !isSupplier(u) && u.role !== 'transitaire' && (can(u, 'proforma.edit') || can(u, 'proforma.sign'));
 
+const round = (by: QuoteRound['by'], price: number, who: string, note?: string): QuoteRound => ({ by, price, at: new Date().toISOString(), who, ...(note?.trim() ? { note: note.trim() } : {}) });
+
+/** Dernière contre-offre de JONAS (négociation en cours) */
+export const lastCounter = (q: Quotation) => [...(q.rounds ?? [])].reverse().find((r) => r.by === 'jonas');
+
+/** Demande lancée depuis un produit de ce même fournisseur : l'acceptation met à jour la fiche existante */
+export function sameSupplierSource(s: State, q: Quotation) {
+  const p = q.sourceProductId ? s.products.find((x) => x.id === q.sourceProductId) : undefined;
+  return p && p.supplierId === q.supplierId ? p : undefined;
+}
+
 /** Offres encore à traiter par JONAS */
 export const pendingQuotes = (s: State) => s.quotations.filter((q) => q.status === 'en_attente');
 
@@ -301,6 +317,24 @@ function productFromQuotation(s: State, q: Quotation, ref: string, ean: string, 
   const fx = s.settings.fx[q.currency] ?? 1;
   const start = new Date().toISOString().slice(0, 10);
   const [photo, ...photos] = q.photos;
+  // Même produit chez un autre fournisseur : on reprend la fiche d'origine (marque, rayon, textes…)
+  const src = q.sourceProductId ? s.products.find((x) => x.id === q.sourceProductId) : undefined;
+  const copied: Partial<Product> = src
+    ? {
+        brandId: src.brandId,
+        rayon: src.rayon,
+        collection: src.collection,
+        gender: src.gender,
+        material: src.material,
+        ...(src.sizes ? { sizes: src.sizes } : {}),
+        emoji: src.emoji,
+        tint: src.tint,
+        description: src.description ?? { en: q.name.trim() },
+        weight: src.weight,
+        cbmCarton: src.cbmCarton,
+        ...(!photo && src.photo ? { photo: src.photo, ...(src.photos?.length ? { photos: src.photos } : {}) } : {}),
+      }
+    : {};
   return {
     id: ref,
     ref,
@@ -317,7 +351,6 @@ function productFromQuotation(s: State, q: Quotation, ref: string, ean: string, 
     tint: '#eef1f5',
     pa: Math.round((q.price ?? 0) * fx * 100) / 100,
     paSupplier: { price: q.price ?? 0, currency: q.currency },
-    pcb: Math.max(1, Math.round(pcb || 1)),
     cbmCarton: 0,
     weight: 0.5,
     developed: false,
@@ -337,6 +370,8 @@ function productFromQuotation(s: State, q: Quotation, ref: string, ean: string, 
     stock: { Péronne: 0, Meaux: 0, Lillois: 0 },
     ...(photo ? { photo } : {}),
     ...(photos.length ? { photos } : {}),
+    ...copied,
+    pcb: Math.max(1, Math.round(pcb || src?.pcb || 1)),
   };
 }
 
@@ -575,17 +610,28 @@ export function isAllowed(s: State, a: Action): boolean {
     }
     case 'answerQuote': {
       const q = s.quotations.find((x) => x.id === a.id);
-      return !!q && q.status === 'demande' && a.price > 0 && ((isSupplier(u) && u.supplierId === q.supplierId) || canQuote(u));
+      return !!q && (q.status === 'demande' || q.status === 'negociation') && a.price > 0 && ((isSupplier(u) && u.supplierId === q.supplierId) || canQuote(u));
+    }
+    case 'counterQuote': {
+      const q = s.quotations.find((x) => x.id === a.id);
+      return !!q && canQuote(u) && q.status === 'en_attente' && a.price > 0;
+    }
+    case 'acceptCounter': {
+      const q = s.quotations.find((x) => x.id === a.id);
+      return !!q && q.status === 'negociation' && !!lastCounter(q) && ((isSupplier(u) && u.supplierId === q.supplierId) || canQuote(u));
     }
     case 'acceptQuote': {
       const q = s.quotations.find((x) => x.id === a.id);
-      return !!q && canQuote(u) && q.status === 'en_attente' && (q.price ?? 0) > 0 && a.qty > 0 && !!a.ref && !s.products.some((p) => p.id === a.ref || p.ref === a.ref);
+      if (!q || !canQuote(u) || q.status !== 'en_attente' || !((q.price ?? 0) > 0) || !(a.qty > 0)) return false;
+      // Même produit, même fournisseur : on met à jour sa fiche ; sinon nouvelle fiche (codes JONAS libres)
+      if (sameSupplierSource(s, q)) return true;
+      return !!a.ref && !s.products.some((p) => p.id === a.ref || p.ref === a.ref);
     }
     case 'refuseQuote': {
       const q = s.quotations.find((x) => x.id === a.id);
-      if (!q || (q.status !== 'demande' && q.status !== 'en_attente')) return false;
-      // Le fournisseur décline une demande de prix ; JONAS refuse une offre (ou annule sa demande)
-      return isSupplier(u) ? u.supplierId === q.supplierId && q.status === 'demande' : canQuote(u);
+      if (!q || !['demande', 'en_attente', 'negociation'].includes(q.status)) return false;
+      // Le fournisseur décline une demande ou une contre-offre ; JONAS refuse une offre (ou annule sa demande)
+      return isSupplier(u) ? u.supplierId === q.supplierId && (q.status === 'demande' || q.status === 'negociation') : canQuote(u);
     }
     case 'deleteQuote': {
       const q = s.quotations.find((x) => x.id === a.id);
@@ -1421,11 +1467,26 @@ function applyAction(s: State, a: Action): State {
         price: a.price,
         status: 'en_attente',
         answeredAt: new Date().toISOString(),
+        rounds: [...(q.rounds ?? []), round('fournisseur', a.price, me, a.note)],
         ...(a.photos?.length ? { photos: [...q.photos, ...a.photos].slice(0, 10) } : {}),
         ...(a.note?.trim() ? { note: [q.note, a.note.trim()].filter(Boolean).join('\n') } : {}),
       }));
+    case 'counterQuote':
+      return mapQ(s, a.id, (q) => ({ ...q, status: 'negociation', rounds: [...(q.rounds ?? []), round('jonas', a.price, me, a.note)] }));
+    case 'acceptCounter':
+      return mapQ(s, a.id, (q) => {
+        const price = lastCounter(q)!.price;
+        return { ...q, price, status: 'en_attente', answeredAt: new Date().toISOString(), rounds: [...(q.rounds ?? []), { ...round('fournisseur', price, me), agreed: true }] };
+      });
     case 'acceptQuote': {
       const q = s.quotations.find((x) => x.id === a.id)!;
+      const src = sameSupplierSource(s, q);
+      if (src) {
+        // Produit déjà au catalogue chez ce fournisseur : nouveau prix d'achat (devise du fournisseur)
+        const fx = s.settings.fx[q.currency] ?? 1;
+        const next = mapP(s, src.id, (p) => ({ ...p, paSupplier: { price: q.price!, currency: q.currency }, pa: Math.round(q.price! * fx * 100) / 100 }));
+        return mapQ(next, a.id, (x) => ({ ...x, status: 'acceptee', decidedAt: new Date().toISOString(), decidedBy: me, productId: src.id }));
+      }
       const p = productFromQuotation(s, q, a.ref, a.ean, a.qty, a.pcb);
       const next = mapQ(s, a.id, (x) => ({ ...x, status: 'acceptee', decidedAt: new Date().toISOString(), decidedBy: me, productId: p.id }));
       return { ...next, products: [...next.products, p] };
@@ -2272,8 +2333,17 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
       const q = s.quotations.find((x) => x.id === a.id);
       return { target: a.id, text: `Prix reçu de ${s.suppliers.find((x) => x.id === q?.supplierId)?.shortName} : ${q?.name} à ${a.price} ${q?.currency}` };
     }
+    case 'counterQuote': {
+      const q = s.quotations.find((x) => x.id === a.id);
+      return { target: a.id, text: `Contre-offre à ${s.suppliers.find((x) => x.id === q?.supplierId)?.shortName} : ${q?.name} à ${a.price} ${q?.currency} (au lieu de ${q?.price})` };
+    }
+    case 'acceptCounter': {
+      const q = s.quotations.find((x) => x.id === a.id);
+      return { target: a.id, text: `${s.suppliers.find((x) => x.id === q?.supplierId)?.shortName} accepte la contre-offre : ${q?.name} à ${q && lastCounter(q)?.price} ${q?.currency}` };
+    }
     case 'acceptQuote': {
       const q = s.quotations.find((x) => x.id === a.id);
+      if (q && sameSupplierSource(s, q)) return { target: q.sourceProductId!, text: `Offre acceptée : ${q.name} → nouveau prix d'achat ${q.price} ${q.currency}, ${a.qty} pcs au panier` };
       return { target: a.ref, text: `Offre acceptée : ${q?.name} (${s.suppliers.find((x) => x.id === q?.supplierId)?.shortName}) → produit ${a.ref} créé, ${a.qty} pcs au panier` };
     }
     case 'refuseQuote': {

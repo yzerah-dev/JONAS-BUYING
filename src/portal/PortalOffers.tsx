@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, Send, X } from 'lucide-react';
-import { newQuoteId, supplierTerms } from '../data/store';
+import { Check, Plus, Send, X } from 'lucide-react';
+import { lastCounter, newQuoteId, supplierTerms } from '../data/store';
+import { money } from '../lib/format';
 import type { ProductPhoto, Quotation } from '../data/types';
 import { supplierScope } from '../lib/files';
 import { QuoteCard, QuotePhotosInput } from '../components/Quotations';
@@ -19,7 +20,7 @@ export default function PortalOffers() {
   const { t } = useT();
   const [params, setParams] = useSearchParams();
   const mine = state.quotations.filter((q) => q.supplierId === supplier?.id);
-  const toAnswer = mine.filter((q) => q.status === 'demande');
+  const toAnswer = mine.filter((q) => q.status === 'demande' || q.status === 'negociation');
   const sent = mine.filter((q) => q.status === 'en_attente');
   const closed = mine.filter((q) => q.status === 'acceptee' || q.status === 'refusee');
   const view = (params.get('vue') as View | null) ?? (toAnswer.length || !sent.length ? 'chiffrer' : 'envoyees');
@@ -54,7 +55,7 @@ export default function PortalOffers() {
       <div className="qt-grid">
         {list.map((q) => (
           <QuoteCard key={q.id} q={q} showSupplier={false}>
-            {q.status === 'demande' &&
+            {(q.status === 'demande' || q.status === 'negociation') &&
               (declining === q.id ? (
                 <>
                   <input className="qt-price-in grow" value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t('q.declineReason')} aria-label={t('q.declineReason')} autoFocus />
@@ -76,24 +77,36 @@ export default function PortalOffers() {
                 </>
               ) : (
                 <>
+                  {q.status === 'negociation' && lastCounter(q) && (
+                    <button
+                      type="button"
+                      className="btn primary qt-accept-counter"
+                      onClick={() => {
+                        dispatch({ type: 'acceptCounter', id: q.id });
+                        toast(t('q.counterOk'));
+                      }}
+                    >
+                      <Check size={15} /> {t('q.acceptCounter', { p: money(lastCounter(q)!.price, q.currency) })}
+                    </button>
+                  )}
                   <input
                     className="qt-price-in"
                     inputMode="decimal"
-                    placeholder={t('q.price', { c: q.currency })}
-                    aria-label={t('q.price', { c: q.currency })}
+                    placeholder={q.status === 'negociation' ? t('q.newPrice', { c: q.currency }) : t('q.price', { c: q.currency })}
+                    aria-label={q.status === 'negociation' ? t('q.newPrice', { c: q.currency }) : t('q.price', { c: q.currency })}
                     value={price[q.id] ?? ''}
                     onChange={(e) => setPrice({ ...price, [q.id]: e.target.value })}
                   />
                   <button
                     type="button"
-                    className="btn primary"
+                    className={`btn ${q.status === 'negociation' ? '' : 'primary'}`}
                     disabled={!parsePrice(price[q.id] ?? '')}
                     onClick={() => {
                       dispatch({ type: 'answerQuote', id: q.id, price: parsePrice(price[q.id] ?? '') });
                       toast(t('q.answered'));
                     }}
                   >
-                    <Send size={15} /> {t('q.answer')}
+                    <Send size={15} /> {q.status === 'negociation' ? t('q.propose') : t('q.answer')}
                   </button>
                   <button type="button" className="btn ghost" onClick={() => setDeclining(q.id)}>
                     {t('q.decline')}

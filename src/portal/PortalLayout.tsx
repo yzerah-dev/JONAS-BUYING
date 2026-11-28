@@ -38,7 +38,7 @@ function PortalShell() {
     n.remove();
   }, [lang]);
   if (!isSupplier(user) || !supplier) return <Navigate to="/" replace />;
-  const quotesToAnswer = state.quotations.filter((q) => q.supplierId === supplier.id && q.status === 'demande').length;
+  const quotesToAnswer = state.quotations.filter((q) => q.supplierId === supplier.id && (q.status === 'demande' || q.status === 'negociation')).length;
   const todo =
     quotesToAnswer + packsToValidate.length + dieCutsRequested.length + bookingsToDo.length + bookingsToAccept.length + proformasToUpload.length + splitsToAccept.length + docsMissing.length;
 

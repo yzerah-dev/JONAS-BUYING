@@ -72,6 +72,9 @@ export function detectMailEvents(prev: State, next: State): MailEvent[] {
   // Demandes de prix : un e-mail par fournisseur interrogé
   const prevQ = new Set((prev.quotations ?? []).map((q) => q.id));
   for (const q of next.quotations ?? []) if (!prevQ.has(q.id) && q.origin === 'rfq') out.push({ kind: 'quote', supplierId: q.supplierId, quoteId: q.id });
+  // Contre-offre JONAS (négociation)
+  const prevStatus = new Map((prev.quotations ?? []).map((q) => [q.id, q.status]));
+  for (const q of next.quotations ?? []) if (q.status === 'negociation' && prevStatus.get(q.id) === 'en_attente') out.push({ kind: 'counter', supplierId: q.supplierId, quoteId: q.id });
   return out;
 }
 
@@ -87,10 +90,20 @@ export interface PreparedMail {
   error?: string;
 }
 
-function quoteItems(s: State, id?: string) {
+function quoteItems(s: State, id?: string, counter = false) {
   const q = s.quotations.find((x) => x.id === id);
   if (!q) return [];
-  return [{ ref: 'RFQ', name: q.name, sub: [q.targetPrice ? `Target ${money(q.targetPrice, q.currency)}` : '', q.note ?? ''].filter(Boolean).join(' · ') || undefined }];
+  if (counter) {
+    const c = [...(q.rounds ?? [])].reverse().find((r) => r.by === 'jonas');
+    return [{ ref: 'RFQ', name: q.name, sub: [q.price ? `${money(q.price, q.currency)} → JONAS ${money(c?.price ?? 0, q.currency)}` : '', c?.note ?? ''].filter(Boolean).join(' · ') }];
+  }
+  return [
+    {
+      ref: 'RFQ',
+      name: q.name,
+      sub: [q.qty ? `${q.qty} pcs` : '', q.targetPrice ? `Target ${money(q.targetPrice, q.currency)}` : '', q.note ?? ''].filter(Boolean).join(' · ') || undefined,
+    },
+  ];
 }
 
 const proformaOf = (s: State, productIds: string[]) => s.proformas.find((pf) => pf.lines.some((l) => productIds.includes(l.productId)));
@@ -135,7 +148,7 @@ export async function prepareMail(s: State, ev: MailEvent): Promise<PreparedMail
       const { loadingPlanXlsx, loadingPlanFileName } = await import('../loadingPlan');
       files.push({ filename: loadingPlanFileName(c), blob: loadingPlanXlsx(s, c) });
     }
-  } else if (ev.kind === 'quote') {
+  } else if (ev.kind === 'quote' || ev.kind === 'counter') {
     link = `${APP_URL}/#/portail/offres`;
     const q = s.quotations.find((x) => x.id === ev.quoteId);
     q?.photos.forEach((ph, i) => files.push({ filename: `photo-${i + 1}.${ph.mime.split('/')[1]?.replace('jpeg', 'jpg') || 'jpg'}`, blob: getBlob(ph.fileId) }));
@@ -176,7 +189,7 @@ export async function prepareMail(s: State, ev: MailEvent): Promise<PreparedMail
     pfTitle: pf?.title,
     amount: t && ev.kind !== 'loading' ? (ev.kind === 'deposit' ? money(Math.round(t.depositCur), t.currency) : money(Math.round(t.amountCur), t.currency)) : undefined,
     loading: pf && (ev.kind === 'order' || ev.kind === 'signed') ? `${weekLabel(pf.etd)} · ${pf.etd}` : undefined,
-    items: ev.kind === 'deposit' ? undefined : ev.kind === 'quote' ? quoteItems(s, ev.quoteId) : items,
+    items: ev.kind === 'deposit' ? undefined : ev.kind === 'quote' || ev.kind === 'counter' ? quoteItems(s, ev.quoteId, ev.kind === 'counter') : items,
     container: ctn ? `${ctn.type} · ${ctn.number ?? ctn.id} · ${containerCbm(s, ctn).toFixed(1).replace('.', ',')} / ${containerCapacity(ctn)} m³` : undefined,
     attached: attachments.map((a) => a.filename),
     onPlatform,

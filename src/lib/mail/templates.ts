@@ -2,7 +2,7 @@
 // Mise en page en tableaux et styles en ligne : lisible dans Gmail, Outlook, Apple Mail et les messageries chinoises.
 
 export type MailLang = 'fr' | 'en' | 'zh';
-export type MailKind = 'order' | 'signed' | 'diecut' | 'deposit' | 'pack' | 'loading' | 'quote';
+export type MailKind = 'order' | 'signed' | 'diecut' | 'deposit' | 'pack' | 'loading' | 'quote' | 'counter';
 
 export interface MailItem {
   ref: string;
@@ -111,6 +111,12 @@ const T: Record<
         intro: () => 'JONAS INTERNATIONAL vous demande votre meilleur prix pour l’article ci-dessous (photos jointes). Merci d’indiquer votre prix unitaire dans votre espace fournisseur.',
         button: 'Donner mon prix',
       },
+      counter: {
+        subject: (d) => `Contre-offre JONAS – ${d.items?.[0]?.name ?? ''}`,
+        title: 'Contre-offre de JONAS',
+        intro: () => 'JONAS vous propose un autre prix pour l’article ci-dessous. Merci d’accepter ce prix ou de proposer le vôtre dans votre espace fournisseur.',
+        button: 'Répondre à la contre-offre',
+      },
     },
   },
   en: {
@@ -167,6 +173,12 @@ const T: Record<
         title: 'Price request',
         intro: () => 'JONAS INTERNATIONAL asks for your best price for the item below (photos attached). Please enter your unit price in your supplier space.',
         button: 'Give my price',
+      },
+      counter: {
+        subject: (d) => `JONAS counter-offer – ${d.items?.[0]?.name ?? ''}`,
+        title: 'JONAS counter-offer',
+        intro: () => 'JONAS proposes another price for the item below. Please accept it or propose your own price in your supplier space.',
+        button: 'Answer the counter-offer',
       },
     },
   },
@@ -225,6 +237,12 @@ const T: Record<
         intro: () => 'JONAS INTERNATIONAL 请您为以下产品提供最优价格（附照片）。请在您的供应商门户中填写单价。',
         button: '填写报价',
       },
+      counter: {
+        subject: (d) => `JONAS 还价 – ${d.items?.[0]?.name ?? ''}`,
+        title: 'JONAS 还价',
+        intro: () => 'JONAS 对以下产品提出了新的价格。请在您的供应商门户中接受该价格或提出您的报价。',
+        button: '回复还价',
+      },
     },
   },
 };
@@ -245,7 +263,7 @@ const GREEN_DARK = '#0b5e47';
 const INK = '#14201c';
 const MUTED = '#5f6d68';
 const LINE = '#e3e9e6';
-const ACCENT: Record<MailKind, string> = { order: '#1d6fd8', signed: GREEN, diecut: '#e0701a', deposit: '#7b2cbf', pack: GREEN, loading: '#2a63c7', quote: '#0f766e' };
+const ACCENT: Record<MailKind, string> = { order: '#1d6fd8', signed: GREEN, diecut: '#e0701a', deposit: '#7b2cbf', pack: GREEN, loading: '#2a63c7', quote: '#0f766e', counter: '#e0701a' };
 
 function section(d: MailData, l: MailLang, first: boolean) {
   const t = T[l];

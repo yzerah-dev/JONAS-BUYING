@@ -664,7 +664,19 @@ export const CUSTOMS_LABEL: Record<CustomsStatus, string> = { en_cours: 'Dédoua
  * Acceptée : le produit est créé au catalogue (en développement) et ajouté au panier de commande.
  * Enregistrée dans la collection « products » de la base partagée (marquée kind = 'quotation') : mêmes règles d'accès.
  */
-export type QuotationStatus = 'demande' | 'en_attente' | 'acceptee' | 'refusee';
+/** demande : prix attendu du fournisseur · en_attente : à décider par JONAS · negociation : contre-offre JONAS, réponse du fournisseur attendue */
+export type QuotationStatus = 'demande' | 'en_attente' | 'negociation' | 'acceptee' | 'refusee';
+
+/** Un tour de négociation : prix proposé par JONAS ou par le fournisseur */
+export interface QuoteRound {
+  by: 'jonas' | 'fournisseur';
+  price: number;
+  note?: string;
+  at: string;
+  who: string;
+  /** Le fournisseur accepte le prix proposé par JONAS */
+  agreed?: boolean;
+}
 
 export interface Quotation {
   id: string;
@@ -693,6 +705,12 @@ export interface Quotation {
   /** Refus : motif, et qui a refusé (JONAS ou le fournisseur qui décline la demande) */
   reason?: string;
   refusedBy?: 'jonas' | 'fournisseur';
-  /** Produit créé à l'acceptation */
+  /** Produit créé (ou mis à jour) à l'acceptation */
   productId?: string;
+  /** Demande de prix lancée depuis une fiche produit du catalogue */
+  sourceProductId?: string;
+  /** Quantité envisagée (pièces), pour que le fournisseur chiffre au bon volume */
+  qty?: number;
+  /** Historique des prix : réponse du fournisseur, contre-offres JONAS, nouveaux prix */
+  rounds?: QuoteRound[];
 }

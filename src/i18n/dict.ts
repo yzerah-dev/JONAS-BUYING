@@ -808,6 +808,18 @@ export const fr = {
   'q.sentOn': 'Envoyée le {d}',
   'q.yourPrice': 'Votre prix',
   'q.bad': 'Désignation et prix obligatoires',
+  'q.status.negociation': 'En négociation',
+  'q.counter': 'Contre-offre JONAS : {p}',
+  'q.acceptCounter': 'Accepter {p}',
+  'q.propose': 'Proposer ce prix',
+  'q.newPrice': 'Autre prix ({c})',
+  'q.history': 'Négociation',
+  'q.by.jonas': 'JONAS',
+  'q.by.fournisseur': 'Fournisseur',
+  'q.qty': 'Quantité : {n} pcs',
+  'q.agreed': 'prix accepté',
+  'q.counterOk': 'Contre-offre acceptée : JONAS confirme la commande',
+  'q.product': 'Produit {ref}',
 };
 
 export type Key = keyof typeof fr;
@@ -1597,6 +1609,18 @@ export const en: Record<Key, string> = {
   'q.sentOn': 'Sent on {d}',
   'q.yourPrice': 'Your price',
   'q.bad': 'Description and price are required',
+  'q.status.negociation': 'Negotiating',
+  'q.counter': 'JONAS counter-offer: {p}',
+  'q.acceptCounter': 'Accept {p}',
+  'q.propose': 'Propose this price',
+  'q.newPrice': 'Other price ({c})',
+  'q.history': 'Negotiation',
+  'q.by.jonas': 'JONAS',
+  'q.by.fournisseur': 'Supplier',
+  'q.qty': 'Quantity: {n} pcs',
+  'q.agreed': 'price accepted',
+  'q.counterOk': 'Counter-offer accepted: JONAS will confirm the order',
+  'q.product': 'Product {ref}',
 };
 
 /**

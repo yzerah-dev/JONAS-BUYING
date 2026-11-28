@@ -775,6 +775,18 @@ export const zh: Record<Key, string> = {
   'q.sentOn': '{d} 发送',
   'q.yourPrice': '您的报价',
   'q.bad': '品名和价格为必填项',
+  'q.status.negociation': '议价中',
+  'q.counter': 'JONAS 还价：{p}',
+  'q.acceptCounter': '接受 {p}',
+  'q.propose': '提交新价格',
+  'q.newPrice': '其他价格（{c}）',
+  'q.history': '议价记录',
+  'q.by.jonas': 'JONAS',
+  'q.by.fournisseur': '供应商',
+  'q.qty': '数量：{n} 件',
+  'q.agreed': '已接受价格',
+  'q.counterOk': '已接受还价：等待 JONAS 确认订单',
+  'q.product': '产品 {ref}',
 };
 
 /** Valeurs issues des données (français) traduites en chinois */

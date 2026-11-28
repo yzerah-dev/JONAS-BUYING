@@ -1,6 +1,6 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { ImagePlus, X } from 'lucide-react';
-import { byId, useStore } from '../data/store';
+import { byId, lastCounter, useStore } from '../data/store';
 import type { ProductPhoto, Quotation } from '../data/types';
 import { newFileId, putBlob } from '../lib/files';
 import { PHOTO_ACCEPT, photoProblem } from '../lib/productPhotos';
@@ -11,7 +11,12 @@ import { ProductPic, SupplierLogo } from './ui';
 import { toast } from './ui-shared';
 
 /** Couleur du statut d'une offre */
-const QUOTE_COLOR: Record<Quotation['status'], string> = { demande: '#e0701a', en_attente: '#1d6fd8', acceptee: '#1a9a3e', refusee: '#8a94a6' };
+// Orange = à vous d'agir, bleu = en attente de l'autre partie (le point de vue change entre JONAS et le portail)
+const ACTION = '#e0701a';
+const WAITING = '#2f6fed';
+const QUOTE_COLOR: Record<Quotation['status'], string> = { demande: WAITING, en_attente: ACTION, negociation: WAITING, acceptee: '#12896c', refusee: '#8a94a6' };
+const colorOf = (status: Quotation['status'], portal: boolean) =>
+  portal && (status === 'demande' || status === 'negociation') ? ACTION : portal && status === 'en_attente' ? WAITING : QUOTE_COLOR[status];
 
 function Thumb({ photo, onRemove, label }: { photo: ProductPhoto; onRemove?: () => void; label: string }) {
   const url = useBlobUrl(photo.fileId);
@@ -80,11 +85,14 @@ export function QuoteCard({ q, showSupplier = true, best, children }: { q: Quota
   const [photo, ...more] = q.photos;
   const [big, setBig] = useState<ProductPhoto | undefined>();
   const shown = big ?? photo;
+  // Réf. JONAS du produit d'origine : seulement s'il est chez ce même fournisseur (un autre fournisseur ne voit pas notre catalogue)
+  const src = q.sourceProductId ? state.products.find((p) => p.id === q.sourceProductId && p.supplierId === q.supplierId) : undefined;
+  const counter = lastCounter(q);
   return (
     <div className={`card qt-card qt-${q.status}`} data-testid={`quote-${q.id}`}>
       <div className="qt-hero">
         <ProductPic product={{ emoji: q.emoji ?? '📦', photo: shown, name: q.name }} />
-        <span className="qt-status" style={{ background: QUOTE_COLOR[q.status] }}>
+        <span className="qt-status" style={{ background: colorOf(q.status, !showSupplier) }}>
           {q.status === 'refusee' && q.refusedBy === 'fournisseur' ? t('q.declinedBySupplier') : t(`q.status.${q.status}`)}
         </span>
         {best && <span className="qt-best">★ Meilleur prix</span>}
@@ -115,7 +123,35 @@ export function QuoteCard({ q, showSupplier = true, best, children }: { q: Quota
           {' · '}
           {q.origin === 'rfq' ? t('q.requestedOn', { d: fmt.fdate(q.createdAt.slice(0, 10)) }) : t('q.sentOn', { d: fmt.fdate(q.createdAt.slice(0, 10)) })}
         </div>
+        {(!!q.qty || src) && (
+          <div className="qt-meta small">
+            {!!q.qty && <b>{t('q.qty', { n: fmt.num(q.qty) })}</b>}
+            {!!q.qty && src && ' · '}
+            {src && <span className="ref-tag">{t('q.product', { ref: src.ref })}</span>}
+          </div>
+        )}
         {q.note && <div className="qt-note small">{q.note}</div>}
+        {!!q.rounds?.length && (q.rounds.length > 1 || q.rounds[0].by === 'jonas') && (
+          <div className="qt-rounds" aria-label={t('q.history')}>
+            {q.rounds.map((r, i) => [
+              i > 0 && (
+                <span key={`a${i}`} className="qt-arrow" aria-hidden>
+                  →
+                </span>
+              ),
+              <span key={i} className={`qt-round ${r.by}`} title={`${r.who} · ${fmt.fdate(r.at.slice(0, 10))}${r.note ? ` · ${r.note}` : ''}`}>
+                <small>{t(`q.by.${r.by}`)}</small> {money(r.price, q.currency)}
+                {r.agreed && <em> ✓ {t('q.agreed')}</em>}
+              </span>,
+            ])}
+          </div>
+        )}
+        {q.status === 'negociation' && counter && (
+          <div className="qt-counter">
+            {t('q.counter', { p: money(counter.price, q.currency) })}
+            {counter.note ? ` · ${counter.note}` : ''}
+          </div>
+        )}
         {q.reason && <div className="qt-note small">{t('q.reason', { r: q.reason })}</div>}
         {q.status === 'acceptee' && q.productId && (
           <div className="small" style={{ color: QUOTE_COLOR.acceptee, fontWeight: 600 }}>

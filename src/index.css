@@ -2631,3 +2631,13 @@ tr.pf-moving td, .pf-line.pf-moving { background: #fff6e8 !important; outline: 2
 .qt-sup-pick { display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px 5px 6px; border-radius: 999px; border: 1px solid var(--line); background: #fff; font-weight: 600; cursor: pointer; }
 .qt-sup-pick small { color: var(--ink-2); font-weight: 500; }
 .qt-sup-pick.on { border-color: var(--green); background: var(--green-soft); color: var(--green-dark); }
+.qt-rounds { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.qt-round { display: inline-flex; align-items: baseline; gap: 5px; padding: 3px 9px; border-radius: 999px; font-size: 13px; font-weight: 700; background: #f2f5f4; }
+.qt-round small { font-size: 11px; font-weight: 600; color: var(--muted); }
+.qt-round.jonas { background: var(--green-soft); color: var(--green-dark); }
+.qt-round em { font-style: normal; font-size: 11px; }
+.qt-arrow { color: var(--muted); font-size: 13px; }
+.qt-counter { background: #fff1e0; color: #b45309; border-radius: 8px; padding: 6px 9px; font-weight: 700; font-size: 14px; }
+.qt-sup-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+.qt-sup-tools .input { flex: 1 1 200px; }
+.qt-sup-pick small.qt-why { color: var(--green-dark); }
