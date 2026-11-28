@@ -62,6 +62,7 @@ import type { Container, Product, Proforma, ProformaStatus } from '../data/types
 import { BrandLogo, ProductPic, ContainerStatusPill, PackPill, Pill, ProductThumb, ProformaStatusPill, Progress, Ring, Seg, SupplierLogo, Tabs } from '../components/ui';
 import { designerColor, toast } from '../components/ui-shared';
 import AssignDesigner from '../components/AssignDesigner';
+import AddProformaLines from '../components/AddProformaLines';
 import LoadingPlanButtons from '../components/LoadingPlanButtons';
 import { BookingRequestButton } from '../components/BookingDialog';
 import BookingReview, { LastRejection } from '../components/BookingReview';
@@ -351,6 +352,7 @@ function ProductsTab({ pf, state, mode }: { pf: Proforma; state: State; mode: 'g
           { id: 'ok', label: `Pack OK (${all.filter(({ p }) => match('ok', p)).length})` },
         ]}
       />
+      <AddProformaLines pf={pf} />
       {canAssign && rows.length > 0 && (
         <label className="row small" style={{ gap: 6, marginLeft: 'auto', cursor: 'pointer' }}>
           <input

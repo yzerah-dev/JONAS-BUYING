@@ -167,6 +167,8 @@ export type Action =
   | { type: 'restoreProforma'; id: string }
   /** Annuler un produit d'une proforma pas encore signée (et le rétablir) */
   | { type: 'cancelLine'; id: string; productId: string; reason?: string }
+  /** Proforma pas encore signée : ajout de produits (existants du fournisseur ou nouveaux) */
+  | { type: 'addProformaLines'; id: string; lines: ImportLine[] }
   | { type: 'restoreLine'; id: string; productId: string }
   | { type: 'deleteProforma'; id: string }
   | { type: 'requestSplit'; id: string; lines: { productId: string; qtyNow: number }[]; etdLater: ISODate; reason: string }
@@ -569,6 +571,10 @@ export function isAllowed(s: State, a: Action): boolean {
       // Le dernier produit ne s'annule pas seul : on annule alors la proforma
       const pf = s.proformas.find((x) => x.id === a.id);
       return !!pf && canCancelLines(u, pf) && pf.lines.length > 1 && pf.lines.some((l) => l.productId === a.productId);
+    }
+    case 'addProformaLines': {
+      const pf = s.proformas.find((x) => x.id === a.id);
+      return !!pf && canCancelLines(u, pf) && pf.status === 'a_signer' && a.lines.length > 0 && importLinesOk(s, pf.supplierId, a.lines);
     }
     case 'restoreLine': {
       const pf = s.proformas.find((x) => x.id === a.id);
@@ -1418,6 +1424,33 @@ function applyAction(s: State, a: Action): State {
           lines: pf.lines.filter((l) => l.productId !== a.productId),
           cancelledLines: [...(pf.cancelledLines ?? []).filter((l) => l.productId !== a.productId), { ...line, at: nowStamp(), by: me, reason }],
           history: [...pf.history, hist(me, `Produit ${ref} annulé (${line.qty} pcs)${reason ? ` : ${reason}` : ''}`)],
+        };
+      });
+    }
+    case 'addProformaLines': {
+      const pf0 = s.proformas.find((x) => x.id === a.id)!;
+      const cur = pf0.currency ?? supplierTerms(s, pf0.supplierId).currency;
+      const mat = materializeLines(s, pf0.supplierId, a.lines, pf0.etd, fxRate(s, cur), cur, pf0.id);
+      const next = { ...s, products: withMaterialized(s.products, mat) };
+      const refOf = (id: string) => next.products.find((p) => p.id === id)?.ref ?? id;
+      return mapPF(next, a.id, (pf) => {
+        // Produit déjà sur la proforma : quantité ajoutée, prix mis à jour ; produit annulé : il revient
+        const lines = pf.lines.map((l) => ({ ...l }));
+        for (const nl of mat.lines) {
+          const ex = lines.find((l) => l.productId === nl.productId);
+          if (ex) Object.assign(ex, { qty: ex.qty + nl.qty, price: nl.price });
+          else lines.push(nl);
+        }
+        const added = mat.lines.map((l) => `${refOf(l.productId)} (${l.qty} pcs)`).join(', ');
+        return {
+          ...pf,
+          lines,
+          cancelledLines: pf.cancelledLines?.filter((c) => !mat.lines.some((l) => l.productId === c.productId)),
+          history: [
+            ...pf.history,
+            hist(me, `Produit(s) ajouté(s) : ${added}`),
+            ...(mat.created.length ? [hist(me, `${mat.created.length} produit(s) créé(s) : ${mat.created.map((p) => p.ref).join(', ')}`)] : []),
+          ],
         };
       });
     }
@@ -2287,6 +2320,8 @@ function describe(s: State, a: Action): { target?: string; text: string } | null
       return { target: a.id, text: `Proforma annulée : ${a.reason.trim()}` };
     case 'restoreProforma':
       return { target: a.id, text: 'Proforma rétablie' };
+    case 'addProformaLines':
+      return { target: a.id, text: `${a.id} : ${a.lines.length} produit(s) ajouté(s)` };
     case 'cancelLine':
       return { target: a.id, text: `Produit ${ref(a.productId)} annulé sur la proforma${a.reason?.trim() ? ` : ${a.reason.trim()}` : ''}` };
     case 'restoreLine':
