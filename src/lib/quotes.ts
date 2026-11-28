@@ -28,7 +28,21 @@ export interface QuoteRequest {
   last: string;
 }
 
-export const requestKey = (q: Quotation) => q.group ?? q.id;
+/**
+ * Un produit = une carte et une fiche : toutes les demandes et offres d'un même produit sont regroupées
+ * (produit du catalogue, sinon même désignation), quel que soit le nombre de demandes envoyées.
+ */
+export const requestKey = (q: Quotation) =>
+  q.sourceProductId
+    ? `P-${q.sourceProductId}`
+    : `N-${
+        q.name
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-|-$/g, '') || q.id
+      }`;
 const activity = (q: Quotation) => [q.createdAt, q.answeredAt ?? '', q.decidedAt ?? '', ...(q.rounds ?? []).map((r) => r.at)].sort().pop()!;
 export const isClosed = (q: Quotation) => q.status === 'acceptee' || q.status === 'refusee';
 

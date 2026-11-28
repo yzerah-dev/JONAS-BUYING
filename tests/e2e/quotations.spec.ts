@@ -245,3 +245,40 @@ test('catalogue : plusieurs produits sélectionnés, une demande de prix groupé
   await expect(page.locator('.qtg-card')).toHaveCount(4);
   await expect(page.getByRole('link', { name: /Offres Tong femme paillettes/ })).toContainText('0 / 2 réponse(s)');
 });
+
+test('même produit demandé plusieurs fois (fournisseurs différents) : une seule carte et une seule fiche', async ({ page }) => {
+  await resetApp(page);
+  await loginAs(page, 'David');
+  // 1re demande depuis la fiche produit : Tide + Jinfa
+  await go(page, 'produits/CP-T001');
+  await page.getByRole('button', { name: 'Demander un prix' }).click();
+  let dlg = page.getByRole('dialog', { name: 'Demande de prix' });
+  await dlg.getByRole('button', { name: /Tide Living/ }).click();
+  await dlg.getByRole('button', { name: /Jinfa Shoes/ }).click();
+  await dlg.getByRole('button', { name: 'Envoyer la demande' }).click();
+  await toast(page, /envoyée à 2 fournisseur/);
+  // 2e demande plus tard : Wenzhou Tex seul
+  await page.getByRole('button', { name: 'Demander un prix' }).click();
+  dlg = page.getByRole('dialog', { name: 'Demande de prix' });
+  await dlg.getByRole('button', { name: /Wenzhou Tex/ }).click();
+  await dlg.getByRole('button', { name: 'Envoyer la demande' }).click();
+  await toast(page, /envoyée à 1 fournisseur/);
+  // Saisie manuelle avec la même désignation qu'une demande existante : même carte
+  await go(page, 'offres');
+  await page.getByRole('button', { name: 'Demande de prix' }).click();
+  dlg = page.getByRole('dialog', { name: 'Demande de prix' });
+  await dlg.getByLabel('Désignation').fill('Coussin extérieur déperlant 45 × 45');
+  await dlg.getByLabel('Rayon').selectOption('');
+  await dlg.getByRole('button', { name: /Northbay/ }).click();
+  await dlg.getByRole('button', { name: 'Envoyer la demande' }).click();
+
+  await expect(page.locator('.qtg-card')).toHaveCount(3);
+  await expect(page.getByRole('link', { name: /Offres Tong femme paillettes/ })).toContainText('0 / 3 réponse(s)');
+  await expect(page.getByRole('link', { name: /Offres Coussin extérieur/ })).toContainText('1 / 3 réponse(s)');
+  await page.getByRole('link', { name: /Offres Tong femme paillettes/ }).click();
+  await expect(page.locator('.qt-card')).toHaveCount(3);
+  await expect(page.locator('.qtt-row:not(.qtt-th)')).toHaveCount(3);
+  // Suivi des prix : une seule ligne-produit
+  await go(page, 'offres?mode=suivi');
+  await expect(page.getByRole('region', { name: /Suivi des prix Tong femme paillettes/ })).toHaveCount(1);
+});

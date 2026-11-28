@@ -92,7 +92,7 @@ export default function Quotations() {
           {!shown.length && <div className="card empty">Aucune demande de prix en cours.</div>}
           <div className="qtg-grid">
             {shown.map((r) => {
-              const head = r.quotes[0];
+              const head = r.quotes.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
               const s = requestSummary(r.quotes);
               return (
                 <Link key={r.key} to={`/offres/${encodeURIComponent(r.key)}`} className="card qtg-card" aria-label={`Offres ${head.name}`}>

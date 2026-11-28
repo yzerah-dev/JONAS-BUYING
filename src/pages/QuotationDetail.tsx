@@ -1,4 +1,4 @@
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, FileQuestion } from 'lucide-react';
 import { useState } from 'react';
 import { canQuote, currentUser, useStore } from '../data/store';
@@ -14,8 +14,13 @@ export default function QuotationDetail() {
   const navigate = useNavigate();
   const [rfq, setRfq] = useState(false);
   const quotes = state.quotations.filter((q) => requestKey(q) === key);
-  if (!quotes.length) return <div className="card empty">Demande introuvable.</div>;
-  const head = quotes[0];
+  if (!quotes.length) {
+    // Ancien lien (numéro de demande ou d'offre) : on ouvre la fiche du produit concerné
+    const old = state.quotations.find((q) => q.group === key || q.id === key);
+    return old ? <Navigate to={`/offres/${encodeURIComponent(requestKey(old))}`} replace /> : <div className="card empty">Demande introuvable.</div>;
+  }
+  // En-tête : la demande la plus récente (quantité, prix cible)
+  const head = quotes.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
   const s = requestSummary(quotes);
   const src = head.sourceProductId ? state.products.find((p) => p.id === head.sourceProductId) : undefined;
   const sorted = quotes.slice().sort((a, b) => (a.price ?? Infinity) - (b.price ?? Infinity));

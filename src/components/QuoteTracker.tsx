@@ -2,6 +2,7 @@ import { Fragment, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Check, X } from 'lucide-react';
 import { CounterInline } from './QuoteDialogs';
+import { requestKey } from '../lib/quotes';
 import { byId, useStore } from '../data/store';
 import type { Quotation } from '../data/types';
 import { dec, fdate, money } from '../lib/format';
@@ -53,7 +54,7 @@ export function QuoteTracker({
   const [closedBox, setClosed] = useState(false);
   const closed = showClosed ?? closedBox;
   const byKey = new Map<string, Quotation[]>();
-  for (const q of quotes) byKey.set(q.group ?? q.id, [...(byKey.get(q.group ?? q.id) ?? []), q]);
+  for (const q of quotes) byKey.set(requestKey(q), [...(byKey.get(requestKey(q)) ?? []), q]);
   const activity = (q: Quotation) => [q.createdAt, q.answeredAt ?? '', q.decidedAt ?? '', ...(q.rounds ?? []).map((r) => r.at)].sort().pop()!;
   const requests: Request[] = [...byKey.entries()]
     .map(([key, list]) => ({ key, quotes: list, last: list.map(activity).sort().pop()! }))
@@ -70,7 +71,7 @@ export function QuoteTracker({
       )}
       {!requests.length && <div className="card empty">Aucune demande de prix en cours.</div>}
       {requests.map((r) => {
-        const head = r.quotes[0];
+        const head = r.quotes.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
         const priced = r.quotes.filter((q) => q.price && q.status !== 'refusee');
         const best = priced.length > 1 ? priced.reduce((m, q) => (q.price! < m.price! ? q : m)) : undefined;
         const answered = r.quotes.filter((q) => q.status !== 'demande').length;
