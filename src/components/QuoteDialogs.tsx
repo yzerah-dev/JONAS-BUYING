@@ -174,47 +174,44 @@ export function RfqDialog({ product, onClose }: { product?: Product; onClose: ()
   );
 }
 
-/** Négocier : contre-offre de prix envoyée au fournisseur, qui accepte, propose un autre prix ou décline */
-export function CounterDialog({ q, onClose }: { q: Quotation; onClose: () => void }) {
+/**
+ * Contre-offre en ligne : on tape le prix dans le cadre, puis « Contre-offre » (Entrée marche aussi).
+ * L'écart avec le prix du fournisseur s'affiche pendant la saisie ; en négociation, la dernière contre-offre est remplacée.
+ */
+export function CounterInline({ q, compact }: { q: Quotation; compact?: boolean }) {
   const { dispatch } = useStore();
-  const [price, setPrice] = useState(q.targetPrice ? String(q.targetPrice).replace('.', ',') : '');
-  const [note, setNote] = useState('');
+  const [price, setPrice] = useState('');
   const p = parsePrice(price);
+  const gap = p && q.price ? (p / q.price - 1) * 100 : undefined;
+  const send = () => {
+    if (!p) return;
+    dispatch({ type: 'counterQuote', id: q.id, price: p });
+    toast(`Contre-offre envoyée : ${money(p, q.currency)}`);
+    setPrice('');
+  };
   return (
-    <Dialog
-      title="Contre-offre"
-      sub={`${q.name} · prix du fournisseur ${money(q.price ?? 0, q.currency)}${q.status === 'negociation' ? ' · votre dernière contre-offre est remplacée' : ''}`}
-      onClose={onClose}
-      foot={
-        <>
-          <span>{p && q.price ? `${p < q.price ? '−' : '+'}${dec(Math.abs((1 - p / q.price) * 100), 1)} %` : ''}</span>
-          <button type="button" className="btn ghost" onClick={onClose}>
-            Annuler
-          </button>
-          <button
-            type="button"
-            className="btn primary"
-            disabled={!p}
-            onClick={() => {
-              dispatch({ type: 'counterQuote', id: q.id, price: p, note });
-              toast(`Contre-offre envoyée : ${money(p, q.currency)}`);
-              onClose();
-            }}
-          >
-            <Handshake size={16} /> Envoyer la contre-offre
-          </button>
-        </>
-      }
-    >
-      <label>
-        <span>Votre prix ({q.currency} / pièce)</span>
-        <input className="input" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} autoFocus />
-      </label>
-      <label>
-        <span>Message (facultatif)</span>
-        <input className="input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="ex. pour 5 000 pcs" />
-      </label>
-    </Dialog>
+    <span className={`qt-counter-in ${compact ? 'compact' : ''}`}>
+      <span className="qt-counter-field">
+        <input
+          className="qt-price-in"
+          inputMode="decimal"
+          placeholder={`Prix ${q.currency}`}
+          aria-label={`Contre-offre ${q.name}`}
+          value={price}
+          onChange={(e) => setPrice(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && send()}
+        />
+        {gap !== undefined && (
+          <small className={gap < 0 ? 'qtt-down' : 'qtt-up'}>
+            {gap < 0 ? '−' : '+'}
+            {dec(Math.abs(gap), 1)} %
+          </small>
+        )}
+      </span>
+      <button type="button" className={`btn ${compact ? 'sm' : ''}`} disabled={!p} onClick={send}>
+        <Handshake size={compact ? 14 : 16} /> Contre-offre
+      </button>
+    </span>
   );
 }
 

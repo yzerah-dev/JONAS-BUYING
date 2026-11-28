@@ -1,6 +1,7 @@
 import { Fragment, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Check, Handshake, X } from 'lucide-react';
+import { Check, X } from 'lucide-react';
+import { CounterInline } from './QuoteDialogs';
 import { byId, useStore } from '../data/store';
 import type { Quotation } from '../data/types';
 import { dec, fdate, money } from '../lib/format';
@@ -33,7 +34,6 @@ interface Request {
  */
 export function QuoteTracker({
   quotes,
-  onCounter,
   onAccept,
   onRefuse,
   allowed,
@@ -41,7 +41,6 @@ export function QuoteTracker({
   bare,
 }: {
   quotes: Quotation[];
-  onCounter: (q: Quotation) => void;
   onAccept: (q: Quotation) => void;
   onRefuse: (q: Quotation) => void;
   allowed: boolean;
@@ -145,11 +144,7 @@ export function QuoteTracker({
                         {gap === undefined ? '—' : `${gap > 0 ? '+' : '−'}${dec(Math.abs(gap), 1)} %`}
                       </span>
                       <span className="qtt-act" role="cell">
-                        {allowed && (q.status === 'en_attente' || q.status === 'negociation') && (
-                          <button type="button" className="btn sm" onClick={() => onCounter(q)} aria-label={`Contre-offre ${sup.shortName}`}>
-                            <Handshake size={14} /> Contre-offre
-                          </button>
-                        )}
+                        {allowed && (q.status === 'en_attente' || q.status === 'negociation') && <CounterInline q={q} compact />}
                         {allowed && q.status === 'en_attente' && (
                           <button type="button" className="btn sm primary" onClick={() => onAccept(q)} aria-label={`Accepter ${sup.shortName}`}>
                             <Check size={14} /> Accepter

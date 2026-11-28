@@ -1,28 +1,26 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Check, Handshake, Trash2, X } from 'lucide-react';
+import { Check, Trash2, X } from 'lucide-react';
 import { canQuote, currentUser, useStore } from '../data/store';
 import type { Quotation } from '../data/types';
 import { bestQuote, parsePrice, requestKey } from '../lib/quotes';
 import { useBlobUrl } from '../lib/blobUrl';
 import { QuoteCard } from './Quotations';
-import { AcceptDialog, CounterDialog, RefuseDialog } from './QuoteDialogs';
+import { AcceptDialog, CounterInline, RefuseDialog } from './QuoteDialogs';
 import { QuoteTracker } from './QuoteTracker';
 import { toast } from './ui-shared';
 
-/** Fenêtres Accepter / Contre-offre / Refuser, partagées par le tableau de suivi et les cartes */
+/** Fenêtres Accepter / Refuser, partagées par le tableau de suivi et les cartes */
 function useQuoteDialogs() {
   const [accepting, setAccepting] = useState<Quotation | null>(null);
   const [refusing, setRefusing] = useState<Quotation | null>(null);
-  const [countering, setCountering] = useState<Quotation | null>(null);
   const dialogs = (
     <>
       {accepting && <AcceptDialog q={accepting} onClose={() => setAccepting(null)} />}
       {refusing && <RefuseDialog q={refusing} onClose={() => setRefusing(null)} />}
-      {countering && <CounterDialog q={countering} onClose={() => setCountering(null)} />}
     </>
   );
-  return { onAccept: setAccepting, onRefuse: setRefusing, onCounter: setCountering, dialogs };
+  return { onAccept: setAccepting, onRefuse: setRefusing, dialogs };
 }
 
 /** Tableau de suivi des prix avec ses actions */
@@ -31,7 +29,7 @@ export function QuoteTrackerWithActions({ quotes, showClosed, bare }: { quotes: 
   const d = useQuoteDialogs();
   return (
     <>
-      <QuoteTracker quotes={quotes} allowed={canQuote(currentUser(state))} onAccept={d.onAccept} onRefuse={d.onRefuse} onCounter={d.onCounter} showClosed={showClosed} bare={bare} />
+      <QuoteTracker quotes={quotes} allowed={canQuote(currentUser(state))} onAccept={d.onAccept} onRefuse={d.onRefuse} showClosed={showClosed} bare={bare} />
       {d.dialogs}
     </>
   );
@@ -60,25 +58,19 @@ export function QuoteCardGrid({ quotes, back }: { quotes: Quotation[]; back: str
                 <button type="button" className="btn primary" onClick={() => d.onAccept(q)}>
                   <Check size={16} /> Accepter
                 </button>
-                <button type="button" className="btn" onClick={() => d.onCounter(q)}>
-                  <Handshake size={16} /> Contre-offre
-                </button>
                 <button type="button" className="btn ghost" onClick={() => d.onRefuse(q)}>
                   <X size={16} /> Refuser
                 </button>
+                <CounterInline q={q} />
               </>
             )}
-            {allowed && q.status === 'negociation' && (
-              <button type="button" className="btn" onClick={() => d.onCounter(q)}>
-                <Handshake size={16} /> Nouvelle contre-offre
-              </button>
-            )}
+            {allowed && q.status === 'negociation' && <CounterInline q={q} />}
             {allowed && (q.status === 'demande' || q.status === 'negociation') && (
               <>
                 <input
                   className="qt-price-in"
                   inputMode="decimal"
-                  placeholder={`Prix reçu (${q.currency})`}
+                  placeholder={`Prix reçu du fournisseur (${q.currency})`}
                   aria-label={`Prix reçu ${q.name}`}
                   value={pricing[q.id] ?? ''}
                   onChange={(e) => setPricing({ ...pricing, [q.id]: e.target.value })}

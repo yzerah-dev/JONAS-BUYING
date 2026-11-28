@@ -112,11 +112,11 @@ test('demande de prix depuis une fiche produit, négociation (contre-offre accep
   await loginAs(page, 'David');
   await go(page, 'offres?mode=cartes');
   const offer = page.locator('.qt-card', { hasText: 'Tong femme paillettes' });
+  // Contre-offre directement sur la carte : prix tapé dans le cadre (écart affiché), puis « Contre-offre »
+  await expect(offer.getByRole('button', { name: 'Contre-offre' })).toBeDisabled();
+  await offer.getByLabel(/^Contre-offre /).fill('2,50');
+  await expect(offer.locator('.qt-counter-field')).toContainText('−10,7 %');
   await offer.getByRole('button', { name: 'Contre-offre' }).click();
-  const nego = page.getByRole('dialog', { name: 'Contre-offre' });
-  await nego.getByLabel(/Votre prix/).fill('2,50');
-  await expect(nego.locator('.rc-foot')).toContainText('−10,7 %');
-  await nego.getByRole('button', { name: 'Envoyer la contre-offre' }).click();
   await toast(page, /Contre-offre envoyée/);
   await page.getByRole('button', { name: /Chez le fournisseur/ }).click();
   await expect(page.locator('.qt-card', { hasText: 'Tong femme paillettes' }).first()).toBeVisible();
@@ -156,16 +156,13 @@ test('suivi des prix reçus : tableau par demande, contre-offre depuis le tablea
   await expect(req.getByTestId('track-Q-DEMO-3')).toContainText('En attente de réponse');
   // Contre-offre sur l'offre spontanée Tide, depuis le tableau
   const spont = page.getByTestId('track-Q-DEMO-1');
-  await spont.getByRole('button', { name: /Contre-offre/ }).click();
-  const dlg = page.getByRole('dialog', { name: 'Contre-offre' });
-  await dlg.getByLabel(/Votre prix/).fill('1,60');
-  await dlg.getByRole('button', { name: 'Envoyer la contre-offre' }).click();
+  await spont.getByLabel(/^Contre-offre /).fill('1,60');
+  await spont.getByRole('button', { name: 'Contre-offre' }).click();
   await expect(spont).toContainText('Contre-offre envoyée');
   await expect(spont.locator('.qt-round')).toHaveCount(2);
   // Nouvelle contre-offre possible pendant la négociation
-  await spont.getByRole('button', { name: /Contre-offre/ }).click();
-  await dlg.getByLabel(/Votre prix/).fill('1,70');
-  await dlg.getByRole('button', { name: 'Envoyer la contre-offre' }).click();
+  await spont.getByLabel(/^Contre-offre /).fill('1,70');
+  await spont.getByLabel(/^Contre-offre /).press('Enter');
   await expect(spont.locator('.qt-round')).toHaveCount(3);
 
   // Portail : « Demandes de quotation » (demandes JONAS) et « Mes offres » (contre-offre sur son offre spontanée)

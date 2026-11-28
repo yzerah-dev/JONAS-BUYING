@@ -2649,7 +2649,7 @@ tr.pf-moving td, .pf-line.pf-moving { background: #fff6e8 !important; outline: 2
 .qtt-pic { width: 52px; height: 52px; border-radius: 10px; background: #fff; display: grid; place-items: center; font-size: 28px; overflow: hidden; flex-shrink: 0; border: 1px solid var(--line); }
 .qtt-pic img { width: 100%; height: 100%; object-fit: cover; }
 .qtt-name { font-size: 17px; }
-.qtt-row { display: grid; grid-template-columns: minmax(150px, 1.1fr) 150px minmax(220px, 2.2fr) 120px 80px minmax(200px, auto); gap: 12px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+.qtt-row { display: grid; grid-template-columns: minmax(150px, 1.1fr) 150px minmax(200px, 2fr) 110px 70px minmax(340px, auto); gap: 12px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--line); }
 .qtt-row:last-child { border-bottom: 0; }
 .qtt-th { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; padding-top: 8px; padding-bottom: 8px; }
 .qtt-row.refusee { opacity: 0.55; }
@@ -2683,3 +2683,12 @@ tr.pf-moving td, .pf-line.pf-moving { background: #fff6e8 !important; outline: 2
 .qtd-pic img { width: 100%; height: 100%; object-fit: contain; background: #fff; }
 .qtd-name { font-size: 24px; color: var(--green-dark); }
 .qtd-h { margin: 18px 0 10px; font-size: 17px; }
+/* Contre-offre en ligne : cadre prix + bouton */
+.qt-counter-in { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.qt-counter-field { position: relative; display: inline-flex; align-items: center; }
+.qt-counter-field small { position: absolute; right: 8px; font-size: 11px; pointer-events: none; }
+.qt-counter-in.compact .qt-price-in { width: 130px; height: 32px; font-size: 13px; padding-right: 48px; }
+.qt-counter-in:not(.compact) .qt-price-in { padding-right: 56px; }
+.qt-actions .qt-counter-in { flex: 1 1 100%; flex-wrap: nowrap; }
+.qt-actions .qt-counter-field { flex: 1 1 auto; }
+.qt-actions .qt-counter-field .qt-price-in { width: 100%; }
